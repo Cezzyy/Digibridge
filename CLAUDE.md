@@ -12,7 +12,7 @@ DigiBridge is a web app that measures the digital literacy of ACLC College of Ma
 
 ## Status
 
-Stage 0 scaffold. Workspaces, TypeScript, ESLint and Prettier are set up. `pnpm dev` serves a placeholder Vue page at http://localhost:5173 and the API at http://localhost:8787: an `OpenAPIHono` app with one route, `GET /api/v1/health`, the spec at `/api/openapi.json` and the docs page at http://localhost:8787/api/reference. Other folders hold a placeholder `index.ts`.
+Stage 0 scaffold. Workspaces, TypeScript, ESLint, Prettier, a Husky pre-commit hook and GitHub Actions CI are set up. `pnpm dev` serves a placeholder Vue page at http://localhost:5173 and the API at http://localhost:8787: an `OpenAPIHono` app with one route, `GET /api/v1/health`, the spec at `/api/openapi.json` and the docs page at http://localhost:8787/api/reference. Other folders hold a placeholder `index.ts`.
 
 ## Commands
 
@@ -35,7 +35,7 @@ pnpm --filter <name> <script>                 # one package: web, api, @digibrid
 | `packages/shared` | Zod enums, option lists and scoring constants used by web and api         |
 | `packages/config` | Shared ESLint rules (`eslint/`), used by the root `eslint.config.ts`      |
 
-At the root: `tsconfig.base.json` (shared TypeScript settings; every package's `tsconfig.json` extends it with `../../tsconfig.base.json`), `eslint.config.ts` (one lint config for the repo, rules from `packages/config`), `.prettierrc`, `turbo.json`, and `pnpm-workspace.yaml` (workspaces and the version catalog).
+At the root: `tsconfig.base.json` (shared TypeScript settings; every package's `tsconfig.json` extends it with `../../tsconfig.base.json`), `eslint.config.ts` (one lint config for the repo, rules from `packages/config`), `.prettierrc`, `turbo.json`, and `pnpm-workspace.yaml` (workspaces and the version catalog). `.husky/pre-commit` runs lint-staged (its config is the `lint-staged` key in the root `package.json`). `.github/workflows/ci.yml` runs on every push to `main` and every pull request: Format, Lint, Typecheck, Test and Build as separate jobs (Turbo cache kept between runs), plus Dependency audit (`pnpm audit --audit-level high`), Secret scan (gitleaks) and Workflow lint (actionlint). Every job installs through `.github/actions/setup`.
 
 ## Rules
 
@@ -61,3 +61,7 @@ At the root: `tsconfig.base.json` (shared TypeScript settings; every package's `
 - API routes live under `/api/v1`; the spec and docs page stay at `/api`. Define each route with `createRoute` in `routes/` and bind it to the `v1` app with `.openapi()` in `app.ts`, so it shows up in `/api/reference`.
 - `api`'s `build` is `wrangler deploy --dry-run --outdir dist`: it bundles the Worker without deploying.
 - `compatibility_date` in `wrangler.toml` can't be later than the installed workerd supports (2026-10-23 for wrangler 4.156).
+- lint-staged 17 needs Node 22.22.1 or newer, which sets the root `engines.node`. Its config lives in `package.json` because lint-staged only loads a `.ts` config when passed `--config`.
+- `pnpm install` runs the root `prepare` script (`husky`), which points Git at `.husky/`. CI sets `HUSKY=0` to skip it.
+- CI uses Node 25 to match local dev. Bump `node-version` in `.github/actions/setup/action.yml` when local Node changes.
+- `pnpm audit` reports one moderate advisory (`minimatch`, pulled in by ESLint, dev only). CI fails only on high or critical ones.

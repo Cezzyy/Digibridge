@@ -20,6 +20,7 @@ It is the working prototype for the study _DigiBridge: Digital Literacy Assessme
 | API      | Hono with Zod and OpenAPI, on Cloudflare Workers                     |
 | Data     | Supabase Postgres, Auth (Google) and Storage, through Drizzle ORM    |
 | Monorepo | Turborepo, pnpm workspaces, TypeScript, ESLint, Prettier             |
+| Checks   | GitHub Actions CI, Husky pre-commit hook with lint-staged            |
 
 ## Repo layout
 
@@ -34,11 +35,13 @@ packages/
 docs/         PRD, TRD and build plan
 tsconfig.base.json   Shared TypeScript settings every package extends
 eslint.config.ts     One lint config for the whole repo
+.github/             CI workflow and its shared setup step
+.husky/              Git hooks (pre-commit)
 ```
 
 ## Getting started
 
-You need Node.js 22.12 or newer and pnpm 12.
+You need Node.js 22.22.1 or newer and pnpm 12.
 
 ```sh
 pnpm install
@@ -48,6 +51,10 @@ pnpm dev
 `pnpm dev` starts the web app at http://localhost:5173 and the API at http://localhost:8787 (API docs at http://localhost:8787/api/reference).
 
 `pnpm check` runs lint, typecheck, tests and build across every package. It must pass before anything is merged into `main`.
+
+`pnpm install` also turns on a pre-commit hook. Before each commit it runs ESLint (with fixes) and Prettier on the files you staged, and stops the commit if ESLint finds an error it can't fix.
+
+On every push to `main` and every pull request, GitHub Actions runs format, lint, typecheck, test and build as separate checks. It also audits dependencies for known security issues, scans new commits for leaked secrets (API keys, tokens) and lints the workflow files.
 
 ## Scripts
 

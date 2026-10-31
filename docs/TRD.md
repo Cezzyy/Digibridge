@@ -35,6 +35,7 @@ TypeScript end to end: a Vue SPA on Cloudflare Pages calls a Hono API on Cloudfl
 | Layer | Choice | Why |
 | --- | --- | --- |
 | Monorepo | Turborepo with pnpm workspaces | One repo, shared types between web and API |
+| Checks | GitHub Actions CI with `pnpm audit`, gitleaks and actionlint; Husky pre-commit hook running lint-staged | Every push to `main` and every pull request runs the ship check, a dependency audit and a secret scan; ESLint and Prettier fix staged files before each commit |
 | Frontend | Vue 3 with the Composition API in `<script setup>`, Vite, TypeScript | Team already knows Vue; logic reused through composables |
 | Routing and state | Vue Router, Pinia | Route guards per role; small stores for session, kiosk and attempt |
 | Styling | Tailwind CSS v4 via `@tailwindcss/vite`, no component library | Full control; design straight in code |
@@ -91,6 +92,10 @@ digibridge/
 │  │  └─ drizzle.config.ts
 │  ├─ shared/                 Zod enums, option lists and scoring constants used by web and api
 │  └─ config/                 shared lint settings, used by the root eslint.config.ts
+├─ .github/
+│  ├─ workflows/ci.yml       CI: checks, dependency audit, secret scan and workflow lint
+│  └─ actions/setup/         shared CI step: pnpm, Node and pnpm install
+├─ .husky/pre-commit          runs lint-staged (config in package.json) before each commit
 ├─ tsconfig.base.json         shared TypeScript settings; every app and package extends it
 ├─ eslint.config.ts           one lint config for the whole repo
 ├─ turbo.json
@@ -387,6 +392,18 @@ Two environments: local for building, production for the pilot and defense. Ther
 ## Testing and QA
 
 The scoring and shuffling logic gets unit tests; everything else is covered by Morales's manual test cases mapped to the PRD requirement IDs.
+
+**Automatic checks**
+
+- **Before each commit:** Husky runs lint-staged on the staged files: `eslint --fix` then Prettier on `.ts` and `.vue` files, Prettier on everything else. A lint error stops the commit. `git commit --no-verify` skips the hook in an emergency; CI still runs.
+- **CI:** `.github/workflows/ci.yml` runs on every push to `main` and every pull request. Each job installs through `.github/actions/setup` (pnpm, Node 25, `pnpm install --frozen-lockfile`) and shows as its own check:
+  - **Format:** `pnpm format:check`.
+  - **Lint, Typecheck, Test, Build:** `pnpm turbo run <task>`, with Turbo's cache kept between runs so unchanged packages are skipped.
+  - **Dependency audit:** `pnpm audit --audit-level high` fails on high or critical advisories.
+  - **Secret scan:** gitleaks checks every new commit for API keys, tokens and passwords.
+  - **Workflow lint:** actionlint checks the workflow files.
+
+  Merge a pull request only when every check is green.
 
 **Unit tests (Vitest, Cez)**
 

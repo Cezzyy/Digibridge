@@ -4,9 +4,10 @@
   "type": "module",
   "packageManager": "pnpm@12.4.1",
   "engines": {
-    "node": ">=22.12"
+    "node": ">=22.22.1"
   },
   "scripts": {
+    "prepare": "husky",
     "dev": "turbo run dev",
     "build": "turbo run build",
     "lint": "turbo run lint",
@@ -16,10 +17,19 @@
     "format": "prettier --write .",
     "format:check": "prettier --check ."
   },
+  "lint-staged": {
+    "*.{ts,vue}": [
+      "eslint --fix --no-warn-ignored",
+      "prettier --write"
+    ],
+    "!(*.{ts,vue})": "prettier --write --ignore-unknown"
+  },
   "devDependencies": {
     "@digibridge/config": "workspace:*",
     "eslint": "catalog:",
+    "husky": "^9.1.7",
     "jiti": "^2.7.0",
+    "lint-staged": "^17.6.0",
     "prettier": "^3.9.10",
     "turbo": "^2.11.10",
     "typescript": "catalog:"
