@@ -1,0 +1,27 @@
+{
+  "name": "digibridge",
+  "private": true,
+  "type": "module",
+  "packageManager": "pnpm@12.4.1",
+  "engines": {
+    "node": ">=22.12"
+  },
+  "scripts": {
+    "dev": "turbo run dev",
+    "build": "turbo run build",
+    "lint": "turbo run lint",
+    "typecheck": "turbo run typecheck",
+    "test": "turbo run test",
+    "check": "turbo run lint typecheck test build",
+    "format": "prettier --write .",
+    "format:check": "prettier --check ."
+  },
+  "devDependencies": {
+    "@digibridge/config": "workspace:*",
+    "eslint": "catalog:",
+    "jiti": "^2.7.0",
+    "prettier": "^3.9.10",
+    "turbo": "^2.11.10",
+    "typescript": "catalog:"
+  }
+}

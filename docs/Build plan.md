@@ -1,0 +1,123 @@
+# DigiBridge build plan
+
+Oct 31, 2026 · @Cornflakesxz
+
+Tick an item when it is merged into `main` and deployed. IDs are the PRD's; file paths are the TRD's.
+
+## Flow
+
+Every feature is built in this order:
+
+1. **Schema** in `packages/db` (only if the feature needs a change): edit, `pnpm db:generate`, `pnpm db:push`.
+2. **Shared types** in `packages/shared`: enums, option lists or constants the web also needs.
+3. **Route contract** in `apps/api/src/routes` with `createRoute`: method, path, middleware, request schema and every response status.
+4. **Handler** in `apps/api/src/handlers`: the logic.
+5. **Bind and mount** the route with its handler in `app.ts`.
+6. **Tests** in `app.test.ts`: one for success, one for a blocked role or bad input.
+7. **Web data composable** using the `hc` client.
+8. **Page and components.**
+9. **Ship check:** `pnpm lint`, `typecheck`, `test` and `build` all pass, then merge.
+
+## Stage 0: Foundation (Oct 31)
+
+Done when you can sign in with Google on the deployed site and `/api/me` answers with your admin profile.
+
+- [ ] **Monorepo:** Turborepo and pnpm workspaces with `apps/web`, `apps/api`, `packages/db`, `packages/shared`, `packages/config`.
+- [ ] **Supabase project:** Google provider on, redirect URLs for `localhost` and the Pages URL, public `media` bucket.
+- [ ] **Full schema** in `packages/db`: all 11 tables and 7 enums from the TRD, the partial unique indexes (one attempt per respondent, one correct choice per question) and the 3 dashboard indexes. `db:generate`, `db:push`.
+- [ ] **Seeds:** `db:seed` for the 3 areas, `db:seed:dummy` for 5 dummy items per area.
+- [ ] **Shared package:** enums, course and year-level lists, student number regex, scoring weights and level cut-offs.
+- [ ] **API skeleton:** OpenAPIHono app, error handler that returns `{ error: { code, message } }`, CORS for the Pages origin, `config/db` connection, docs in `openapi/`.
+- [ ] **Auth middleware and `GET /api/me`:** verify the Supabase token with `jose`, create the profile on first call, `ADMIN_EMAILS` makes you admin, `requireRole` (AUTH-01, AUTH-02, AUTH-04).
+- [ ] **Web skeleton:** Vue Router, Pinia, Tailwind v4 tokens in `@theme`, Supabase client, `hc` client, sign in and sign out (AUTH-01, AUTH-03).
+- [ ] **Deploy both:** Pages from `main`, `wrangler deploy` for the API, cron trigger in `wrangler.toml`.
+
+## Stage 1: Respondent flow (Nov 1 to 2)
+
+Done when a test account goes from consent to results and lessons on a phone, using dummy items. In this order:
+
+- [ ] **Consent and profile:** `POST /api/respondents`, consent saved with the profile, student number regex, year level limited by course, show-identity choice, 409 for a used student number (CON-01, CON-02, PRO-01 to PRO-05).
+- [ ] **Start an attempt:** `POST /api/attempts`, pick 4 basic, 4 intermediate and 2 advanced per area, shuffle items and choices, set `expires_at`, return the in-progress attempt if there is one (ASM-01, ASM-02).
+- [ ] **Read and save:** `GET /api/attempts/:id` without correct answers but with server time; `PUT /answers/:questionId` that checks the item and choice belong to the attempt and refuses after `expires_at` + 30 s (ASM-04, ASM-07).
+- [ ] **Assessment page:** `QuestionCard`, `QuestionGrid`, Back and Next, `CountdownTimer` from server time (amber at 5 min, red at 1), saved indicator with 3 retries, submit dialog with unanswered count (ASM-03, ASM-05, ASM-06, ASM-08).
+- [ ] **Scoring:** `lib/scoring.ts` as a pure function with its unit tests first, then `POST /submit`, idempotent, all writes in one transaction (ASM-09).
+- [ ] **Cron:** `scheduled` handler in `index.ts` closes attempts past `expires_at` + 30 s as expired.
+- [ ] **Results page:** overall level, radar chart, score and level per area, recommended lessons, no per-item marks (RES-01 to RES-03, RES-05).
+- [ ] **Lessons:** public library and lesson page with Markdown rendered through DOMPurify (LES-01 to LES-03).
+- [ ] **SUS:** `lib/sus.ts` with its tests, `POST /api/attempts/:id/sus`, `SusForm` as an optional card under results (SUS-01, SUS-02, SUS-04).
+- [ ] **QR code:** `results_token` at submit, `GET /api/results/:token`, `ResultsQr` on the results page (RES-04).
+
+## Stage 2: Kiosk mode (Nov 3)
+
+Done when two students in a row finish on one tablet and the second sees nothing of the first. Tell Morales once this works so he can test the whole respondent side.
+
+- [ ] **Kiosk sessions:** `POST /api/kiosk/sessions` with device label and PIN (hashed with salt), `GET` to check it's open, `POST /end` with the PIN, 5 wrong tries locks exit for 1 minute (KIO-01, KIO-05).
+- [ ] **Kiosk middleware:** checks `X-Kiosk-Session` belongs to the signed-in facilitator; respondents created with `mode = kiosk` and no `profile_id`; attempts store `kiosk_session_id` (KIO-03, KIO-06).
+- [ ] **Kiosk pages:** `/kiosk` start screen, `/kiosk/*` flow reusing the respondent pages, `kioskLock` guard on every route (KIO-02).
+- [ ] **Kiosk ending:** SUS opens by itself after results, then Done clears the attempt store and returns to `/kiosk` (SUS-03, KIO-04).
+
+## Stage 3: Admin side (by Nov 6)
+
+Done when an admin can load the 30 real items by CSV and read the pilot data on the dashboard. You're back at work from Nov 4, so these are evening-sized pieces. In this order:
+
+- [ ] **Questions:** list per area, create and edit with exactly 4 choices and 1 correct, correct choice locked once answered, deactivate instead of delete (CMS-01 to CMS-03).
+- [ ] **Uploads:** `POST /api/admin/uploads` to the `media` bucket, PNG, JPEG or WebP up to 2 MB (CMS-05).
+- [ ] **CSV import:** columns from the TRD, report row errors, and the readiness check of 10 active items per area in the 4/4/2 mix (CMS-06, CMS-07). Needed by Nov 8, when the real items arrive.
+- [ ] **Lessons editor:** list and Markdown editor with preview (CMS-04).
+- [ ] **Dashboard:** `GET /api/admin/stats` with every filter, summary cards including mean SUS, level chart per area, comparison chart by a chosen grouping (DSH-01 to DSH-04, SUS-05).
+- [ ] **Respondents:** paged table, detail drawer, Hidden for respondents who chose it, read only for facilitators (DSH-05, DSH-07, PRO-05).
+- [ ] **CSV export:** admin only, follows the filters, includes SUS, keeps hidden identities hidden (DSH-06).
+- [ ] **Users:** list, change role, last admin can't be demoted (USR-01, USR-02).
+- [ ] **Void and delete:** void an attempt with a reason; delete a respondent on request (USR-03).
+- [ ] **Item analysis:** percent correct per item on the questions page (DSH-08).
+
+## Small items and backend safety
+
+Small, fit in anywhere:
+
+- [ ] Notice in Messenger's in-app browser: "Open in Chrome or Safari to sign in with Google."
+- [ ] Error screens in plain words, no technical terms or stack traces.
+- [ ] Empty states: dashboard with 0 respondents, lessons not yet published, no questions in an area.
+- [ ] Mobile pass at 360 px on every page; tap targets at least 44 px.
+- [ ] Landing page copy: what DigiBridge is, how long it takes, privacy line.
+- [ ] Loading and saving states on every button that calls the API.
+
+Backend safety, before the freeze on Nov 11. Most urgent first:
+
+- [ ] **RLS on** for every `public` table with no policies; check the anon key can read nothing.
+- [ ] **Rate limits** on answer saves, kiosk PIN and CSV import.
+- [ ] **Secrets** only in Wrangler secrets and Pages env vars; `.env.example` in the repo.
+- [ ] **Security headers** on the API and the web.
+- [ ] **Supabase settings:** only the Pages URL and `localhost` as redirect URLs.
+- [ ] **Decide whether `/api/docs` stays open in prod**, with an `API_DOCS` flag.
+- [ ] **Dependency audit:** `pnpm audit`.
+
+## Stage 4: Real content and freeze (Nov 7 to 11)
+
+Done when the database holds only real content and no test data.
+
+- [ ] Real questions imported from the team's sheet by CSV (Nov 8).
+- [ ] 9 lessons and the SUS wording from Gonzaga loaded (Nov 8).
+- [ ] Dummy items deactivated; readiness check passes in all 3 areas.
+- [ ] Morales's QA pass; every Must bug closed (Nov 10).
+- [ ] Device run: low-end Android on mobile data, an iPhone, a laptop.
+- [ ] Feature freeze (Nov 11): test respondents and attempts deleted, bugs only from here.
+
+## Stage 5: Pilot and defense (Nov 11 to 15)
+
+- [ ] Kiosk devices set up: facilitators signed in, a session open on each, pocket Wi-Fi or hotspot ready.
+- [ ] Pilot with 30 or more ACLC students (Nov 11 to 12); watch `wrangler tail` during sessions.
+- [ ] Fixes deployed, read the `db:push` prompt carefully if the schema changes, Morales retests (Nov 14).
+- [ ] Rehearsal with the live demo (Nov 15).
+- [ ] Defense (1st week of December).
+- [ ] End of semester (December): delete all respondent data, as the consent notice promises.
+
+## Settle as we go
+
+- **Token check:** see whether the Supabase project signs tokens with the new asymmetric keys (JWKS) or the legacy JWT secret before writing the auth middleware.
+- **Database connection:** Hyperdrive in production, a direct `DATABASE_URL` locally. If Hyperdrive fights you on day 1, use the Supabase transaction pooler and add Hyperdrive later.
+- **Kiosk resume:** if a kiosk tablet refreshes mid-attempt, the attempt ID in memory is gone. Proposed: on the kiosk start screen, entering the same student number in the same kiosk session returns the in-progress attempt.
+- **Age field:** the PRD gives no range. Proposed: whole numbers from 15 to 60.
+- **Finding a hidden respondent for a deletion request:** Hidden respondents can't be found in the table. Proposed: admins can search by the exact student number only, and the result opens the delete and void actions without listing the name.
+- **Results token lifetime:** proposed: valid until respondent data is deleted at the end of the semester.
+- **Needed from the team:** real questions (Nov 6), checked questions and 9 lessons (Nov 7), SUS wording (Nov 7).

@@ -1,0 +1,420 @@
+# DigiBridge TRD
+
+Oct 30, 2026 · @Cornflakesxz
+
+## Architecture
+
+```mermaid
+flowchart LR
+  B["Browser<br/>Vue app on a phone, tablet or laptop<br/>online or kiosk"]
+  subgraph CF["Cloudflare"]
+    P["Pages<br/>Vue app, static files"]
+    W["API Worker: Hono + OpenAPI<br/>auth check, roles, scoring<br/>cron closes expired attempts"]
+    H["Hyperdrive<br/>connection pooling"]
+  end
+  subgraph SB["Supabase"]
+    A["Auth<br/>Google provider"]
+    S["Storage<br/>media bucket, images"]
+    DB[("Postgres<br/>Drizzle schema, RLS on")]
+  end
+  P -- "loads app" --> B
+  B -- "Google sign-in, returns token" --> A
+  B -- "API calls + Bearer token" --> W
+  W -- "verify token (JWKS)" --> A
+  W -- "uploads" --> S
+  W --> H
+  H -- "SQL" --> DB
+```
+
+The browser talks to Supabase only to sign in. Everything else goes through the API Worker, which checks the token, applies role rules and is the only part that reads or writes Postgres.
+
+## Tech stack
+
+TypeScript end to end: a Vue SPA on Cloudflare Pages calls a Hono API on Cloudflare Workers, which is the only thing that talks to Supabase Postgres.
+
+| Layer | Choice | Why |
+| --- | --- | --- |
+| Monorepo | Turborepo with pnpm workspaces | One repo, shared types between web and API |
+| Frontend | Vue 3 with the Composition API in `<script setup>`, Vite, TypeScript | Team already knows Vue; logic reused through composables |
+| Routing and state | Vue Router, Pinia | Route guards per role; small stores for session, kiosk and attempt |
+| Styling | Tailwind CSS v4 via `@tailwindcss/vite`, no component library | Full control; design straight in code |
+| Charts | Chart.js with vue-chartjs | Radar chart for results, bar charts for the dashboard |
+| Markdown | markdown-it with DOMPurify | Lesson bodies stored as Markdown, rendered safely |
+| API client | Hono RPC client (`hc`) | Typed calls from Vue straight off the API's route types |
+| API | Hono on Cloudflare Workers, split into `routes/` (definitions) and `handlers/` (logic) | Small, fast, built for Workers; routes stay short and readable |
+| Validation and API docs | Zod with `@hono/zod-openapi`; OpenAPI spec and docs set up in `openapi/` | Each route declares its input and output once, which validates requests and documents the API |
+| Database | Supabase Postgres | Managed Postgres with auth and storage in one place |
+| ORM and schema changes | Drizzle ORM and drizzle-kit. Schema, migrations and seeds in `packages/db`; `pnpm db:push` pushes the schema to Supabase. The API's connection setup lives in `apps/api/src/config/db`. | One schema package any app can import; typed queries; schema changes applied with one command |
+| DB connection from Workers | Cloudflare Hyperdrive in front of Supabase, postgres.js driver | Connection pooling so Workers don't open a new connection per request |
+| Auth | Supabase Auth, Google provider | Google sign-in with no password handling |
+| Token check in API | `jose` verifying the Supabase access token | Stateless auth on every request |
+| File storage | Supabase Storage, public `media` bucket | Images for scenario items and lessons |
+| Scheduled jobs | Cloudflare Cron Trigger on the API Worker | Closes attempts whose time ran out |
+| Hosting | Cloudflare Pages (web), Cloudflare Workers (API) | Free tier fits the pilot |
+| Tests | Vitest: `app.test.ts` with `test-helpers.ts` for routes, plus unit tests for scoring | Fast, no server needed (`app.request()`) |
+
+## Repository structure
+
+Two apps and three shared packages. The web app imports the API's route types for the typed client but never its runtime code.
+
+```
+digibridge/
+├─ apps/
+│  ├─ web/                    Vue 3 (Composition API, <script setup>) + Vite → Cloudflare Pages
+│  │  ├─ src/
+│  │  │  ├─ pages/           one folder per route group: start, assessment, results, lessons, kiosk, admin
+│  │  │  ├─ components/      QuestionCard, CountdownTimer, QuestionGrid, RadarChart, SusForm, ResultsQr, StatCard, DataTable
+│  │  │  ├─ composables/     useAuth, useAttempt, useCountdown, useKiosk, useApi
+│  │  │  ├─ stores/          session.ts, kiosk.ts, attempt.ts
+│  │  │  ├─ lib/             api.ts (hc client), supabase.ts, markdown.ts
+│  │  │  ├─ router.ts        routes + role guards
+│  │  │  └─ main.ts
+│  │  └─ vite.config.ts
+│  └─ api/                    Hono + OpenAPI → Cloudflare Workers
+│     ├─ src/
+│     │  ├─ config/db/       the API's database connection: Hyperdrive binding, postgres.js client, drizzle() instance
+│     │  ├─ routes/          route definitions per feature: me, respondents, attempts, results, lessons, kiosk, admin
+│     │  ├─ handlers/        the logic behind each route
+│     │  ├─ middleware/      auth, requireRole, kiosk, cors, error handler
+│     │  ├─ lib/             scoring.ts, sus.ts, shuffle.ts, stats.ts, csv.ts, helpers
+│     │  ├─ openapi/         OpenAPI setup and API docs page
+│     │  ├─ app.ts           builds the Hono app, mounts routes, exports AppType
+│     │  ├─ index.ts         Worker entry: fetch + scheduled (cron)
+│     │  ├─ app.test.ts      route tests
+│     │  └─ test-helpers.ts  signed-in requests, test data
+│     └─ wrangler.toml
+├─ packages/
+│  ├─ db/                     Drizzle schema, migrations and seeds (db:generate, db:push, db:seed)
+│  │  ├─ src/schema/        tables, enums, relations
+│  │  ├─ migrations/
+│  │  ├─ seed/              base.ts (3 areas), dummy.ts (dev items)
+│  │  └─ drizzle.config.ts
+│  ├─ shared/                 Zod enums, option lists and scoring constants used by web and api
+│  └─ config/                 shared lint settings, used by the root eslint.config.ts
+├─ tsconfig.base.json         shared TypeScript settings; every app and package extends it
+├─ eslint.config.ts           one lint config for the whole repo
+├─ turbo.json
+├─ pnpm-workspace.yaml
+└─ package.json
+```
+
+Scoring constants live in `packages/shared` so the API, the tests and any display text use the same numbers. TypeScript settings live in the root `tsconfig.base.json`; each app or package's own `tsconfig.json` extends it and adds only what that package needs, such as the DOM types for `web` and `api`.
+
+## Data model
+
+11 tables in the `public` schema. A respondent is keyed by student number, so online and kiosk respondents share one table and the one-attempt rule holds across both.
+
+**Enums**
+
+- `role`: respondent, facilitator, admin
+- `mode`: online, kiosk
+- `sex`: male, female, prefer\_not\_to\_say
+- `difficulty`: basic, intermediate, advanced
+- `level`: beginner, basic, intermediate, advanced
+- `lesson_tier`: foundations, intermediate, advanced
+- `attempt_status`: in\_progress, submitted, expired, voided
+
+**Tables**
+
+| Table | Key columns | Constraints and notes |
+| --- | --- | --- |
+| `profiles` | `id` (uuid, = `auth.users.id`), `email`, `full_name`, `avatar_url`, `role`, `created_at`, `last_sign_in_at` | Created on first API call after Google sign-in. `role` defaults to respondent. |
+| `respondents` | `id`, `profile_id` (null for kiosk), `student_number`, `full_name`, `course`, `year_level`, `age`, `sex`, `devices` (text\[\]), `internet_access` (text\[\]), `show_identity` (boolean), `mode`, `consent_version`, `consented_at`, `created_at` | `student_number` unique, stored uppercase. `profile_id` unique when not null. `show_identity` false hides name and student number from all team views and the CSV. Consent is saved together with the profile, so declining stores nothing. |
+| `kiosk_sessions` | `id`, `facilitator_id`, `device_label`, `pin_hash`, `started_at`, `ended_at` | One open session per device. PIN stored hashed. |
+| `competency_areas` | `id`, `code`, `name`, `description`, `sort_order` | Seeded with 3 rows: `info_literacy`, `communication`, `safety`. |
+| `questions` | `id`, `area_id`, `difficulty`, `stem`, `image_url`, `is_scenario`, `explanation`, `is_active`, `created_by`, `created_at`, `updated_at` | Never hard-deleted once answered; set `is_active` false instead. |
+| `choices` | `id`, `question_id`, `label`, `is_correct`, `position` | Exactly 4 per question. Partial unique index on `question_id` where `is_correct` keeps 1 correct choice. |
+| `attempts` | `id`, `respondent_id`, `kiosk_session_id` (null online), `status`, `started_at`, `expires_at`, `submitted_at`, `question_order` (uuid\[\]), `choice_order` (jsonb), `total_points`, `overall_pct`, `overall_level`, `results_token`, `void_reason`, `voided_by` | Partial unique index on `respondent_id` where `status <> 'voided'` enforces one attempt. `expires_at` = `started_at` + 25 min. `results_token` (random, unique) is set at submit for the QR link. |
+| `answers` | `attempt_id`, `question_id`, `choice_id`, `points`, `answered_at` | Primary key (`attempt_id`, `question_id`), so a changed answer overwrites. `points` filled at scoring. |
+| `area_results` | `attempt_id`, `area_id`, `points`, `max_points`, `pct`, `level` | Primary key (`attempt_id`, `area_id`). Written once at submit. |
+| `sus_responses` | `attempt_id`, `q1` to `q10` (smallint 1 to 5), `score` (numeric 0 to 100), `submitted_at` | Primary key `attempt_id`, so one SUS response per attempt. Only for submitted or expired attempts. |
+| `lessons` | `id`, `area_id`, `tier`, `slug`, `title`, `summary`, `body_md`, `image_url`, `video_url`, `resources` (jsonb), `is_published`, `sort_order`, `updated_at` | `slug` unique. One published lesson per area and tier for the 9-lesson set. |
+
+**Fixed option lists** (stored as text, validated by Zod in `packages/shared`)
+
+- `student_number`: trimmed and uppercased, must match `^[A-Z]\d{2}-\d{2}-\d{4}-[A-Z]{3}\d{3}$` (e.g. C23-01-7557-MAN121)
+- `course`: BSIT, BSCS, BSBA, BSA, BSHM (regular, year 1 to 4); HRT, WADT (TESDA scholars, year 1 to 3)
+- `year_level`: 1 to 4, and at most 3 for HRT and WADT, checked in the Zod schema and again in the API
+- `devices`: smartphone, laptop, desktop, tablet, none
+- `internet_access`: home\_wifi, mobile\_data, school\_wifi, piso\_wifi, none
+
+**Indexes for the dashboard:** `attempts(status, submitted_at)`, `respondents(course, year_level)`, `answers(question_id)` for item analysis.
+
+## Auth, roles and kiosk mode
+
+Every API request carries a Supabase access token. Kiosk requests carry the facilitator's token plus a kiosk session ID, so a student on a kiosk never holds a token of their own.
+
+**Sign-in (online respondents, facilitators, admins)**
+
+1. The web app calls `supabase.auth.signInWithOAuth({ provider: 'google' })` and gets a session back on the redirect.
+2. Every API call sends `Authorization: Bearer <access_token>`.
+3. The `auth` middleware verifies the token with `jose` against the project's JWKS (or the legacy JWT secret, whichever the Supabase project uses), then loads or creates the `profiles` row.
+4. On first sign-in, if the email is in `ADMIN_EMAILS`, the role is set to admin. Everyone else starts as respondent.
+5. `requireRole('admin')` and `requireRole('facilitator', 'admin')` guard routes. The Vue router mirrors these guards for display only; the API is the real check.
+
+**Kiosk mode**
+
+1. A signed-in facilitator opens `/kiosk`, enters a device label ("Tablet 1") and a 4-digit PIN. `POST /api/kiosk/sessions` stores the session with the PIN hashed.
+2. The `kiosk` Pinia store keeps `kioskSessionId` in `localStorage`, and the router locks the device to `/kiosk/*` routes.
+3. Kiosk calls send the facilitator's token plus an `X-Kiosk-Session` header. The `kiosk` middleware checks the session is open and belongs to that facilitator.
+4. A kiosk respondent row has `mode = kiosk` and no `profile_id`. Their attempt stores `kiosk_session_id`.
+5. Done, after results and the SUS survey, clears the attempt store and returns to `/kiosk`. Nothing about the student stays in the browser.
+6. Exit calls `POST /api/kiosk/sessions/:id/end` with the PIN. A wrong PIN 5 times in a row locks exit for 1 minute.
+
+**What each role can call**
+
+| Route group | Respondent | Facilitator | Admin |
+| --- | --- | --- | --- |
+| `/api/me`, own respondent and attempt | Yes | Yes | Yes |
+| `/api/lessons` (public read) | Yes | Yes | Yes |
+| `/api/kiosk/*` | No | Yes | Yes |
+| `/api/admin/stats`, `/api/admin/respondents` (read) | No | Yes, identity only if allowed | Yes |
+| `/api/admin/export`, questions, lessons, users, void attempt | No | No | Yes |
+
+## API
+
+All routes live under `/api`, take and return JSON validated by Zod, and send errors as `{ error: { code, message } }`. "Self" means the signed-in respondent, or the kiosk respondent of the current kiosk session.
+
+**Respondent flow**
+
+| Method | Path | Auth | Purpose |
+| --- | --- | --- | --- |
+| GET | `/api/me` | Signed in | Profile, role, own respondent record and attempt status |
+| POST | `/api/respondents` | Self | Save consent, profile and identity choice. Returns 409 if the student number already has a completed attempt. |
+| POST | `/api/attempts` | Self | Start the attempt: pick items, shuffle, set `expires_at`. Returns the existing attempt if one is in progress. |
+| GET | `/api/attempts/:id` | Self | Items in shuffled order (no correct answers), saved answers, `expires_at`, server time |
+| PUT | `/api/attempts/:id/answers/:questionId` | Self | Save or change one answer. Rejected after `expires_at` + 30 s. |
+| POST | `/api/attempts/:id/submit` | Self | Score and close the attempt, create `results_token`. Safe to call twice. |
+| GET | `/api/attempts/:id/result` | Self | Overall and per-area scores, levels, recommended lessons, `results_token` and whether SUS is answered |
+| POST | `/api/attempts/:id/sus` | Self | Save the 10 SUS answers and return the score. 409 if already answered. |
+| GET | `/api/results/:token` | Public | Results and lessons by private token, opened from the QR code (RES-04) |
+| GET | `/api/lessons` | Public | Published lessons, filterable by area and tier |
+| GET | `/api/lessons/:slug` | Public | One lesson |
+
+**Kiosk**
+
+| Method | Path | Auth | Purpose |
+| --- | --- | --- | --- |
+| POST | `/api/kiosk/sessions` | Facilitator, admin | Open a kiosk session with device label and PIN |
+| GET | `/api/kiosk/sessions/:id` | Owner | Check the session is still open |
+| POST | `/api/kiosk/sessions/:id/end` | Owner + PIN | Close the session |
+
+Kiosk respondents use the same respondent-flow routes with the `X-Kiosk-Session` header.
+
+**Admin**
+
+| Method | Path | Auth | Purpose |
+| --- | --- | --- | --- |
+| GET | `/api/admin/stats` | Facilitator, admin | Summary cards (including mean SUS and SUS count), level counts, comparison by a `groupBy` field. Takes all dashboard filters as query params. |
+| GET | `/api/admin/respondents` | Facilitator, admin | Paged, filtered, sorted list. Name and student number show as Hidden unless the respondent allowed them. |
+| GET | `/api/admin/respondents/:id` | Facilitator, admin | Profile and area results of one respondent |
+| GET | `/api/admin/export.csv` | Admin | Filtered respondents with profile, area scores, levels and SUS score; hidden identities stay hidden |
+| POST | `/api/admin/attempts/:id/void` | Admin | Void an attempt with a reason |
+| DELETE | `/api/admin/respondents/:id` | Admin | Delete a respondent and their attempt on request |
+| GET, POST | `/api/admin/questions` | Admin | List with item analysis; create a question with its 4 choices |
+| PATCH | `/api/admin/questions/:id` | Admin | Edit. Correct choice locked once answered. |
+| POST | `/api/admin/questions/import` | Admin | Import CSV rows; returns created count and row errors |
+| GET, POST | `/api/admin/lessons` | Admin | List and create lessons |
+| PATCH, DELETE | `/api/admin/lessons/:id` | Admin | Edit or delete a lesson |
+| POST | `/api/admin/uploads` | Admin | Upload an image to the `media` bucket; returns its public URL |
+| GET | `/api/admin/users` | Admin | Accounts with role and last sign-in |
+| PATCH | `/api/admin/users/:id` | Admin | Change role. Refuses to demote the last admin. |
+
+**Question import CSV columns:** `area_code, difficulty, stem, image_url, choice_a, choice_b, choice_c, choice_d, correct (a to d), explanation, is_scenario`. This matches the columns the content team uses in the shared sheet.
+
+## Assessment engine
+
+The server owns the item order, the clock and the score. The browser only shows items and sends answers.
+
+**Start** (`POST /api/attempts`)
+
+1. Refuse if the respondent has a submitted or expired attempt that isn't voided.
+2. If an attempt is in progress, return it instead of creating a new one.
+3. For each area, take the active items: 4 basic, 4 intermediate, 2 advanced. If an area has more active items than that, pick randomly within each difficulty.
+4. Shuffle the 30 items together with Fisher–Yates using `crypto.getRandomValues`, and shuffle each item's 4 choices.
+5. Save `question_order`, `choice_order`, `started_at = now()` and `expires_at = now() + 25 min` in one insert.
+
+**During the attempt**
+
+- The browser shows the countdown from `expires_at` minus the server time sent with each response, so a wrong phone clock doesn't matter.
+- Picking a choice sends `PUT /answers/:questionId` right away. The UI marks it saved on success and retries up to 3 times on failure, keeping the choice on screen.
+- A refresh calls `GET /api/attempts/:id` and restores the item order, saved answers and remaining time.
+- The server rejects an answer for an item not in `question_order` or a choice that doesn't belong to that item.
+
+**Submit and timeout**
+
+- At 0 the browser calls `submit` by itself. The server also accepts saves up to 30 seconds past `expires_at` for answers already in flight.
+- If the browser never submits (tab closed, phone died), a Cron Trigger every 5 minutes scores and closes attempts past `expires_at` + 30 s with `status = expired`.
+- Submit is idempotent: a second call returns the saved result.
+
+**Scoring** (`lib/scoring.ts`, pure function, unit tested)
+
+```ts
+const POINTS = { basic: 1, intermediate: 2, advanced: 3 } as const
+const LEVELS = [
+  { min: 80, level: 'advanced' },
+  { min: 60, level: 'intermediate' },
+  { min: 40, level: 'basic' },
+  { min: 0,  level: 'beginner' },
+] as const
+
+// per area: pct = earned / 18 * 100 ; overall: pct = earned / 54 * 100
+// level = first LEVELS entry where pct >= min
+```
+
+Scoring writes `answers.points`, one `area_results` row per area, and `total_points`, `overall_pct` and `overall_level` on the attempt, all in one transaction.
+
+**Recommended lessons**
+
+| Level in area | Lessons returned |
+| --- | --- |
+| Beginner | Foundations |
+| Basic | Foundations, Intermediate (as next step) |
+| Intermediate | Intermediate, Advanced (as next step) |
+| Advanced | Advanced |
+
+**SUS scoring** (`lib/sus.ts`, unit tested)
+
+```ts
+// a: the 10 answers (1 to 5) in statement order
+const susScore = (a: number[]) =>
+  a.reduce((sum, v, i) => sum + (i % 2 === 0 ? v - 1 : 5 - v), 0) * 2.5
+```
+
+Odd-numbered statements (index 0, 2, 4, ...) score answer minus 1, even-numbered ones score 5 minus answer, and the total times 2.5 gives 0 to 100. The score is computed on the server and saved in `sus_responses`.
+
+## Frontend
+
+One Vue app serves respondents, kiosk devices and admins, split by route guards.
+
+**Route guards** (`router.ts`, `meta.requires`)
+
+| Guard | Applies to | Rule |
+| --- | --- | --- |
+| `public` | `/`, `/lessons/*` | Anyone |
+| `signedIn` | `/start/*`, `/assessment`, `/results` | Supabase session required, else back to `/` |
+| `step` | `/start/profile`, `/start/ready`, `/assessment`, `/results` | Sends the user to the right step from `/api/me` (no profile → consent; attempt submitted → results) |
+| `kioskLock` | Every route | If a kiosk session is open on this device, anything outside `/kiosk/*` redirects to `/kiosk` |
+| `staff` | `/admin`, `/admin/respondents` | Role facilitator or admin |
+| `admin` | `/admin/questions`, `/admin/lessons`, `/admin/users` | Role admin |
+
+**Stores**
+
+| Store | Holds | Persisted |
+| --- | --- | --- |
+| `session` | Supabase session, `/api/me` result, role | Supabase handles it |
+| `kiosk` | `kioskSessionId`, device label | `localStorage`, cleared on exit |
+| `attempt` | Attempt ID, items, answers, `expiresAt`, server time offset, current index | Memory only; refetched on reload |
+
+**Key components**
+
+- `QuestionCard`: item text, optional image, 4 radio choices, saved indicator
+- `CountdownTimer`: mm:ss, turns amber at 5 minutes and red at 1 minute, fires `expired`
+- `QuestionGrid`: 30 numbered cells, answered or unanswered, tap to jump
+- `SubmitDialog`: unanswered count and confirm
+- `RadarChart`: 3 axes, 0 to 100
+- `LevelBadge`, `LessonCard`
+- `StatCard`, `FilterBar`, `BarChart`, `DataTable` for the dashboard
+- `MarkdownEditor`: textarea with live preview for lessons
+
+Also: `SusForm` (10 statements, each a row of 5 radio buttons, Submit and Skip) and `ResultsQr` (QR code of the private results link, drawn with the `qrcode` package).
+
+**Styling rules:** Tailwind v4 with design tokens in `@theme` (colors, radius, font). Mobile first. Tap targets at least 44 px. Choices are full-width buttons wrapping real radio inputs.
+
+## Security and privacy
+
+The browser never talks to the database directly, and only the fields the study needs are collected.
+
+- **No direct database access.** Row Level Security is on for every `public` table with no policies, so the Supabase anon key can't read or write any table. Only the API reaches the database, through Hyperdrive with a server-side connection string.
+- **Correct answers never leave the server** during an attempt. `GET /api/attempts/:id` returns choices without `is_correct`, and results show levels and scores, not per-item marks (RES-05).
+- **Every input is validated** with the shared Zod schemas. Markdown is rendered with markdown-it and cleaned with DOMPurify.
+- **CORS** allows only the Pages domain (and `localhost` in development).
+- **Kiosk PIN** is hashed with SHA-256 plus a per-session salt and rate limited (5 tries, then 1 minute).
+- **Uploads** accept only PNG, JPEG and WebP up to 2 MB.
+- **Data Privacy Act of 2012:**
+  - Consent notice versioned (`consent_version`) and stored with a timestamp.
+  - Name and student number are shown to the team only if the respondent allowed it (show\_identity). Otherwise they read Hidden everywhere, including the CSV.
+  - CSV export is admin only.
+  - Respondent deletion on request (USR-03).
+  - All respondent data deleted at the end of the semester (December 2026).
+- **Secrets** (`DATABASE_URL`, Supabase keys) live in Wrangler secrets and Pages env vars, never in the repo.
+
+## Environments and deployment
+
+Two environments: local for building, production for the pilot and defense. There is no staging; Morales tests on production before the freeze, then test data is cleared.
+
+**Environment variables**
+
+| Variable | Where | Value |
+| --- | --- | --- |
+| `VITE_SUPABASE_URL` | web | Supabase project URL |
+| `VITE_SUPABASE_ANON_KEY` | web | Public anon key (safe because RLS blocks every table) |
+| `VITE_API_URL` | web | API Worker URL |
+| `SUPABASE_URL` | api | Supabase project URL, used to fetch the JWKS |
+| `SUPABASE_JWT_SECRET` | api (secret) | Only if the project still uses the legacy JWT secret |
+| `SUPABASE_SERVICE_ROLE_KEY` | api (secret) | For Storage uploads |
+| `HYPERDRIVE` binding | api | Hyperdrive config pointing at the Supabase connection string |
+| `DATABASE_URL` | local only | Direct Supabase connection for drizzle-kit and seeds |
+| `ADMIN_EMAILS` | api | Comma-separated emails that become admin on first sign-in |
+| `WEB_ORIGIN` | api | Pages URL for CORS |
+
+**One-time setup**
+
+1. Create the Supabase project. Enable the Google provider with a Google Cloud OAuth client. Add the Pages URL and `localhost` to the redirect URLs.
+2. Create the public `media` bucket in Supabase Storage.
+3. Create a Hyperdrive config from the Supabase connection string and bind it in `wrangler.toml`.
+4. Connect the GitHub repo to Cloudflare Pages: root `apps/web`, build `pnpm turbo build --filter=web`, output `apps/web/dist`.
+5. Add a cron trigger `*/5 * * * *` to the API Worker in `wrangler.toml`.
+
+**Deploying**
+
+- **Web:** a push to `main` deploys through Pages.
+- **API:** run `pnpm --filter api deploy`, which is `wrangler deploy`.
+- **Database:** change the schema in `packages/db`, run `pnpm db:generate` to record the migration in the repo, then `pnpm db:push` to push the schema to Supabase. Push before deploying an API change that needs it. The API picks up the new types through its import of `packages/db`; its connection setup in `config/db` doesn't change.
+- **Careful after Nov 11:** once real pilot data exists, read the `db:push` prompt before confirming. Push can drop or rename columns that hold respondent data.
+- **Seeds:** `pnpm db:seed` loads the 3 areas; `pnpm db:seed:dummy` loads 5 dummy items per area for development only.
+
+**Before the pilot (Nov 11):** deactivate dummy items, delete test respondents and attempts, and confirm 10 active items per area.
+
+## Testing and QA
+
+The scoring and shuffling logic gets unit tests; everything else is covered by Morales's manual test cases mapped to the PRD requirement IDs.
+
+**Unit tests (Vitest, Cez)**
+
+- Scoring: all correct = 100% Advanced; all wrong = 0% Beginner; boundaries at 39.9, 40, 59.9, 60, 79.9 and 80; unanswered counts as 0.
+- Level-to-lesson mapping for all 4 levels, and SUS scoring (all 3s = 50, best answers = 100, worst answers = 0).
+- Item selection always gives 4 basic, 4 intermediate and 2 advanced per area.
+- Shuffle keeps all 30 items and all 4 choices, with no duplicates.
+
+Route tests live in `apps/api/src/app.test.ts`. They call `app.request()` directly, so no server or Worker runtime is needed, and use `test-helpers.ts` to build signed-in requests for each role. Each Must endpoint gets at least one test for success and one for a blocked role.
+
+**Manual test cases (Morales)**
+
+One case per Must requirement, written as ID, steps, expected result, pass or fail. The ones that matter most:
+
+| Case | What to check |
+| --- | --- |
+| One attempt | Same student number online, then on kiosk: the second is blocked |
+| Resume | Answer 10 items, refresh, close and reopen: answers and timer intact |
+| Timeout | Wait out the timer (set to 2 minutes on a test build): auto-submits; a closed tab is closed by the cron within 5 minutes |
+| Kiosk handover | Finish as student A, press Done, start student B: nothing from A visible |
+| Kiosk lock | In kiosk mode, type `/admin` in the address bar: redirected to `/kiosk` |
+| Role checks | Respondent calls an admin endpoint: 403. A respondent who chose to hide their identity shows as Hidden on the dashboard and in the CSV |
+| Scoring | Answer a known pattern, compare against a hand-worked score |
+| Devices | Full run on a low-end Android phone on mobile data, an iPhone, and a laptop |
+| Load | 10 people start at the same time: no errors, saves under 500 ms |
+
+Bugs go in GitHub Issues with the requirement ID, steps, expected and actual result, and a screenshot.
+
+## Technical risks
+
+| Risk | Effect | Fallback |
+| --- | --- | --- |
+| Hyperdrive or Drizzle setup with Supabase takes longer than planned | Day 1 lost on plumbing | Use the Supabase transaction pooler connection string directly with postgres.js, add Hyperdrive later |
+| Weak signal during in-person sessions | Saves fail, students wait | Autosave retries; bring a pocket Wi-Fi or phone hotspot for kiosk devices |
+| Google sign-in blocked in Messenger's in-app browser | Online respondents can't sign in | Show an "Open in Chrome or Safari" notice when the in-app browser is detected |
+| Content arrives late (Nov 6 to 8) | Real assessment not ready | Build and test on dummy items; CSV import makes loading real content a 10-minute job |
+| Cloudflare free-tier limits | Requests blocked | 30 to 100 respondents is far below the free limits; watch usage in the dashboard |
+| Someone takes it twice with a fake student number | Duplicate data | Student number format check; facilitators confirm IDs in person; admin can void |
+| One developer | Cez sick or busy | Keep the repo, `.env.example` and this TRD current so Morales can take over fixes |

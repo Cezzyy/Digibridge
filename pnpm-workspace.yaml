@@ -1,0 +1,9 @@
+packages:
+  - apps/*
+  - packages/*
+
+# One version of each shared dependency across the repo.
+# Use "catalog:" as the version in a package.json to pick these up.
+catalog:
+  eslint: ^10.13.0
+  typescript: ~6.0.3

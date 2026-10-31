@@ -1,0 +1,16 @@
+# Normalize line endings to LF for every text file
+* text=auto eol=lf
+
+# Binary files
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.webp binary
+*.gif binary
+*.ico binary
+*.woff binary
+*.woff2 binary
+
+# Generated files: collapsed in GitHub diffs
+pnpm-lock.yaml linguist-generated=true
+packages/db/migrations/** linguist-generated=true

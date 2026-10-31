@@ -1,0 +1,4 @@
+# Prettier also skips everything in .gitignore
+pnpm-lock.yaml
+packages/db/migrations/
+docs/
