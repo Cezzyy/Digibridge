@@ -54,7 +54,7 @@ pnpm dev
 
 `pnpm install` also turns on a pre-commit hook. Before each commit it runs ESLint (with fixes) and Prettier on the files you staged, and stops the commit if ESLint finds an error it can't fix.
 
-On every push to `main` and every pull request, GitHub Actions runs format, lint, typecheck, test and build as separate checks. It also audits dependencies for known security issues, scans new commits for leaked secrets (API keys, tokens) and lints the workflow files.
+On every push to `main` and every pull request, GitHub Actions runs format, lint, typecheck, test and build as separate checks. It also audits dependencies for known security issues, scans the commit history for leaked secrets (API keys, tokens) and lints the workflow files.
 
 ## Scripts
 

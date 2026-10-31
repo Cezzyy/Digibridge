@@ -64,4 +64,5 @@ At the root: `tsconfig.base.json` (shared TypeScript settings; every package's `
 - lint-staged 17 needs Node 22.22.1 or newer, which sets the root `engines.node`. Its config lives in `package.json` because lint-staged only loads a `.ts` config when passed `--config`.
 - `pnpm install` runs the root `prepare` script (`husky`), which points Git at `.husky/`. CI sets `HUSKY=0` to skip it.
 - CI uses Node 25 to match local dev. Bump `node-version` in `.github/actions/setup/action.yml` when local Node changes.
+- The Secret scan job runs the gitleaks CLI (version and SHA-256 pinned in `ci.yml`) over the full history, not `gitleaks/gitleaks-action`: the action scans `<first pushed commit>^..<head>`, which fails when a push includes the repo's first commit.
 - `pnpm audit` reports one moderate advisory (`minimatch`, pulled in by ESLint, dev only). CI fails only on high or critical ones.

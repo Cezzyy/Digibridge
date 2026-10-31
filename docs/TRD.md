@@ -400,7 +400,7 @@ The scoring and shuffling logic gets unit tests; everything else is covered by M
   - **Format:** `pnpm format:check`.
   - **Lint, Typecheck, Test, Build:** `pnpm turbo run <task>`, with Turbo's cache kept between runs so unchanged packages are skipped.
   - **Dependency audit:** `pnpm audit --audit-level high` fails on high or critical advisories.
-  - **Secret scan:** gitleaks checks every new commit for API keys, tokens and passwords.
+  - **Secret scan:** gitleaks checks the whole Git history for API keys, tokens and passwords.
   - **Workflow lint:** actionlint checks the workflow files.
 
   Merge a pull request only when every check is green.

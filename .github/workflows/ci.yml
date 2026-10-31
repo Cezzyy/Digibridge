@@ -62,22 +62,32 @@ jobs:
       # Fails on high or critical advisories only. Run `pnpm audit` locally to see all of them.
       - run: pnpm audit --audit-level high
 
+  # Runs the gitleaks CLI directly. gitleaks-action builds a commit range that breaks
+  # when a push includes the repo's first commit, so this scans the whole history instead.
   secrets:
     name: Secret scan
     runs-on: ubuntu-latest
     timeout-minutes: 10
-    permissions:
-      contents: read
-      pull-requests: read # to list a pull request's commits
+    env:
+      # To upgrade, change both. The SHA-256 is in the release's checksums.txt.
+      GITLEAKS_VERSION: 8.30.1
+      GITLEAKS_SHA256: 551f6fc83ea457d62a0d98237cbad105af8d557003051f41f3e7ca7b3f2470eb
     steps:
       - uses: actions/checkout@v7
         with:
-          fetch-depth: 0 # full history, so every new commit is scanned
-      - uses: gitleaks/gitleaks-action@v3
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          # Findings show in the job summary; PR comments would need write access.
-          GITLEAKS_ENABLE_COMMENTS: false
+          fetch-depth: 0 # full history
+
+      - name: Install gitleaks
+        working-directory: ${{ runner.temp }}
+        run: |
+          tarball="gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz"
+          curl -sSfLO "https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}/${tarball}"
+          echo "${GITLEAKS_SHA256}  ${tarball}" | sha256sum -c -
+          tar xzf "${tarball}" gitleaks
+          echo "${RUNNER_TEMP}" >> "${GITHUB_PATH}"
+
+      - name: Scan every commit
+        run: gitleaks git --redact --verbose .
 
   actionlint:
     name: Workflow lint
