@@ -20,7 +20,7 @@ Every feature is built in this order:
 
 ## Stage 0: Foundation (Oct 31)
 
-Done when you can sign in with Google on the deployed site and `/api/me` answers with your admin profile.
+Done when you can sign in with Google on the deployed site and `/api/v1/me` answers with your admin profile.
 
 - [ ] **Monorepo:** Turborepo and pnpm workspaces with `apps/web`, `apps/api`, `packages/db`, `packages/shared`, `packages/config`.
 - [ ] **Supabase project:** Google provider on, redirect URLs for `localhost` and the Pages URL, public `media` bucket.
@@ -28,7 +28,7 @@ Done when you can sign in with Google on the deployed site and `/api/me` answers
 - [ ] **Seeds:** `db:seed` for the 3 areas, `db:seed:dummy` for 5 dummy items per area.
 - [ ] **Shared package:** enums, course and year-level lists, student number regex, scoring weights and level cut-offs.
 - [ ] **API skeleton:** OpenAPIHono app, error handler that returns `{ error: { code, message } }`, CORS for the Pages origin, `config/db` connection, docs in `openapi/`.
-- [ ] **Auth middleware and `GET /api/me`:** verify the Supabase token with `jose`, create the profile on first call, `ADMIN_EMAILS` makes you admin, `requireRole` (AUTH-01, AUTH-02, AUTH-04).
+- [ ] **Auth middleware and `GET /api/v1/me`:** verify the Supabase token with `jose`, create the profile on first call, `ADMIN_EMAILS` makes you admin, `requireRole` (AUTH-01, AUTH-02, AUTH-04).
 - [ ] **Web skeleton:** Vue Router, Pinia, Tailwind v4 tokens in `@theme`, Supabase client, `hc` client, sign in and sign out (AUTH-01, AUTH-03).
 - [ ] **Deploy both:** Pages from `main`, `wrangler deploy` for the API, cron trigger in `wrangler.toml`.
 
@@ -36,22 +36,22 @@ Done when you can sign in with Google on the deployed site and `/api/me` answers
 
 Done when a test account goes from consent to results and lessons on a phone, using dummy items. In this order:
 
-- [ ] **Consent and profile:** `POST /api/respondents`, consent saved with the profile, student number regex, year level limited by course, show-identity choice, 409 for a used student number (CON-01, CON-02, PRO-01 to PRO-05).
-- [ ] **Start an attempt:** `POST /api/attempts`, pick 4 basic, 4 intermediate and 2 advanced per area, shuffle items and choices, set `expires_at`, return the in-progress attempt if there is one (ASM-01, ASM-02).
-- [ ] **Read and save:** `GET /api/attempts/:id` without correct answers but with server time; `PUT /answers/:questionId` that checks the item and choice belong to the attempt and refuses after `expires_at` + 30 s (ASM-04, ASM-07).
+- [ ] **Consent and profile:** `POST /api/v1/respondents`, consent saved with the profile, student number regex, year level limited by course, show-identity choice, 409 for a used student number (CON-01, CON-02, PRO-01 to PRO-05).
+- [ ] **Start an attempt:** `POST /api/v1/attempts`, pick 4 basic, 4 intermediate and 2 advanced per area, shuffle items and choices, set `expires_at`, return the in-progress attempt if there is one (ASM-01, ASM-02).
+- [ ] **Read and save:** `GET /api/v1/attempts/:id` without correct answers but with server time; `PUT /answers/:questionId` that checks the item and choice belong to the attempt and refuses after `expires_at` + 30 s (ASM-04, ASM-07).
 - [ ] **Assessment page:** `QuestionCard`, `QuestionGrid`, Back and Next, `CountdownTimer` from server time (amber at 5 min, red at 1), saved indicator with 3 retries, submit dialog with unanswered count (ASM-03, ASM-05, ASM-06, ASM-08).
 - [ ] **Scoring:** `lib/scoring.ts` as a pure function with its unit tests first, then `POST /submit`, idempotent, all writes in one transaction (ASM-09).
 - [ ] **Cron:** `scheduled` handler in `index.ts` closes attempts past `expires_at` + 30 s as expired.
 - [ ] **Results page:** overall level, radar chart, score and level per area, recommended lessons, no per-item marks (RES-01 to RES-03, RES-05).
 - [ ] **Lessons:** public library and lesson page with Markdown rendered through DOMPurify (LES-01 to LES-03).
-- [ ] **SUS:** `lib/sus.ts` with its tests, `POST /api/attempts/:id/sus`, `SusForm` as an optional card under results (SUS-01, SUS-02, SUS-04).
-- [ ] **QR code:** `results_token` at submit, `GET /api/results/:token`, `ResultsQr` on the results page (RES-04).
+- [ ] **SUS:** `lib/sus.ts` with its tests, `POST /api/v1/attempts/:id/sus`, `SusForm` as an optional card under results (SUS-01, SUS-02, SUS-04).
+- [ ] **QR code:** `results_token` at submit, `GET /api/v1/results/:token`, `ResultsQr` on the results page (RES-04).
 
 ## Stage 2: Kiosk mode (Nov 3)
 
 Done when two students in a row finish on one tablet and the second sees nothing of the first. Tell Morales once this works so he can test the whole respondent side.
 
-- [ ] **Kiosk sessions:** `POST /api/kiosk/sessions` with device label and PIN (hashed with salt), `GET` to check it's open, `POST /end` with the PIN, 5 wrong tries locks exit for 1 minute (KIO-01, KIO-05).
+- [ ] **Kiosk sessions:** `POST /api/v1/kiosk/sessions` with device label and PIN (hashed with salt), `GET` to check it's open, `POST /end` with the PIN, 5 wrong tries locks exit for 1 minute (KIO-01, KIO-05).
 - [ ] **Kiosk middleware:** checks `X-Kiosk-Session` belongs to the signed-in facilitator; respondents created with `mode = kiosk` and no `profile_id`; attempts store `kiosk_session_id` (KIO-03, KIO-06).
 - [ ] **Kiosk pages:** `/kiosk` start screen, `/kiosk/*` flow reusing the respondent pages, `kioskLock` guard on every route (KIO-02).
 - [ ] **Kiosk ending:** SUS opens by itself after results, then Done clears the attempt store and returns to `/kiosk` (SUS-03, KIO-04).
@@ -61,10 +61,10 @@ Done when two students in a row finish on one tablet and the second sees nothing
 Done when an admin can load the 30 real items by CSV and read the pilot data on the dashboard. You're back at work from Nov 4, so these are evening-sized pieces. In this order:
 
 - [ ] **Questions:** list per area, create and edit with exactly 4 choices and 1 correct, correct choice locked once answered, deactivate instead of delete (CMS-01 to CMS-03).
-- [ ] **Uploads:** `POST /api/admin/uploads` to the `media` bucket, PNG, JPEG or WebP up to 2 MB (CMS-05).
+- [ ] **Uploads:** `POST /api/v1/admin/uploads` to the `media` bucket, PNG, JPEG or WebP up to 2 MB (CMS-05).
 - [ ] **CSV import:** columns from the TRD, report row errors, and the readiness check of 10 active items per area in the 4/4/2 mix (CMS-06, CMS-07). Needed by Nov 8, when the real items arrive.
 - [ ] **Lessons editor:** list and Markdown editor with preview (CMS-04).
-- [ ] **Dashboard:** `GET /api/admin/stats` with every filter, summary cards including mean SUS, level chart per area, comparison chart by a chosen grouping (DSH-01 to DSH-04, SUS-05).
+- [ ] **Dashboard:** `GET /api/v1/admin/stats` with every filter, summary cards including mean SUS, level chart per area, comparison chart by a chosen grouping (DSH-01 to DSH-04, SUS-05).
 - [ ] **Respondents:** paged table, detail drawer, Hidden for respondents who chose it, read only for facilitators (DSH-05, DSH-07, PRO-05).
 - [ ] **CSV export:** admin only, follows the filters, includes SUS, keeps hidden identities hidden (DSH-06).
 - [ ] **Users:** list, change role, last admin can't be demoted (USR-01, USR-02).
@@ -89,7 +89,7 @@ Backend safety, before the freeze on Nov 11. Most urgent first:
 - [ ] **Secrets** only in Wrangler secrets and Pages env vars; `.env.example` in the repo.
 - [ ] **Security headers** on the API and the web.
 - [ ] **Supabase settings:** only the Pages URL and `localhost` as redirect URLs.
-- [ ] **Decide whether `/api/docs` stays open in prod**, with an `API_DOCS` flag.
+- [ ] **Decide whether `/api/reference` stays open in prod**, with an `API_DOCS` flag.
 - [ ] **Dependency audit:** `pnpm audit`.
 
 ## Stage 4: Real content and freeze (Nov 7 to 11)

@@ -42,7 +42,7 @@ TypeScript end to end: a Vue SPA on Cloudflare Pages calls a Hono API on Cloudfl
 | Markdown | markdown-it with DOMPurify | Lesson bodies stored as Markdown, rendered safely |
 | API client | Hono RPC client (`hc`) | Typed calls from Vue straight off the API's route types |
 | API | Hono on Cloudflare Workers, split into `routes/` (definitions) and `handlers/` (logic) | Small, fast, built for Workers; routes stay short and readable |
-| Validation and API docs | Zod with `@hono/zod-openapi`; OpenAPI spec and docs set up in `openapi/` | Each route declares its input and output once, which validates requests and documents the API |
+| Validation and API docs | Zod with `@hono/zod-openapi`; OpenAPI spec and Scalar docs page set up in `openapi/` | Each route declares its input and output once, which validates requests and documents the API |
 | Database | Supabase Postgres | Managed Postgres with auth and storage in one place |
 | ORM and schema changes | Drizzle ORM and drizzle-kit. Schema, migrations and seeds in `packages/db`; `pnpm db:push` pushes the schema to Supabase. The API's connection setup lives in `apps/api/src/config/db`. | One schema package any app can import; typed queries; schema changes applied with one command |
 | DB connection from Workers | Cloudflare Hyperdrive in front of Supabase, postgres.js driver | Connection pooling so Workers don't open a new connection per request |
@@ -154,50 +154,50 @@ Every API request carries a Supabase access token. Kiosk requests carry the faci
 
 **Kiosk mode**
 
-1. A signed-in facilitator opens `/kiosk`, enters a device label ("Tablet 1") and a 4-digit PIN. `POST /api/kiosk/sessions` stores the session with the PIN hashed.
+1. A signed-in facilitator opens `/kiosk`, enters a device label ("Tablet 1") and a 4-digit PIN. `POST /api/v1/kiosk/sessions` stores the session with the PIN hashed.
 2. The `kiosk` Pinia store keeps `kioskSessionId` in `localStorage`, and the router locks the device to `/kiosk/*` routes.
 3. Kiosk calls send the facilitator's token plus an `X-Kiosk-Session` header. The `kiosk` middleware checks the session is open and belongs to that facilitator.
 4. A kiosk respondent row has `mode = kiosk` and no `profile_id`. Their attempt stores `kiosk_session_id`.
 5. Done, after results and the SUS survey, clears the attempt store and returns to `/kiosk`. Nothing about the student stays in the browser.
-6. Exit calls `POST /api/kiosk/sessions/:id/end` with the PIN. A wrong PIN 5 times in a row locks exit for 1 minute.
+6. Exit calls `POST /api/v1/kiosk/sessions/:id/end` with the PIN. A wrong PIN 5 times in a row locks exit for 1 minute.
 
 **What each role can call**
 
 | Route group | Respondent | Facilitator | Admin |
 | --- | --- | --- | --- |
-| `/api/me`, own respondent and attempt | Yes | Yes | Yes |
-| `/api/lessons` (public read) | Yes | Yes | Yes |
-| `/api/kiosk/*` | No | Yes | Yes |
-| `/api/admin/stats`, `/api/admin/respondents` (read) | No | Yes, identity only if allowed | Yes |
-| `/api/admin/export`, questions, lessons, users, void attempt | No | No | Yes |
+| `/api/v1/me`, own respondent and attempt | Yes | Yes | Yes |
+| `/api/v1/lessons` (public read) | Yes | Yes | Yes |
+| `/api/v1/kiosk/*` | No | Yes | Yes |
+| `/api/v1/admin/stats`, `/api/v1/admin/respondents` (read) | No | Yes, identity only if allowed | Yes |
+| `/api/v1/admin/export`, questions, lessons, users, void attempt | No | No | Yes |
 
 ## API
 
-All routes live under `/api`, take and return JSON validated by Zod, and send errors as `{ error: { code, message } }`. "Self" means the signed-in respondent, or the kiosk respondent of the current kiosk session.
+All routes live under `/api/v1` (only the OpenAPI spec and docs page sit at `/api`), take and return JSON validated by Zod, and send errors as `{ error: { code, message } }`. "Self" means the signed-in respondent, or the kiosk respondent of the current kiosk session.
 
 **Respondent flow**
 
 | Method | Path | Auth | Purpose |
 | --- | --- | --- | --- |
-| GET | `/api/me` | Signed in | Profile, role, own respondent record and attempt status |
-| POST | `/api/respondents` | Self | Save consent, profile and identity choice. Returns 409 if the student number already has a completed attempt. |
-| POST | `/api/attempts` | Self | Start the attempt: pick items, shuffle, set `expires_at`. Returns the existing attempt if one is in progress. |
-| GET | `/api/attempts/:id` | Self | Items in shuffled order (no correct answers), saved answers, `expires_at`, server time |
-| PUT | `/api/attempts/:id/answers/:questionId` | Self | Save or change one answer. Rejected after `expires_at` + 30 s. |
-| POST | `/api/attempts/:id/submit` | Self | Score and close the attempt, create `results_token`. Safe to call twice. |
-| GET | `/api/attempts/:id/result` | Self | Overall and per-area scores, levels, recommended lessons, `results_token` and whether SUS is answered |
-| POST | `/api/attempts/:id/sus` | Self | Save the 10 SUS answers and return the score. 409 if already answered. |
-| GET | `/api/results/:token` | Public | Results and lessons by private token, opened from the QR code (RES-04) |
-| GET | `/api/lessons` | Public | Published lessons, filterable by area and tier |
-| GET | `/api/lessons/:slug` | Public | One lesson |
+| GET | `/api/v1/me` | Signed in | Profile, role, own respondent record and attempt status |
+| POST | `/api/v1/respondents` | Self | Save consent, profile and identity choice. Returns 409 if the student number already has a completed attempt. |
+| POST | `/api/v1/attempts` | Self | Start the attempt: pick items, shuffle, set `expires_at`. Returns the existing attempt if one is in progress. |
+| GET | `/api/v1/attempts/:id` | Self | Items in shuffled order (no correct answers), saved answers, `expires_at`, server time |
+| PUT | `/api/v1/attempts/:id/answers/:questionId` | Self | Save or change one answer. Rejected after `expires_at` + 30 s. |
+| POST | `/api/v1/attempts/:id/submit` | Self | Score and close the attempt, create `results_token`. Safe to call twice. |
+| GET | `/api/v1/attempts/:id/result` | Self | Overall and per-area scores, levels, recommended lessons, `results_token` and whether SUS is answered |
+| POST | `/api/v1/attempts/:id/sus` | Self | Save the 10 SUS answers and return the score. 409 if already answered. |
+| GET | `/api/v1/results/:token` | Public | Results and lessons by private token, opened from the QR code (RES-04) |
+| GET | `/api/v1/lessons` | Public | Published lessons, filterable by area and tier |
+| GET | `/api/v1/lessons/:slug` | Public | One lesson |
 
 **Kiosk**
 
 | Method | Path | Auth | Purpose |
 | --- | --- | --- | --- |
-| POST | `/api/kiosk/sessions` | Facilitator, admin | Open a kiosk session with device label and PIN |
-| GET | `/api/kiosk/sessions/:id` | Owner | Check the session is still open |
-| POST | `/api/kiosk/sessions/:id/end` | Owner + PIN | Close the session |
+| POST | `/api/v1/kiosk/sessions` | Facilitator, admin | Open a kiosk session with device label and PIN |
+| GET | `/api/v1/kiosk/sessions/:id` | Owner | Check the session is still open |
+| POST | `/api/v1/kiosk/sessions/:id/end` | Owner + PIN | Close the session |
 
 Kiosk respondents use the same respondent-flow routes with the `X-Kiosk-Session` header.
 
@@ -205,20 +205,28 @@ Kiosk respondents use the same respondent-flow routes with the `X-Kiosk-Session`
 
 | Method | Path | Auth | Purpose |
 | --- | --- | --- | --- |
-| GET | `/api/admin/stats` | Facilitator, admin | Summary cards (including mean SUS and SUS count), level counts, comparison by a `groupBy` field. Takes all dashboard filters as query params. |
-| GET | `/api/admin/respondents` | Facilitator, admin | Paged, filtered, sorted list. Name and student number show as Hidden unless the respondent allowed them. |
-| GET | `/api/admin/respondents/:id` | Facilitator, admin | Profile and area results of one respondent |
-| GET | `/api/admin/export.csv` | Admin | Filtered respondents with profile, area scores, levels and SUS score; hidden identities stay hidden |
-| POST | `/api/admin/attempts/:id/void` | Admin | Void an attempt with a reason |
-| DELETE | `/api/admin/respondents/:id` | Admin | Delete a respondent and their attempt on request |
-| GET, POST | `/api/admin/questions` | Admin | List with item analysis; create a question with its 4 choices |
-| PATCH | `/api/admin/questions/:id` | Admin | Edit. Correct choice locked once answered. |
-| POST | `/api/admin/questions/import` | Admin | Import CSV rows; returns created count and row errors |
-| GET, POST | `/api/admin/lessons` | Admin | List and create lessons |
-| PATCH, DELETE | `/api/admin/lessons/:id` | Admin | Edit or delete a lesson |
-| POST | `/api/admin/uploads` | Admin | Upload an image to the `media` bucket; returns its public URL |
-| GET | `/api/admin/users` | Admin | Accounts with role and last sign-in |
-| PATCH | `/api/admin/users/:id` | Admin | Change role. Refuses to demote the last admin. |
+| GET | `/api/v1/admin/stats` | Facilitator, admin | Summary cards (including mean SUS and SUS count), level counts, comparison by a `groupBy` field. Takes all dashboard filters as query params. |
+| GET | `/api/v1/admin/respondents` | Facilitator, admin | Paged, filtered, sorted list. Name and student number show as Hidden unless the respondent allowed them. |
+| GET | `/api/v1/admin/respondents/:id` | Facilitator, admin | Profile and area results of one respondent |
+| GET | `/api/v1/admin/export.csv` | Admin | Filtered respondents with profile, area scores, levels and SUS score; hidden identities stay hidden |
+| POST | `/api/v1/admin/attempts/:id/void` | Admin | Void an attempt with a reason |
+| DELETE | `/api/v1/admin/respondents/:id` | Admin | Delete a respondent and their attempt on request |
+| GET, POST | `/api/v1/admin/questions` | Admin | List with item analysis; create a question with its 4 choices |
+| PATCH | `/api/v1/admin/questions/:id` | Admin | Edit. Correct choice locked once answered. |
+| POST | `/api/v1/admin/questions/import` | Admin | Import CSV rows; returns created count and row errors |
+| GET, POST | `/api/v1/admin/lessons` | Admin | List and create lessons |
+| PATCH, DELETE | `/api/v1/admin/lessons/:id` | Admin | Edit or delete a lesson |
+| POST | `/api/v1/admin/uploads` | Admin | Upload an image to the `media` bucket; returns its public URL |
+| GET | `/api/v1/admin/users` | Admin | Accounts with role and last sign-in |
+| PATCH | `/api/v1/admin/users/:id` | Admin | Change role. Refuses to demote the last admin. |
+
+**System**
+
+| Method | Path | Auth | Purpose |
+| --- | --- | --- | --- |
+| GET | `/api/v1/health` | Public | Check that the API is running |
+| GET | `/api/openapi.json` | Public | OpenAPI 3.1 spec, built from the route definitions |
+| GET | `/api/reference` | Public | API docs page (Scalar) for the spec above |
 
 **Question import CSV columns:** `area_code, difficulty, stem, image_url, choice_a, choice_b, choice_c, choice_d, correct (a to d), explanation, is_scenario`. This matches the columns the content team uses in the shared sheet.
 
@@ -226,7 +234,7 @@ Kiosk respondents use the same respondent-flow routes with the `X-Kiosk-Session`
 
 The server owns the item order, the clock and the score. The browser only shows items and sends answers.
 
-**Start** (`POST /api/attempts`)
+**Start** (`POST /api/v1/attempts`)
 
 1. Refuse if the respondent has a submitted or expired attempt that isn't voided.
 2. If an attempt is in progress, return it instead of creating a new one.
@@ -238,7 +246,7 @@ The server owns the item order, the clock and the score. The browser only shows 
 
 - The browser shows the countdown from `expires_at` minus the server time sent with each response, so a wrong phone clock doesn't matter.
 - Picking a choice sends `PUT /answers/:questionId` right away. The UI marks it saved on success and retries up to 3 times on failure, keeping the choice on screen.
-- A refresh calls `GET /api/attempts/:id` and restores the item order, saved answers and remaining time.
+- A refresh calls `GET /api/v1/attempts/:id` and restores the item order, saved answers and remaining time.
 - The server rejects an answer for an item not in `question_order` or a choice that doesn't belong to that item.
 
 **Submit and timeout**
@@ -293,7 +301,7 @@ One Vue app serves respondents, kiosk devices and admins, split by route guards.
 | --- | --- | --- |
 | `public` | `/`, `/lessons/*` | Anyone |
 | `signedIn` | `/start/*`, `/assessment`, `/results` | Supabase session required, else back to `/` |
-| `step` | `/start/profile`, `/start/ready`, `/assessment`, `/results` | Sends the user to the right step from `/api/me` (no profile → consent; attempt submitted → results) |
+| `step` | `/start/profile`, `/start/ready`, `/assessment`, `/results` | Sends the user to the right step from `/api/v1/me` (no profile → consent; attempt submitted → results) |
 | `kioskLock` | Every route | If a kiosk session is open on this device, anything outside `/kiosk/*` redirects to `/kiosk` |
 | `staff` | `/admin`, `/admin/respondents` | Role facilitator or admin |
 | `admin` | `/admin/questions`, `/admin/lessons`, `/admin/users` | Role admin |
@@ -302,7 +310,7 @@ One Vue app serves respondents, kiosk devices and admins, split by route guards.
 
 | Store | Holds | Persisted |
 | --- | --- | --- |
-| `session` | Supabase session, `/api/me` result, role | Supabase handles it |
+| `session` | Supabase session, `/api/v1/me` result, role | Supabase handles it |
 | `kiosk` | `kioskSessionId`, device label | `localStorage`, cleared on exit |
 | `attempt` | Attempt ID, items, answers, `expiresAt`, server time offset, current index | Memory only; refetched on reload |
 
@@ -326,7 +334,7 @@ Also: `SusForm` (10 statements, each a row of 5 radio buttons, Submit and Skip) 
 The browser never talks to the database directly, and only the fields the study needs are collected.
 
 - **No direct database access.** Row Level Security is on for every `public` table with no policies, so the Supabase anon key can't read or write any table. Only the API reaches the database, through Hyperdrive with a server-side connection string.
-- **Correct answers never leave the server** during an attempt. `GET /api/attempts/:id` returns choices without `is_correct`, and results show levels and scores, not per-item marks (RES-05).
+- **Correct answers never leave the server** during an attempt. `GET /api/v1/attempts/:id` returns choices without `is_correct`, and results show levels and scores, not per-item marks (RES-05).
 - **Every input is validated** with the shared Zod schemas. Markdown is rendered with markdown-it and cleaned with DOMPurify.
 - **CORS** allows only the Pages domain (and `localhost` in development).
 - **Kiosk PIN** is hashed with SHA-256 plus a per-session salt and rate limited (5 tries, then 1 minute).

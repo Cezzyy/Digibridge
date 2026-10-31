@@ -12,13 +12,14 @@ DigiBridge is a web app that measures the digital literacy of ACLC College of Ma
 
 ## Status
 
-Stage 0 scaffold. Workspaces, TypeScript, ESLint and Prettier are set up. Most folders hold a placeholder `index.ts`; there is no app code yet.
+Stage 0 scaffold. Workspaces, TypeScript, ESLint and Prettier are set up. `pnpm dev` serves a placeholder Vue page at http://localhost:5173 and the API at http://localhost:8787: an `OpenAPIHono` app with one route, `GET /api/v1/health`, the spec at `/api/openapi.json` and the docs page at http://localhost:8787/api/reference. Other folders hold a placeholder `index.ts`.
 
 ## Commands
 
 ```sh
 pnpm install
-pnpm dev | build | lint | typecheck | test   # Turborepo, every package
+pnpm dev                                      # web on :5173 (Vite), api on :8787 (wrangler dev)
+pnpm build | lint | typecheck | test          # Turborepo, every package
 pnpm check                                    # lint + typecheck + test + build (ship check)
 pnpm format | format:check                    # Prettier
 pnpm --filter <name> <script>                 # one package: web, api, @digibridge/db, @digibridge/shared, @digibridge/config
@@ -56,3 +57,7 @@ At the root: `tsconfig.base.json` (shared TypeScript settings; every package's `
 - Use `postgres` (postgres.js) 3.4.x. 4.0 was only days old on 2026-10-31.
 - pnpm 12 holds back versions published in the last day (`minimumReleaseAge`). Approve packages that need install scripts with `pnpm approve-builds`.
 - ESLint loads `eslint.config.ts` through `jiti`, a root devDependency.
+- `web` type-checks with `vue-tsc`, not `tsc`, so `.vue` files are checked.
+- API routes live under `/api/v1`; the spec and docs page stay at `/api`. Define each route with `createRoute` in `routes/` and bind it to the `v1` app with `.openapi()` in `app.ts`, so it shows up in `/api/reference`.
+- `api`'s `build` is `wrangler deploy --dry-run --outdir dist`: it bundles the Worker without deploying.
+- `compatibility_date` in `wrangler.toml` can't be later than the installed workerd supports (2026-10-23 for wrangler 4.156).

@@ -42,8 +42,10 @@ You need Node.js 22.12 or newer and pnpm 12.
 
 ```sh
 pnpm install
-pnpm check
+pnpm dev
 ```
+
+`pnpm dev` starts the web app at http://localhost:5173 and the API at http://localhost:8787 (API docs at http://localhost:8787/api/reference).
 
 `pnpm check` runs lint, typecheck, tests and build across every package. It must pass before anything is merged into `main`.
 
@@ -66,7 +68,7 @@ To run a script in one package: `pnpm --filter web dev`, `pnpm --filter api test
 
 ## Status
 
-Stage 0 of the build plan: the monorepo is set up with TypeScript, ESLint and Prettier. App code, environment variables and deploy steps are added as each stage lands.
+Stage 0 of the build plan: the monorepo is set up with TypeScript, ESLint and Prettier. The web app shows a placeholder page and the API has one route, `/api/v1/health`, with docs at `/api/reference`. App code, environment variables and deploy steps are added as each stage lands.
 
 ## Reporting bugs
 
