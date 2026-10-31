@@ -4,14 +4,21 @@
   "private": true,
   "type": "module",
   "scripts": {
+    "dev": "wrangler dev",
+    "build": "wrangler deploy --dry-run --outdir dist",
     "lint": "eslint .",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
     "@digibridge/db": "workspace:*",
-    "@digibridge/shared": "workspace:*"
+    "@digibridge/shared": "workspace:*",
+    "@hono/zod-openapi": "^1.6.3",
+    "@scalar/hono-api-reference": "^0.12.17",
+    "hono": "^4.13.14",
+    "zod": "catalog:"
   },
   "devDependencies": {
-    "typescript": "catalog:"
+    "typescript": "catalog:",
+    "wrangler": "^4.156.0"
   }
 }
