@@ -35,7 +35,7 @@ TypeScript end to end: a Vue SPA on Cloudflare Pages calls a Hono API on Cloudfl
 | Layer | Choice | Why |
 | --- | --- | --- |
 | Monorepo | Turborepo with pnpm workspaces | One repo, shared types between web and API |
-| Checks | GitHub Actions CI with `pnpm audit`, gitleaks and actionlint; Husky pre-commit hook running lint-staged | Every push to `main` and every pull request runs the ship check, a dependency audit and a secret scan; ESLint and Prettier fix staged files before each commit |
+| Checks | GitHub Actions CI with `pnpm audit`, gitleaks and actionlint; Husky pre-commit hook running lint-staged | Every push to `main` or `develop` and every pull request runs the ship check, a dependency audit and a secret scan; ESLint and Prettier fix staged files before each commit |
 | Frontend | Vue 3 with the Composition API in `<script setup>`, Vite, TypeScript | Team already knows Vue; logic reused through composables |
 | Routing and state | Vue Router, Pinia | Route guards per role; small stores for session, kiosk and attempt |
 | Styling | Tailwind CSS v4 via `@tailwindcss/vite`, no component library | Full control; design straight in code |
@@ -400,7 +400,7 @@ The scoring and shuffling logic gets unit tests; everything else is covered by M
 **Automatic checks**
 
 - **Before each commit:** Husky runs lint-staged on the staged files: `eslint --fix` then Prettier on `.ts` and `.vue` files, Prettier on everything else. A lint error stops the commit. `git commit --no-verify` skips the hook in an emergency; CI still runs.
-- **CI:** `.github/workflows/ci.yml` runs on every push to `main` and every pull request. Each job installs through `.github/actions/setup` (pnpm, Node 25, `pnpm install --frozen-lockfile`) and shows as its own check:
+- **CI:** `.github/workflows/ci.yml` runs on every push to `main` or `develop` and every pull request. Each job installs through `.github/actions/setup` (pnpm, Node 25, `pnpm install --frozen-lockfile`) and shows as its own check:
   - **Format:** `pnpm format:check`.
   - **Lint, Typecheck, Test, Build:** `pnpm turbo run <task>`, with Turbo's cache kept between runs so unchanged packages are skipped.
   - **Dependency audit:** `pnpm audit --audit-level high` fails on high or critical advisories.
