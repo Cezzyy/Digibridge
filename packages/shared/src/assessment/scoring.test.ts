@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import { ITEMS_PER_AREA, ITEMS_PER_ATTEMPT } from './assessment'
-import { LEVELS } from './enums'
+import { ITEMS_PER_AREA, ITEMS_PER_ATTEMPT } from './rules'
+import { LEVELS } from '../enums'
 import {
   AREA_MAX_POINTS,
   LESSON_TIERS_FOR_LEVEL,

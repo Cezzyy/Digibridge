@@ -1,5 +1,5 @@
-import { AREA_CODES, ITEMS_PER_DIFFICULTY } from './assessment'
-import type { Difficulty, LessonTier, Level } from './enums'
+import { AREA_CODES, ITEMS_PER_DIFFICULTY } from './rules'
+import type { Difficulty, LessonTier, Level } from '../enums'
 
 // Scoring weights, level cut-offs and lesson recommendations (PRD "Assessment and scoring rules").
 

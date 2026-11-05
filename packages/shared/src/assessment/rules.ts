@@ -1,4 +1,4 @@
-import type { Difficulty } from './enums'
+import type { Difficulty } from '../enums'
 
 // Rules of one assessment attempt (ASM-01, ASM-03, ASM-09, CMS-07).
 
