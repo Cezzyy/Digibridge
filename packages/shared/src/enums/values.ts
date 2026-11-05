@@ -30,24 +30,3 @@ export type LessonTier = (typeof LESSON_TIERS)[number]
 export const ATTEMPT_STATUSES = ['in_progress', 'submitted', 'expired', 'voided'] as const
 export const attemptStatusSchema = z.enum(ATTEMPT_STATUSES)
 export type AttemptStatus = (typeof ATTEMPT_STATUSES)[number]
-
-// Labels shown to students.
-
-export const SEX_LABELS = {
-  male: 'Male',
-  female: 'Female',
-  prefer_not_to_say: 'Prefer not to say',
-} as const satisfies Record<Sex, string>
-
-export const LEVEL_LABELS = {
-  beginner: 'Beginner',
-  basic: 'Basic',
-  intermediate: 'Intermediate',
-  advanced: 'Advanced',
-} as const satisfies Record<Level, string>
-
-export const LESSON_TIER_LABELS = {
-  foundations: 'Foundations',
-  intermediate: 'Intermediate',
-  advanced: 'Advanced',
-} as const satisfies Record<LessonTier, string>
