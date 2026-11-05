@@ -11,17 +11,17 @@ flowchart LR
     P["Pages<br/>Vue app, static files"]
     W["API Worker: Hono + OpenAPI<br/>auth check, roles, scoring<br/>cron closes expired attempts"]
     H["Hyperdrive<br/>connection pooling"]
+    R["R2<br/>private media bucket, images"]
   end
   subgraph SB["Supabase"]
     A["Auth<br/>Google provider"]
-    S["Storage<br/>media bucket, images"]
     DB[("Postgres<br/>Drizzle schema, RLS on")]
   end
   P -- "loads app" --> B
   B -- "Google sign-in, returns token" --> A
   B -- "API calls + Bearer token" --> W
   W -- "verify token (JWKS)" --> A
-  W -- "uploads" --> S
+  W -- "uploads, serves images" --> R
   W --> H
   H -- "SQL" --> DB
 ```
@@ -44,12 +44,12 @@ TypeScript end to end: a Vue SPA on Cloudflare Pages calls a Hono API on Cloudfl
 | API client | Hono RPC client (`hc`) | Typed calls from Vue straight off the API's route types |
 | API | Hono on Cloudflare Workers, split into `routes/` (definitions) and `handlers/` (logic) | Small, fast, built for Workers; routes stay short and readable |
 | Validation and API docs | Zod with `@hono/zod-openapi`; OpenAPI spec and Scalar docs page set up in `openapi/` | Each route declares its input and output once, which validates requests and documents the API |
-| Database | Supabase Postgres | Managed Postgres with auth and storage in one place |
+| Database | Supabase Postgres | Managed Postgres with auth in one place |
 | ORM and schema changes | Drizzle ORM and drizzle-kit. Schema and seeds in `packages/db`; `pnpm db:generate` writes SQL migrations to the root `supabase/migrations`, and `pnpm db:push` (`supabase db push`) applies them to the linked Supabase project. The API's connection setup lives in `apps/api/src/config/db`. | One schema package any app can import; typed queries; schema changes applied with one command |
 | DB connection from Workers | Cloudflare Hyperdrive in front of Supabase, postgres.js driver | Connection pooling so Workers don't open a new connection per request |
 | Auth | Supabase Auth, Google provider | Google sign-in with no password handling |
 | Token check in API | `jose` verifying the Supabase access token | Stateless auth on every request |
-| File storage | Supabase Storage, public `media` bucket | Images for scenario items and lessons |
+| File storage | Cloudflare R2, private `digibridge-media` bucket bound to the API as `MEDIA`; the API serves images at `/api/v1/media/:key` | Images for scenario items and lessons. Uploads go through the binding, so no storage keys; a public R2 bucket would need a custom domain |
 | Scheduled jobs | Cloudflare Cron Trigger on the API Worker | Closes attempts whose time ran out |
 | Hosting | Cloudflare Pages (web), Cloudflare Workers (API) | Free tier fits the pilot |
 | Tests | Vitest: `app.test.ts` with `test-helpers.ts` for routes, plus unit tests for scoring | Fast, no server needed (`app.request()`) |
@@ -221,7 +221,7 @@ Kiosk respondents use the same respondent-flow routes with the `X-Kiosk-Session`
 | POST | `/api/v1/admin/questions/import` | Admin | Import CSV rows; returns created count and row errors |
 | GET, POST | `/api/v1/admin/lessons` | Admin | List and create lessons |
 | PATCH, DELETE | `/api/v1/admin/lessons/:id` | Admin | Edit or delete a lesson |
-| POST | `/api/v1/admin/uploads` | Admin | Upload an image to the `media` bucket; returns its public URL |
+| POST | `/api/v1/admin/uploads` | Admin | Upload an image to the R2 `MEDIA` bucket; returns its `/api/v1/media/:key` URL |
 | GET | `/api/v1/admin/users` | Admin | Accounts with role and last sign-in |
 | PATCH | `/api/v1/admin/users/:id` | Admin | Change role. Refuses to demote the last admin. |
 
@@ -230,6 +230,7 @@ Kiosk respondents use the same respondent-flow routes with the `X-Kiosk-Session`
 | Method | Path | Auth | Purpose |
 | --- | --- | --- | --- |
 | GET | `/api/v1/health` | Public | Check that the API is running |
+| GET | `/api/v1/media/:key` | Public | Serve an uploaded image from R2, cached for a year (keys are random and never reused) |
 | GET | `/api/openapi.json` | Public | OpenAPI 3.1 spec, built from the route definitions |
 | GET | `/api/reference` | Public | API docs page (Scalar) for the spec above |
 
@@ -350,7 +351,7 @@ The browser never talks to the database directly, and only the fields the study 
   - CSV export is admin only.
   - Respondent deletion on request (USR-03).
   - All respondent data deleted at the end of the semester (December 2026).
-- **Secrets** (`DATABASE_URL`, Supabase keys) live in Wrangler secrets and Pages env vars, never in the repo.
+- **Secrets** (`DATABASE_URL`, Supabase keys) live in Wrangler secrets and local env files, never in the repo.
 
 ## Environments and deployment
 
@@ -364,27 +365,28 @@ Two environments: local for building, production for the pilot and defense. Ther
 | `VITE_SUPABASE_PUBLISHABLE_KEY` | web | Publishable key, `sb_publishable_...` (safe because RLS blocks every table) |
 | `VITE_API_URL` | web | API Worker URL |
 | `SUPABASE_URL` | api | Supabase project URL, used to fetch the JWKS |
-| `SUPABASE_SECRET_KEY` | api (secret) | Secret key, `sb_secret_...`, for Storage uploads |
-| `HYPERDRIVE` binding | api | Hyperdrive config pointing at the Supabase connection string |
+| `HYPERDRIVE` binding | api | Hyperdrive config `digibridge-db` pointing at the Supabase direct connection (`db.<project-ref>.supabase.co:5432`) |
+| `MEDIA` binding | api | R2 bucket `digibridge-media` |
+| `CLOUDFLARE_HYPERDRIVE_LOCAL_CONNECTION_STRING_HYPERDRIVE` | local only | In `apps/api/.env`; `wrangler dev` connects `HYPERDRIVE` straight to this (the session pooler string) |
 | `DATABASE_URL` | local only | Supabase session pooler string (port 5432) for drizzle-kit and seeds, in `packages/db/.env` |
 | `ADMIN_EMAILS` | api | Comma-separated emails that become admin on first sign-in |
-| `WEB_ORIGIN` | api | Pages URL for CORS |
+| `WEB_ORIGIN` | api | Pages URL for CORS, `https://digibridge-web.pages.dev` |
 
-Local values live in `apps/web/.env`, `packages/db/.env` and `apps/api/.dev.vars`, each copied from its committed `.example`. In production the API's values are Wrangler secrets (`wrangler secret put <NAME>`) and the web's are Pages env vars. The API's types for them are in `apps/api/src/env.ts`.
+Local values live in `apps/web/.env`, `packages/db/.env`, `apps/api/.dev.vars` and `apps/api/.env`, each copied from its committed `.example`. In production the API's public values (`SUPABASE_URL`, `WEB_ORIGIN`) are `[vars]` in `wrangler.toml` and its secret (`ADMIN_EMAILS`) is a Wrangler secret (`wrangler secret put <NAME>`). The web's `VITE_*` values are baked in at build time from `apps/web/.env` plus `apps/web/.env.production` (the production `VITE_API_URL`). The API's types for them are in `apps/api/src/env.ts`.
 
 **One-time setup**
 
 1. Create the Supabase project. Enable the Google provider with a Google Cloud OAuth client. Add the Pages URL and `localhost` to the redirect URLs.
-2. Create the public `media` bucket in Supabase Storage.
+2. Create the R2 bucket: `wrangler r2 bucket create digibridge-media`, bound as `MEDIA` in `wrangler.toml`.
 3. Link the repo to the project: `pnpm exec supabase login`, then `pnpm exec supabase link --project-ref <project-ref>`. Copy `apps/web/.env.example` and `packages/db/.env.example` to `.env` and fill them in.
-4. Create a Hyperdrive config from the Supabase connection string and bind it in `wrangler.toml`.
-5. Connect the GitHub repo to Cloudflare Pages: root `apps/web`, build `pnpm turbo build --filter=web`, output `apps/web/dist`.
+4. Create the Hyperdrive config from the Supabase direct connection string (`wrangler hyperdrive create digibridge-db --connection-string=...`) and bind it as `HYPERDRIVE` in `wrangler.toml`.
+5. Create the Pages project as a direct-upload project: `wrangler pages project create digibridge-web --production-branch main --force` (`--force` makes a classic Pages project; without it Wrangler now makes a Worker). The project name sets the subdomain: `https://digibridge-web.pages.dev`.
 6. Add a cron trigger `*/5 * * * *` to the API Worker in `wrangler.toml`.
 
 **Deploying**
 
-- **Web:** a push to `main` deploys through Pages.
-- **API:** run `pnpm --filter api deploy`, which is `wrangler deploy`.
+- **Web:** run `pnpm --filter web run deploy`: `vite build`, then `wrangler pages deploy dist` to the `digibridge-web` project. Pages isn't connected to Git, so a push doesn't deploy.
+- **API:** run `pnpm --filter api run deploy`, which is `wrangler deploy`, to `https://digibridge-api.casupananjohncez.workers.dev`. Use `run`: `pnpm --filter api deploy` would run pnpm's own `deploy` command.
 - **Database:** change the schema in `packages/db`, run `pnpm db:generate` to write a migration to `supabase/migrations`, read the SQL, then `pnpm db:push` (`supabase db push`) to apply it to the linked project. `pnpm db:status` lists which migrations are applied. Never edit a migration that has been pushed; generate a new one. Push before deploying an API change that needs it. The API picks up the new types through its import of `packages/db`; its connection setup in `config/db` doesn't change.
 - **Careful after Nov 11:** once real pilot data exists, read each generated migration before pushing. A migration can drop or rename columns that hold respondent data.
 - **Seeds:** `pnpm db:seed` loads the 3 areas; `pnpm db:seed:dummy` loads 5 dummy items per area for development only.

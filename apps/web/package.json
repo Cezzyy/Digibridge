@@ -8,7 +8,8 @@
     "build": "vite build",
     "preview": "vite preview",
     "lint": "eslint .",
-    "typecheck": "vue-tsc --noEmit"
+    "typecheck": "vue-tsc --noEmit",
+    "deploy": "vite build && wrangler pages deploy dist --project-name digibridge-web --branch main"
   },
   "dependencies": {
     "@digibridge/shared": "workspace:*",
@@ -19,6 +20,7 @@
     "api": "workspace:*",
     "typescript": "catalog:",
     "vite": "^8.3.5",
-    "vue-tsc": "^3.3.14"
+    "vue-tsc": "^3.3.14",
+    "wrangler": "catalog:"
   }
 }

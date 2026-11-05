@@ -25,6 +25,8 @@ pnpm format | format:check                    # Prettier
 pnpm db:generate                              # drizzle-kit: schema changes -> supabase/migrations/*.sql
 pnpm db:push                                  # supabase db push: apply new migrations to the linked project
 pnpm db:status                                # supabase migration list: local vs remote
+pnpm --filter web run deploy                  # build + wrangler pages deploy -> https://digibridge-web.pages.dev
+pnpm --filter api run deploy                  # wrangler deploy -> https://digibridge-api.casupananjohncez.workers.dev
 pnpm --filter <name> <script>                 # one package: web, api, @digibridge/db, @digibridge/shared, @digibridge/config
 ```
 
@@ -51,7 +53,7 @@ At the root: `tsconfig.base.json` (shared TypeScript settings; every package's `
 - `apps/web` imports only types from `apps/api` (`import type`), never runtime code.
 - Internal packages are used as TypeScript source (`exports` point at `src/*.ts`), with no build step.
 - A dependency used by more than one package gets its version in the `catalog:` in `pnpm-workspace.yaml`.
-- Secrets never go in the repo, only `.env.example` and `.dev.vars.example`. Local values live in `apps/web/.env`, `packages/db/.env` and `apps/api/.dev.vars`. Add a new API variable to `.dev.vars.example` and the `Bindings` type in `apps/api/src/env.ts`.
+- Secrets never go in the repo, only `.env.example` and `.dev.vars.example`. Local values live in `apps/web/.env`, `packages/db/.env`, `apps/api/.dev.vars` and `apps/api/.env`. Add a new API variable to `.dev.vars.example` and the `Bindings` type in `apps/api/src/env.ts`.
 - User-facing text is plain English, written for students.
 
 ## Versions and gotchas
@@ -63,6 +65,8 @@ At the root: `tsconfig.base.json` (shared TypeScript settings; every package's `
 - ESLint loads `eslint.config.ts` through `jiti`, a root devDependency.
 - `web` type-checks with `vue-tsc`, not `tsc`, so `.vue` files are checked.
 - API routes live under `/api/v1`; the spec and docs page stay at `/api`. Define each route with `createRoute` in `routes/` and bind it to the `v1` app with `.openapi()` in `app.ts`, so it shows up in `/api/reference`.
+- The API's bindings are in `wrangler.toml`: `HYPERDRIVE` (config `digibridge-db`, Supabase direct connection) and `MEDIA` (private R2 bucket `digibridge-media`, images served by the API). `wrangler dev` connects `HYPERDRIVE` to `CLOUDFLARE_HYPERDRIVE_LOCAL_CONNECTION_STRING_HYPERDRIVE` in `apps/api/.env` and uses a local stand-in for R2. The API type-checks against `@cloudflare/workers-types`, not DOM.
+- Deploy with `pnpm --filter <app> run deploy`, not `pnpm --filter <app> deploy` (that's pnpm's own `deploy` command). Pages is a direct-upload project, so pushing to `main` doesn't deploy the web app. The API's public settings are `[vars]` in `wrangler.toml`; its secrets are set with `wrangler secret put`. The web's production `VITE_API_URL` is in `apps/web/.env.production` (gitignored).
 - `api`'s `build` is `wrangler deploy --dry-run --outdir dist`: it bundles the Worker without deploying.
 - `compatibility_date` in `wrangler.toml` can't be later than the installed workerd supports (2026-10-23 for wrangler 4.156).
 - lint-staged 17 needs Node 22.22.1 or newer, which sets the root `engines.node`. Its config lives in `package.json` because lint-staged only loads a `.ts` config when passed `--config`.

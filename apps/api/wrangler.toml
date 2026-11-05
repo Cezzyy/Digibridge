@@ -4,3 +4,19 @@ compatibility_date = "2026-10-23"
 
 [dev]
 port = 8787
+
+# Public settings. .dev.vars overrides these in `wrangler dev`; secrets are set with `wrangler secret put`.
+[vars]
+SUPABASE_URL = "https://pvjykztyqpuywsccvlqg.supabase.co"
+WEB_ORIGIN = "https://digibridge-web.pages.dev"
+
+# Postgres through Hyperdrive (pooled connection to the Supabase direct connection).
+# Locally, wrangler dev uses CLOUDFLARE_HYPERDRIVE_LOCAL_CONNECTION_STRING_HYPERDRIVE from apps/api/.env instead.
+[[hyperdrive]]
+binding = "HYPERDRIVE"
+id = "cb86ab5ed71c4778886200d6c14a318c"
+
+# Private bucket for question and lesson images, served by the API at /api/v1/media/<key>.
+[[r2_buckets]]
+binding = "MEDIA"
+bucket_name = "digibridge-media"

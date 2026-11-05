@@ -23,14 +23,15 @@ Every feature is built in this order:
 Done when you can sign in with Google on the deployed site and `/api/v1/me` answers with your admin profile.
 
 - [ ] **Monorepo:** Turborepo and pnpm workspaces with `apps/web`, `apps/api`, `packages/db`, `packages/shared`, `packages/config`.
-- [ ] **Supabase project:** Google provider on, redirect URLs for `localhost` and the Pages URL, public `media` bucket.
+- [ ] **Supabase project:** Google provider on, redirect URLs for `localhost` and the Pages URL.
+- [ ] **Cloudflare resources:** Pages project `digibridge-web`, R2 bucket `digibridge-media`, Hyperdrive config `digibridge-db`, all bound in `wrangler.toml`.
 - [ ] **Full schema** in `packages/db`: all 11 tables and 7 enums from the TRD, the partial unique indexes (one attempt per respondent, one correct choice per question) and the 3 dashboard indexes. `db:generate`, `db:push`.
 - [ ] **Seeds:** `db:seed` for the 3 areas, `db:seed:dummy` for 5 dummy items per area.
 - [ ] **Shared package:** enums, course and year-level lists, student number regex, scoring weights and level cut-offs.
 - [ ] **API skeleton:** OpenAPIHono app, error handler that returns `{ error: { code, message } }`, CORS for the Pages origin, `config/db` connection, docs in `openapi/`.
 - [ ] **Auth middleware and `GET /api/v1/me`:** verify the Supabase token with `jose`, create the profile on first call, `ADMIN_EMAILS` makes you admin, `requireRole` (AUTH-01, AUTH-02, AUTH-04).
 - [ ] **Web skeleton:** Vue Router, Pinia, Tailwind v4 tokens in `@theme`, Supabase client, `hc` client, sign in and sign out (AUTH-01, AUTH-03).
-- [ ] **Deploy both:** Pages from `main`, `wrangler deploy` for the API, cron trigger in `wrangler.toml`.
+- [ ] **Deploy both:** `pnpm --filter web run deploy` to Pages, `pnpm --filter api run deploy` for the API, cron trigger in `wrangler.toml`.
 
 ## Stage 1: Respondent flow (Nov 1 to 2)
 
@@ -61,7 +62,7 @@ Done when two students in a row finish on one tablet and the second sees nothing
 Done when an admin can load the 30 real items by CSV and read the pilot data on the dashboard. You're back at work from Nov 4, so these are evening-sized pieces. In this order:
 
 - [ ] **Questions:** list per area, create and edit with exactly 4 choices and 1 correct, correct choice locked once answered, deactivate instead of delete (CMS-01 to CMS-03).
-- [ ] **Uploads:** `POST /api/v1/admin/uploads` to the `media` bucket, PNG, JPEG or WebP up to 2 MB (CMS-05).
+- [ ] **Uploads:** `POST /api/v1/admin/uploads` to the R2 `MEDIA` bucket, PNG, JPEG or WebP up to 2 MB, and `GET /api/v1/media/:key` to serve them (CMS-05).
 - [ ] **CSV import:** columns from the TRD, report row errors, and the readiness check of 10 active items per area in the 4/4/2 mix (CMS-06, CMS-07). Needed by Nov 8, when the real items arrive.
 - [ ] **Lessons editor:** list and Markdown editor with preview (CMS-04).
 - [ ] **Dashboard:** `GET /api/v1/admin/stats` with every filter, summary cards including mean SUS, level chart per area, comparison chart by a chosen grouping (DSH-01 to DSH-04, SUS-05).
@@ -86,7 +87,7 @@ Backend safety, before the freeze on Nov 11. Most urgent first:
 
 - [ ] **RLS on** for every `public` table with no policies; check the anon key can read nothing.
 - [ ] **Rate limits** on answer saves, kiosk PIN and CSV import.
-- [ ] **Secrets** only in Wrangler secrets and Pages env vars; `.env.example` in the repo.
+- [ ] **Secrets** only in Wrangler secrets and local env files; `.env.example` in the repo.
 - [ ] **Security headers** on the API and the web.
 - [ ] **Supabase settings:** only the Pages URL and `localhost` as redirect URLs.
 - [ ] **Decide whether `/api/reference` stays open in prod**, with an `API_DOCS` flag.
@@ -115,7 +116,7 @@ Done when the database holds only real content and no test data.
 ## Settle as we go
 
 - **Token check:** see whether the Supabase project signs tokens with the new asymmetric keys (JWKS) or the legacy JWT secret before writing the auth middleware.
-- **Database connection:** Hyperdrive in production, a direct `DATABASE_URL` locally. If Hyperdrive fights you on day 1, use the Supabase transaction pooler and add Hyperdrive later.
+- **Database connection:** Hyperdrive in production; locally `wrangler dev` points the `HYPERDRIVE` binding at the session pooler string in `apps/api/.env`. If Hyperdrive fights you on day 1, use the Supabase transaction pooler and add Hyperdrive later.
 - **Kiosk resume:** if a kiosk tablet refreshes mid-attempt, the attempt ID in memory is gone. Proposed: on the kiosk start screen, entering the same student number in the same kiosk session returns the in-progress attempt.
 - **Age field:** the PRD gives no range. Proposed: whole numbers from 15 to 60.
 - **Finding a hidden respondent for a deletion request:** Hidden respondents can't be found in the table. Proposed: admins can search by the exact student number only, and the result opens the delete and void actions without listing the name.

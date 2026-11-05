@@ -14,13 +14,13 @@ It is the working prototype for the study _DigiBridge: Digital Literacy Assessme
 
 ## Stack
 
-| Part     | Tools                                                                |
-| -------- | -------------------------------------------------------------------- |
-| Web      | Vue 3, Vite, Vue Router, Pinia, Tailwind CSS v4, on Cloudflare Pages |
-| API      | Hono with Zod and OpenAPI, on Cloudflare Workers                     |
-| Data     | Supabase Postgres, Auth (Google) and Storage, through Drizzle ORM    |
-| Monorepo | Turborepo, pnpm workspaces, TypeScript, ESLint, Prettier             |
-| Checks   | GitHub Actions CI, Husky pre-commit hook with lint-staged            |
+| Part     | Tools                                                                  |
+| -------- | ---------------------------------------------------------------------- |
+| Web      | Vue 3, Vite, Vue Router, Pinia, Tailwind CSS v4, on Cloudflare Pages   |
+| API      | Hono with Zod and OpenAPI, on Cloudflare Workers                       |
+| Data     | Supabase Postgres and Auth (Google) through Drizzle ORM; R2 for images |
+| Monorepo | Turborepo, pnpm workspaces, TypeScript, ESLint, Prettier               |
+| Checks   | GitHub Actions CI, Husky pre-commit hook with lint-staged              |
 
 ## Repo layout
 

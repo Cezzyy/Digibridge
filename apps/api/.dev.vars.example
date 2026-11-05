@@ -1,11 +1,8 @@
-# Copy to .dev.vars for `wrangler dev`. In production set each one with `wrangler secret put <NAME>`.
+# Copy to .dev.vars for `wrangler dev`. Values here override [vars] in wrangler.toml.
 
-# Supabase dashboard > Project Settings > API Keys
-SUPABASE_URL=https://<project-ref>.supabase.co
-# Secret key (sb_secret_...), used only for Storage uploads. Never send it to the browser.
-SUPABASE_SECRET_KEY=sb_secret_...
-
+# Secret. In production set it with `wrangler secret put ADMIN_EMAILS`.
 # Comma-separated emails that become admin on first sign-in
 ADMIN_EMAILS=you@example.com
-# Web app origin allowed by CORS
+
+# Local override of [vars]: the Vite dev server
 WEB_ORIGIN=http://localhost:5173
