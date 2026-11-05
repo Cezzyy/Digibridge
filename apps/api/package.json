@@ -15,7 +15,9 @@
     "@digibridge/shared": "workspace:*",
     "@hono/zod-openapi": "^1.6.3",
     "@scalar/hono-api-reference": "^0.12.17",
+    "drizzle-orm": "catalog:",
     "hono": "^4.13.14",
+    "postgres": "~3.4.9",
     "zod": "catalog:"
   },
   "devDependencies": {
