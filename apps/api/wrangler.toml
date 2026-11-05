@@ -1,6 +1,8 @@
 name = "digibridge-api"
 main = "src/index.ts"
 compatibility_date = "2026-10-23"
+# postgres.js needs Node's Buffer and crypto on Workers.
+compatibility_flags = ["nodejs_compat"]
 
 [dev]
 port = 8787

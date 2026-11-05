@@ -12,7 +12,7 @@ DigiBridge is a web app that measures the digital literacy of ACLC College of Ma
 
 ## Status
 
-Stage 0 scaffold. Workspaces, TypeScript, ESLint, Prettier, a Husky pre-commit hook and GitHub Actions CI are set up. `pnpm dev` serves a placeholder Vue page at http://localhost:5173 and the API at http://localhost:8787: an `OpenAPIHono` app with one route, `GET /api/v1/health`, the spec at `/api/openapi.json` and the docs page at http://localhost:8787/api/reference. Other folders hold a placeholder `index.ts`.
+Stage 0 scaffold. Workspaces, TypeScript, ESLint, Prettier, a Husky pre-commit hook and GitHub Actions CI are set up. `pnpm dev` serves a placeholder Vue page at http://localhost:5173 and the API at http://localhost:8787: an `OpenAPIHono` app with one route, `GET /api/v1/health`, the spec at `/api/openapi.json` and the docs page at http://localhost:8787/api/reference. The full schema (11 tables, 7 enums, RLS on every table) is in `packages/db/src/schema` and pushed to Supabase as `supabase/migrations/*_init_schema.sql`; the enum values come from `packages/shared/src/enums.ts`. `apps/api/src/config/db` exports `createDb(env)`, which no route uses yet. Other folders hold a placeholder `index.ts`.
 
 ## Commands
 
@@ -75,5 +75,9 @@ At the root: `tsconfig.base.json` (shared TypeScript settings; every package's `
 - The Secret scan job runs the gitleaks CLI (version and SHA-256 pinned in `ci.yml`) over the full history, not `gitleaks/gitleaks-action`: the action scans `<first pushed commit>^..<head>`, which fails when a push includes the repo's first commit.
 - drizzle-kit writes migrations to `supabase/migrations` with `migrations.prefix: 'supabase'`, so file names match the Supabase CLI's `<timestamp>_name.sql`. Drizzle's snapshots sit in `migrations/meta/`, which the CLI skips. Don't hand-edit pushed migrations; don't use `drizzle-kit push`.
 - The Supabase CLI is the root devDependency `supabase` (run it as `pnpm exec supabase`). `supabase link` stores the project ref in `supabase/.temp/`, which is gitignored, so each machine links once.
+- Every table calls `.enableRLS()` and has no policies, so the publishable key can't read or write anything. The API connects as `postgres`, the table owner, which skips RLS. Add `.enableRLS()` to every new table.
+- `profiles.id` references `auth.users(id)` through `authUsers` from `drizzle-orm/supabase`. Don't export `authUsers` from the schema, or drizzle-kit will try to create it.
+- Call `createDb(c.env)` once per request: a Worker can't reuse a connection across requests, and Hyperdrive does the pooling. postgres.js needs `nodejs_compat` in `wrangler.toml`.
+- `db:push` and `db:status` need `supabase link` (which needs `supabase login`). Without a link, pass the URL: `pnpm exec supabase db push --db-url "$DATABASE_URL"` with `packages/db/.env` loaded.
 - `DATABASE_URL` uses the session pooler (port 5432). The transaction pooler (6543) doesn't support prepared statements.
 - `pnpm audit` reports one moderate advisory (`minimatch`, pulled in by ESLint, dev only). CI fails only on high or critical ones.
