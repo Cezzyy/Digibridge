@@ -22,10 +22,10 @@ Every feature is built in this order:
 
 Done when you can sign in with Google on the deployed site and `/api/v1/me` answers with your admin profile.
 
-- [ ] **Monorepo:** Turborepo and pnpm workspaces with `apps/web`, `apps/api`, `packages/db`, `packages/shared`, `packages/config`.
-- [ ] **Supabase project:** Google provider on, redirect URLs for `localhost` and the Pages URL.
-- [ ] **Cloudflare resources:** Pages project `digibridge-web`, R2 bucket `digibridge-media`, Hyperdrive config `digibridge-db`, all bound in `wrangler.toml`.
-- [ ] **Full schema** in `packages/db`: all 11 tables and 7 enums from the TRD, the partial unique indexes (one attempt per respondent, one correct choice per question) and the 3 dashboard indexes. `db:generate`, `db:push`.
+- [x] **Monorepo:** Turborepo and pnpm workspaces with `apps/web`, `apps/api`, `packages/db`, `packages/shared`, `packages/config`.
+- [x] **Supabase project:** Google provider on, redirect URLs for `localhost` and the Pages URL.
+- [x] **Cloudflare resources:** Pages project `digibridge-web`, R2 bucket `digibridge-media`, Hyperdrive config `digibridge-db`, all bound in `wrangler.toml`.
+- [x] **Full schema** in `packages/db`: all 11 tables and 7 enums from the TRD, the partial unique indexes (one attempt per respondent, one correct choice per question) and the 3 dashboard indexes. `db:generate`, `db:push`.
 - [ ] **Seeds:** `db:seed` for the 3 areas, `db:seed:dummy` for 5 dummy items per area.
 - [ ] **Shared package:** enums, course and year-level lists, student number regex, scoring weights and level cut-offs.
 - [ ] **API skeleton:** OpenAPIHono app, error handler that returns `{ error: { code, message } }`, CORS for the Pages origin, `config/db` connection, docs in `openapi/`.
@@ -121,4 +121,6 @@ Done when the database holds only real content and no test data.
 - **Age field:** the PRD gives no range. Proposed: whole numbers from 15 to 60.
 - **Finding a hidden respondent for a deletion request:** Hidden respondents can't be found in the table. Proposed: admins can search by the exact student number only, and the result opens the delete and void actions without listing the name.
 - **Results token lifetime:** proposed: valid until respondent data is deleted at the end of the semester.
+- **Kiosk PIN lockout:** `kiosk_sessions` has no columns to count wrong PINs, and the Worker keeps no state between requests, so "5 wrong tries locks exit for 1 minute" has nowhere to live. Proposed: in Stage 2, add `pin_failed_count` (smallint, default 0) and `pin_locked_until` (timestamptz, null) with a new migration, and store the salt inside `pin_hash` as `salt:hash`.
+- **Exactly 4 choices:** the database allows at most 4 choices per question (positions 0 to 3, no repeats) and at most 1 correct, but it can't stop a question from having fewer than 4 or none correct. Proposed: the question create, edit and CSV import handlers check for exactly 4 choices with exactly 1 correct, and save the question and its choices in one transaction.
 - **Needed from the team:** real questions (Nov 6), checked questions and 9 lessons (Nov 7), SUS wording (Nov 7).
