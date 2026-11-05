@@ -1,0 +1,11 @@
+# Copy to .dev.vars for `wrangler dev`. In production set each one with `wrangler secret put <NAME>`.
+
+# Supabase dashboard > Project Settings > API Keys
+SUPABASE_URL=https://<project-ref>.supabase.co
+# Secret key (sb_secret_...), used only for Storage uploads. Never send it to the browser.
+SUPABASE_SECRET_KEY=sb_secret_...
+
+# Comma-separated emails that become admin on first sign-in
+ADMIN_EMAILS=you@example.com
+# Web app origin allowed by CORS
+WEB_ORIGIN=http://localhost:5173

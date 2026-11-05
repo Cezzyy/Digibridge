@@ -1,13 +1,14 @@
 import { OpenAPIHono } from '@hono/zod-openapi'
+import type { AppEnv } from './env'
 import { getHealth } from './handlers/health'
 import { addApiDocs } from './openapi'
 import { healthRoute } from './routes/health'
 
 // Version 1 routes. Each route is defined in routes/ and bound to its handler here.
-const v1 = new OpenAPIHono().openapi(healthRoute, getHealth)
+const v1 = new OpenAPIHono<AppEnv>().openapi(healthRoute, getHealth)
 
 // Builds the Hono app: routes under /api/v1, docs under /api.
-export const app = new OpenAPIHono().basePath('/api').route('/v1', v1)
+export const app = new OpenAPIHono<AppEnv>().basePath('/api').route('/v1', v1)
 
 addApiDocs(app)
 

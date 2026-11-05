@@ -15,7 +15,10 @@
     "test": "turbo run test",
     "check": "turbo run lint typecheck test build",
     "format": "prettier --write .",
-    "format:check": "prettier --check ."
+    "format:check": "prettier --check .",
+    "db:generate": "pnpm --filter @digibridge/db db:generate",
+    "db:push": "supabase db push",
+    "db:status": "supabase migration list"
   },
   "lint-staged": {
     "*.{ts,vue}": [
@@ -31,6 +34,7 @@
     "jiti": "^2.7.0",
     "lint-staged": "^17.6.0",
     "prettier": "^3.9.10",
+    "supabase": "^2.122.0",
     "turbo": "^2.11.10",
     "typescript": "catalog:"
   }

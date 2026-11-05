@@ -29,9 +29,10 @@ apps/
   web/        Vue app for respondents, kiosk devices and admins
   api/        API Worker: auth, roles, scoring, dashboard data
 packages/
-  db/         Database schema, migrations and seeds
+  db/         Database schema and seeds
   shared/     Enums, option lists and scoring constants used by web and api
   config/     Shared ESLint rules
+supabase/     Supabase CLI config and SQL migrations
 docs/         PRD, TRD and build plan
 tsconfig.base.json   Shared TypeScript settings every package extends
 eslint.config.ts     One lint config for the whole repo

@@ -22,6 +22,9 @@ pnpm dev                                      # web on :5173 (Vite), api on :878
 pnpm build | lint | typecheck | test          # Turborepo, every package
 pnpm check                                    # lint + typecheck + test + build (ship check)
 pnpm format | format:check                    # Prettier
+pnpm db:generate                              # drizzle-kit: schema changes -> supabase/migrations/*.sql
+pnpm db:push                                  # supabase db push: apply new migrations to the linked project
+pnpm db:status                                # supabase migration list: local vs remote
 pnpm --filter <name> <script>                 # one package: web, api, @digibridge/db, @digibridge/shared, @digibridge/config
 ```
 
@@ -31,9 +34,10 @@ pnpm --filter <name> <script>                 # one package: web, api, @digibrid
 | ----------------- | ------------------------------------------------------------------------- |
 | `apps/web`        | Vue 3 SPA, deployed to Cloudflare Pages                                   |
 | `apps/api`        | Hono + OpenAPI on Cloudflare Workers; the only code that touches Postgres |
-| `packages/db`     | Drizzle schema, migrations and seeds                                      |
+| `packages/db`     | Drizzle schema, seeds and `drizzle.config.ts`                             |
 | `packages/shared` | Zod enums, option lists and scoring constants used by web and api         |
 | `packages/config` | Shared ESLint rules (`eslint/`), used by the root `eslint.config.ts`      |
+| `supabase`        | Supabase CLI project (`config.toml`) and the SQL `migrations/`            |
 
 At the root: `tsconfig.base.json` (shared TypeScript settings; every package's `tsconfig.json` extends it with `../../tsconfig.base.json`), `eslint.config.ts` (one lint config for the repo, rules from `packages/config`), `.prettierrc`, `turbo.json`, and `pnpm-workspace.yaml` (workspaces and the version catalog). `.husky/pre-commit` runs lint-staged (its config is the `lint-staged` key in the root `package.json`). `.github/workflows/ci.yml` runs on every push to `main` and every pull request: Format, Lint, Typecheck, Test and Build as separate jobs (Turbo cache kept between runs), plus Dependency audit (`pnpm audit --audit-level high`), Secret scan (gitleaks) and Workflow lint (actionlint). Every job installs through `.github/actions/setup`.
 
@@ -47,7 +51,7 @@ At the root: `tsconfig.base.json` (shared TypeScript settings; every package's `
 - `apps/web` imports only types from `apps/api` (`import type`), never runtime code.
 - Internal packages are used as TypeScript source (`exports` point at `src/*.ts`), with no build step.
 - A dependency used by more than one package gets its version in the `catalog:` in `pnpm-workspace.yaml`.
-- Secrets never go in the repo, only `.env.example` and `.dev.vars.example`.
+- Secrets never go in the repo, only `.env.example` and `.dev.vars.example`. Local values live in `apps/web/.env`, `packages/db/.env` and `apps/api/.dev.vars`. Add a new API variable to `.dev.vars.example` and the `Bindings` type in `apps/api/src/env.ts`.
 - User-facing text is plain English, written for students.
 
 ## Versions and gotchas
@@ -65,4 +69,7 @@ At the root: `tsconfig.base.json` (shared TypeScript settings; every package's `
 - `pnpm install` runs the root `prepare` script (`husky`), which points Git at `.husky/`. CI sets `HUSKY=0` to skip it.
 - CI uses Node 25 to match local dev. Bump `node-version` in `.github/actions/setup/action.yml` when local Node changes.
 - The Secret scan job runs the gitleaks CLI (version and SHA-256 pinned in `ci.yml`) over the full history, not `gitleaks/gitleaks-action`: the action scans `<first pushed commit>^..<head>`, which fails when a push includes the repo's first commit.
+- drizzle-kit writes migrations to `supabase/migrations` with `migrations.prefix: 'supabase'`, so file names match the Supabase CLI's `<timestamp>_name.sql`. Drizzle's snapshots sit in `migrations/meta/`, which the CLI skips. Don't hand-edit pushed migrations; don't use `drizzle-kit push`.
+- The Supabase CLI is the root devDependency `supabase` (run it as `pnpm exec supabase`). `supabase link` stores the project ref in `supabase/.temp/`, which is gitignored, so each machine links once.
+- `DATABASE_URL` uses the session pooler (port 5432). The transaction pooler (6543) doesn't support prepared statements.
 - `pnpm audit` reports one moderate advisory (`minimatch`, pulled in by ESLint, dev only). CI fails only on high or critical ones.

@@ -7,13 +7,18 @@
     ".": "./src/index.ts"
   },
   "scripts": {
+    "db:generate": "drizzle-kit generate",
+    "db:studio": "drizzle-kit studio",
     "lint": "eslint .",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@digibridge/shared": "workspace:*"
+    "@digibridge/shared": "workspace:*",
+    "drizzle-orm": "^0.45.4"
   },
   "devDependencies": {
+    "@types/node": "^25.9.9",
+    "drizzle-kit": "^0.31.11",
     "typescript": "catalog:"
   }
 }

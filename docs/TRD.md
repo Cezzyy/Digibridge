@@ -45,7 +45,7 @@ TypeScript end to end: a Vue SPA on Cloudflare Pages calls a Hono API on Cloudfl
 | API | Hono on Cloudflare Workers, split into `routes/` (definitions) and `handlers/` (logic) | Small, fast, built for Workers; routes stay short and readable |
 | Validation and API docs | Zod with `@hono/zod-openapi`; OpenAPI spec and Scalar docs page set up in `openapi/` | Each route declares its input and output once, which validates requests and documents the API |
 | Database | Supabase Postgres | Managed Postgres with auth and storage in one place |
-| ORM and schema changes | Drizzle ORM and drizzle-kit. Schema, migrations and seeds in `packages/db`; `pnpm db:push` pushes the schema to Supabase. The API's connection setup lives in `apps/api/src/config/db`. | One schema package any app can import; typed queries; schema changes applied with one command |
+| ORM and schema changes | Drizzle ORM and drizzle-kit. Schema and seeds in `packages/db`; `pnpm db:generate` writes SQL migrations to the root `supabase/migrations`, and `pnpm db:push` (`supabase db push`) applies them to the linked Supabase project. The API's connection setup lives in `apps/api/src/config/db`. | One schema package any app can import; typed queries; schema changes applied with one command |
 | DB connection from Workers | Cloudflare Hyperdrive in front of Supabase, postgres.js driver | Connection pooling so Workers don't open a new connection per request |
 | Auth | Supabase Auth, Google provider | Google sign-in with no password handling |
 | Token check in API | `jose` verifying the Supabase access token | Stateless auth on every request |
@@ -85,13 +85,13 @@ digibridge/
 │     │  └─ test-helpers.ts  signed-in requests, test data
 │     └─ wrangler.toml
 ├─ packages/
-│  ├─ db/                     Drizzle schema, migrations and seeds (db:generate, db:push, db:seed)
+│  ├─ db/                     Drizzle schema and seeds (db:generate, db:seed)
 │  │  ├─ src/schema/        tables, enums, relations
-│  │  ├─ migrations/
 │  │  ├─ seed/              base.ts (3 areas), dummy.ts (dev items)
 │  │  └─ drizzle.config.ts
 │  ├─ shared/                 Zod enums, option lists and scoring constants used by web and api
 │  └─ config/                 shared lint settings, used by the root eslint.config.ts
+├─ supabase/                 Supabase CLI project: config.toml, migrations/ (written by drizzle-kit, applied by db:push)
 ├─ .github/
 │  ├─ workflows/ci.yml       CI: checks, dependency audit, secret scan and workflow lint
 │  └─ actions/setup/         shared CI step: pnpm, Node and pnpm install
@@ -153,7 +153,7 @@ Every API request carries a Supabase access token. Kiosk requests carry the faci
 
 1. The web app calls `supabase.auth.signInWithOAuth({ provider: 'google' })` and gets a session back on the redirect.
 2. Every API call sends `Authorization: Bearer <access_token>`.
-3. The `auth` middleware verifies the token with `jose` against the project's JWKS (or the legacy JWT secret, whichever the Supabase project uses), then loads or creates the `profiles` row.
+3. The `auth` middleware verifies the token with `jose` against the project's JWKS (`<SUPABASE_URL>/auth/v1/.well-known/jwks.json`, ES256 signing keys), then loads or creates the `profiles` row.
 4. On first sign-in, if the email is in `ADMIN_EMAILS`, the role is set to admin. Everyone else starts as respondent.
 5. `requireRole('admin')` and `requireRole('facilitator', 'admin')` guard routes. The Vue router mirrors these guards for display only; the API is the real check.
 
@@ -338,7 +338,7 @@ Also: `SusForm` (10 statements, each a row of 5 radio buttons, Submit and Skip) 
 
 The browser never talks to the database directly, and only the fields the study needs are collected.
 
-- **No direct database access.** Row Level Security is on for every `public` table with no policies, so the Supabase anon key can't read or write any table. Only the API reaches the database, through Hyperdrive with a server-side connection string.
+- **No direct database access.** Row Level Security is on for every `public` table with no policies, so the Supabase publishable key can't read or write any table. Only the API reaches the database, through Hyperdrive with a server-side connection string.
 - **Correct answers never leave the server** during an attempt. `GET /api/v1/attempts/:id` returns choices without `is_correct`, and results show levels and scores, not per-item marks (RES-05).
 - **Every input is validated** with the shared Zod schemas. Markdown is rendered with markdown-it and cleaned with DOMPurify.
 - **CORS** allows only the Pages domain (and `localhost` in development).
@@ -361,30 +361,32 @@ Two environments: local for building, production for the pilot and defense. Ther
 | Variable | Where | Value |
 | --- | --- | --- |
 | `VITE_SUPABASE_URL` | web | Supabase project URL |
-| `VITE_SUPABASE_ANON_KEY` | web | Public anon key (safe because RLS blocks every table) |
+| `VITE_SUPABASE_PUBLISHABLE_KEY` | web | Publishable key, `sb_publishable_...` (safe because RLS blocks every table) |
 | `VITE_API_URL` | web | API Worker URL |
 | `SUPABASE_URL` | api | Supabase project URL, used to fetch the JWKS |
-| `SUPABASE_JWT_SECRET` | api (secret) | Only if the project still uses the legacy JWT secret |
-| `SUPABASE_SERVICE_ROLE_KEY` | api (secret) | For Storage uploads |
+| `SUPABASE_SECRET_KEY` | api (secret) | Secret key, `sb_secret_...`, for Storage uploads |
 | `HYPERDRIVE` binding | api | Hyperdrive config pointing at the Supabase connection string |
-| `DATABASE_URL` | local only | Direct Supabase connection for drizzle-kit and seeds |
+| `DATABASE_URL` | local only | Supabase session pooler string (port 5432) for drizzle-kit and seeds, in `packages/db/.env` |
 | `ADMIN_EMAILS` | api | Comma-separated emails that become admin on first sign-in |
 | `WEB_ORIGIN` | api | Pages URL for CORS |
+
+Local values live in `apps/web/.env`, `packages/db/.env` and `apps/api/.dev.vars`, each copied from its committed `.example`. In production the API's values are Wrangler secrets (`wrangler secret put <NAME>`) and the web's are Pages env vars. The API's types for them are in `apps/api/src/env.ts`.
 
 **One-time setup**
 
 1. Create the Supabase project. Enable the Google provider with a Google Cloud OAuth client. Add the Pages URL and `localhost` to the redirect URLs.
 2. Create the public `media` bucket in Supabase Storage.
-3. Create a Hyperdrive config from the Supabase connection string and bind it in `wrangler.toml`.
-4. Connect the GitHub repo to Cloudflare Pages: root `apps/web`, build `pnpm turbo build --filter=web`, output `apps/web/dist`.
-5. Add a cron trigger `*/5 * * * *` to the API Worker in `wrangler.toml`.
+3. Link the repo to the project: `pnpm exec supabase login`, then `pnpm exec supabase link --project-ref <project-ref>`. Copy `apps/web/.env.example` and `packages/db/.env.example` to `.env` and fill them in.
+4. Create a Hyperdrive config from the Supabase connection string and bind it in `wrangler.toml`.
+5. Connect the GitHub repo to Cloudflare Pages: root `apps/web`, build `pnpm turbo build --filter=web`, output `apps/web/dist`.
+6. Add a cron trigger `*/5 * * * *` to the API Worker in `wrangler.toml`.
 
 **Deploying**
 
 - **Web:** a push to `main` deploys through Pages.
 - **API:** run `pnpm --filter api deploy`, which is `wrangler deploy`.
-- **Database:** change the schema in `packages/db`, run `pnpm db:generate` to record the migration in the repo, then `pnpm db:push` to push the schema to Supabase. Push before deploying an API change that needs it. The API picks up the new types through its import of `packages/db`; its connection setup in `config/db` doesn't change.
-- **Careful after Nov 11:** once real pilot data exists, read the `db:push` prompt before confirming. Push can drop or rename columns that hold respondent data.
+- **Database:** change the schema in `packages/db`, run `pnpm db:generate` to write a migration to `supabase/migrations`, read the SQL, then `pnpm db:push` (`supabase db push`) to apply it to the linked project. `pnpm db:status` lists which migrations are applied. Never edit a migration that has been pushed; generate a new one. Push before deploying an API change that needs it. The API picks up the new types through its import of `packages/db`; its connection setup in `config/db` doesn't change.
+- **Careful after Nov 11:** once real pilot data exists, read each generated migration before pushing. A migration can drop or rename columns that hold respondent data.
 - **Seeds:** `pnpm db:seed` loads the 3 areas; `pnpm db:seed:dummy` loads 5 dummy items per area for development only.
 
 **Before the pilot (Nov 11):** deactivate dummy items, delete test respondents and attempts, and confirm 10 active items per area.
