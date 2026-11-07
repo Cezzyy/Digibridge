@@ -1,3 +1,4 @@
+import { SUS_ANSWER_MAX, SUS_ANSWER_MIN } from '@digibridge/shared'
 import { sql } from 'drizzle-orm'
 import {
   check,
@@ -96,7 +97,8 @@ export const areaResults = pgTable(
 
 const susAnswer = (name: string) => smallint(name).notNull()
 
-// One SUS response per attempt. Answers are 1 to 5; the score is 0 to 100 in steps of 2.5.
+// One SUS response per attempt, one column per statement (SUS_STATEMENT_COUNT).
+// Answers are SUS_ANSWER_MIN to SUS_ANSWER_MAX; the score is 0 to 100 in steps of 2.5.
 export const susResponses = pgTable(
   'sus_responses',
   {
@@ -119,8 +121,8 @@ export const susResponses = pgTable(
   (t) => [
     check(
       'sus_responses_answers_range',
-      sql`least(${t.q1}, ${t.q2}, ${t.q3}, ${t.q4}, ${t.q5}, ${t.q6}, ${t.q7}, ${t.q8}, ${t.q9}, ${t.q10}) >= 1
-        and greatest(${t.q1}, ${t.q2}, ${t.q3}, ${t.q4}, ${t.q5}, ${t.q6}, ${t.q7}, ${t.q8}, ${t.q9}, ${t.q10}) <= 5`,
+      sql`least(${t.q1}, ${t.q2}, ${t.q3}, ${t.q4}, ${t.q5}, ${t.q6}, ${t.q7}, ${t.q8}, ${t.q9}, ${t.q10}) >= ${sql.raw(String(SUS_ANSWER_MIN))}
+        and greatest(${t.q1}, ${t.q2}, ${t.q3}, ${t.q4}, ${t.q5}, ${t.q6}, ${t.q7}, ${t.q8}, ${t.q9}, ${t.q10}) <= ${sql.raw(String(SUS_ANSWER_MAX))}`,
     ),
     check('sus_responses_score_range', sql`${t.score} between 0 and 100`),
   ],

@@ -1,3 +1,4 @@
+import { YEAR_LEVELS } from '@digibridge/shared'
 import { sql } from 'drizzle-orm'
 import {
   boolean,
@@ -57,7 +58,10 @@ export const respondents = pgTable(
   },
   (t) => [
     check('respondents_student_number_upper', sql`${t.studentNumber} = upper(${t.studentNumber})`),
-    check('respondents_year_level_range', sql`${t.yearLevel} between 1 and 4`),
+    check(
+      'respondents_year_level_range',
+      sql`${t.yearLevel} between ${sql.raw(String(YEAR_LEVELS[0]))} and ${sql.raw(String(YEAR_LEVELS.at(-1)))}`,
+    ),
     index('respondents_course_year_level_idx').on(t.course, t.yearLevel),
   ],
 ).enableRLS()

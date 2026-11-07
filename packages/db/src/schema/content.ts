@@ -1,3 +1,4 @@
+import { CHOICES_PER_QUESTION } from '@digibridge/shared'
 import { sql } from 'drizzle-orm'
 import {
   boolean,
@@ -43,7 +44,7 @@ export const questions = pgTable('questions', {
     .$onUpdate(() => new Date()),
 }).enableRLS()
 
-// 4 per question, at positions 0 to 3, exactly 1 of them correct.
+// CHOICES_PER_QUESTION per question, at positions 0 to CHOICES_PER_QUESTION - 1, exactly 1 correct.
 export const choices = pgTable(
   'choices',
   {
@@ -62,7 +63,10 @@ export const choices = pgTable(
     uniqueIndex('choices_one_correct_idx')
       .on(t.questionId)
       .where(sql`${t.isCorrect}`),
-    check('choices_position_range', sql`${t.position} between 0 and 3`),
+    check(
+      'choices_position_range',
+      sql`${t.position} between 0 and ${sql.raw(String(CHOICES_PER_QUESTION - 1))}`,
+    ),
   ],
 ).enableRLS()
 
