@@ -1,4 +1,4 @@
-import { YEAR_LEVELS } from '@digibridge/shared'
+import { YEAR_LEVELS, type Mode } from '@digibridge/shared'
 import { sql } from 'drizzle-orm'
 import {
   boolean,
@@ -12,6 +12,9 @@ import {
 } from 'drizzle-orm/pg-core'
 import { authUsers } from 'drizzle-orm/supabase'
 import { modeEnum, roleEnum, sexEnum } from './enums'
+
+// Mode values for the school fields check, typed against MODES so renaming one breaks the build.
+const modeLiteral = (mode: Mode) => sql.raw(`'${mode}'`)
 
 // One row per Google account, created on the first API call after sign-in.
 export const profiles = pgTable('profiles', {
@@ -67,9 +70,9 @@ export const respondents = pgTable(
     // No profile_id check for online: it turns null when the account is deleted.
     check(
       'respondents_school_fields_by_mode',
-      sql`(${t.mode} = 'kiosk' and ${t.studentNumber} is not null and ${t.course} is not null
+      sql`(${t.mode} = ${modeLiteral('kiosk')} and ${t.studentNumber} is not null and ${t.course} is not null
           and ${t.yearLevel} is not null and ${t.profileId} is null)
-        or (${t.mode} = 'online' and ${t.studentNumber} is null and ${t.course} is null
+        or (${t.mode} = ${modeLiteral('online')} and ${t.studentNumber} is null and ${t.course} is null
           and ${t.yearLevel} is null)`,
     ),
     index('respondents_course_year_level_idx').on(t.course, t.yearLevel),
