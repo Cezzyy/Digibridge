@@ -36,10 +36,12 @@ vi.mock('./config/db', async () => {
   return { createDb: () => testDb }
 })
 
+// Starting PGlite and running the migrations takes a few seconds, more when
+// `pnpm check` runs every package at once, so allow longer than the 10 s default.
 beforeAll(async () => {
   await setUpDatabase()
   serveTestJwks()
-})
+}, 60_000)
 afterEach(clearAccounts)
 
 const get = (path: string, headers: Record<string, string> = {}) =>
