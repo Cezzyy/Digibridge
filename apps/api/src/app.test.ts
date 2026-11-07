@@ -1,4 +1,5 @@
 import { attempts, profiles, respondents } from '@digibridge/db'
+import { COURSES, STUDENT_NUMBER_EXAMPLE, YEAR_LEVELS } from '@digibridge/shared'
 import { OpenAPIHono, createRoute, z } from '@hono/zod-openapi'
 import { eq } from 'drizzle-orm'
 import { bodyLimit } from 'hono/body-limit'
@@ -405,9 +406,11 @@ describe('GET /api/v1/me', () => {
     const respondent = await addRespondent(user.id)
     const attempt = await addAttempt(respondent.id, 'in_progress')
     const body = await (await get('/api/v1/me', user.headers)).json()
-    expect(body).toMatchObject({
+    // toEqual, so school details sneaking back into the respondent fail the test (PRO-06).
+    expect(body).toEqual({
+      profile: expect.any(Object),
       respondent: { id: respondent.id, fullName: 'Juan Dela Cruz' },
-      attempt: { id: attempt.id, status: 'in_progress' },
+      attempt: expect.objectContaining({ id: attempt.id, status: 'in_progress' }),
     })
   })
 
@@ -417,5 +420,63 @@ describe('GET /api/v1/me', () => {
     await addAttempt(respondent.id, 'voided')
     const body = await (await get('/api/v1/me', user.headers)).json()
     expect(body).toMatchObject({ respondent: { id: respondent.id }, attempt: null })
+  })
+})
+
+describe('respondents_school_fields_by_mode', () => {
+  const base = {
+    fullName: 'Juan Dela Cruz',
+    age: 19,
+    sex: 'male',
+    consentVersion: '1',
+    consentedAt: new Date(),
+  } as const
+  const school = {
+    studentNumber: STUDENT_NUMBER_EXAMPLE,
+    course: COURSES[0],
+    yearLevel: YEAR_LEVELS[0],
+  }
+
+  // The Postgres error sits under Drizzle's wrapper, as `cause`.
+  const insertError = async (values: typeof respondents.$inferInsert) => {
+    try {
+      await testDb.insert(respondents).values(values)
+    } catch (error) {
+      return (error as { cause?: { constraint?: string } }).cause?.constraint
+    }
+  }
+
+  it('takes a kiosk row with school details and an online row without', async () => {
+    const user = await signedIn()
+    expect(await insertError({ ...base, ...school, mode: 'kiosk' })).toBeUndefined()
+    expect(await insertError({ ...base, mode: 'online', profileId: user.id })).toBeUndefined()
+  })
+
+  it.each([
+    ['without a student number', { ...school, studentNumber: null }],
+    ['without a course', { ...school, course: null }],
+    ['without a year level', { ...school, yearLevel: null }],
+  ])('refuses a kiosk row %s', async (_, fields) => {
+    expect(await insertError({ ...base, ...fields, mode: 'kiosk' })).toBe(
+      'respondents_school_fields_by_mode',
+    )
+  })
+
+  it('refuses a kiosk row linked to a profile', async () => {
+    const user = await signedIn()
+    expect(await insertError({ ...base, ...school, mode: 'kiosk', profileId: user.id })).toBe(
+      'respondents_school_fields_by_mode',
+    )
+  })
+
+  it.each([
+    ['a student number', { studentNumber: school.studentNumber }],
+    ['a course', { course: school.course }],
+    ['a year level', { yearLevel: school.yearLevel }],
+  ])('refuses an online row with %s', async (_, fields) => {
+    const user = await signedIn()
+    expect(await insertError({ ...base, ...fields, mode: 'online', profileId: user.id })).toBe(
+      'respondents_school_fields_by_mode',
+    )
   })
 })
