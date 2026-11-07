@@ -224,11 +224,13 @@ Example: a student gets all 4 basic, 2 intermediate and 1 advanced item right in
 
 ## Screens
 
-16 screens in three groups: respondent, kiosk and admin.
+18 screens in three groups: respondent, kiosk and admin.
 
 | Screen | Route | Who | What's on it |
 | --- | --- | --- | --- |
-| Landing | / | Everyone | What DigiBridge is, Sign in with Google, link to lessons |
+| Landing | / | Signed out | What DigiBridge is, Get started (to sign in), link to lessons |
+| Sign in | /sign-in | Signed out | Continue with Google; the first sign-in makes the account |
+| Home | /home | Signed in | Where signed-in users land (placeholder: name, email, role) |
 | Consent | /start/consent | Respondent | Data Privacy Act notice, Agree and Decline buttons |
 | Profile | /start/profile | Respondent | Name, student number, course, year level, age, sex, devices, internet access, show-my-identity choice |
 | Instructions | /start/ready | Respondent | 30 items, 25 minutes, can go back, Start button |

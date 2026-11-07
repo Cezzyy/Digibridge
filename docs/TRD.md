@@ -305,8 +305,9 @@ One Vue app serves respondents, kiosk devices and admins, split by route guards.
 
 | Guard | Applies to | Rule |
 | --- | --- | --- |
-| `public` | `/`, `/lessons/*` | Anyone |
-| `signedIn` | `/start/*`, `/assessment`, `/results` | Supabase session required, else back to `/` |
+| `public` | `/lessons/*` | Anyone |
+| `guest` | `/`, `/sign-in` | Signed out only, else to `/home` |
+| `signedIn` | `/home`, `/start/*`, `/assessment`, `/results` | Supabase session required, else to `/sign-in` |
 | `step` | `/start/profile`, `/start/ready`, `/assessment`, `/results` | Sends the user to the right step from `/api/v1/me` (no profile → consent; attempt submitted → results) |
 | `kioskLock` | Every route | If a kiosk session is open on this device, anything outside `/kiosk/*` redirects to `/kiosk` |
 | `staff` | `/admin`, `/admin/respondents` | Role facilitator or admin |
