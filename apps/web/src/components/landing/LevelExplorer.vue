@@ -180,9 +180,9 @@ const valueText = computed(
     </label>
 
     <dl
-      class="mt-8 grid divide-y divide-line overflow-hidden rounded-card border border-line bg-surface sm:grid-cols-3 sm:divide-x sm:divide-y-0"
+      class="mt-8 grid gap-px overflow-hidden rounded-card border border-line bg-line sm:grid-cols-2 lg:grid-cols-3"
     >
-      <div class="p-5 sm:p-6">
+      <div class="bg-surface p-5 sm:p-6">
         <dt class="text-sm font-semibold text-quiet">Score in this area</dt>
         <dd class="mt-1 flex items-baseline gap-2">
           <span class="inline-grid overflow-hidden font-display text-4xl font-bold tabular-nums">
@@ -225,7 +225,7 @@ const valueText = computed(
         </dd>
       </div>
 
-      <div class="p-5 sm:p-6">
+      <div class="bg-surface p-5 sm:p-6">
         <dt class="text-sm font-semibold text-quiet">Your level</dt>
         <dd class="relative mt-3 inline-grid">
           <span
@@ -262,12 +262,12 @@ const valueText = computed(
         <dd class="mt-3 text-sm text-quiet">{{ bandRange }} of the points</dd>
       </div>
 
-      <div class="p-5 sm:p-6">
+      <div class="bg-surface p-5 sm:col-span-2 sm:p-6 lg:col-span-1">
         <dt class="text-sm font-semibold text-quiet">Lessons for you</dt>
         <dd class="mt-3">
           <TransitionGroup
             tag="ol"
-            class="grid gap-2"
+            class="grid gap-2 sm:grid-cols-2 lg:grid-cols-1"
             enter-from-class="translate-x-6 opacity-0"
             enter-active-class="transition duration-500 ease-glide motion-reduce:transition-none"
             leave-active-class="hidden"

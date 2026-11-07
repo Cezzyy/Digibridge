@@ -179,7 +179,7 @@ const trackStyle = computed(() => ({
       @dragstart.prevent
     >
       <div
-        class="flex gap-(--gap) [--gap:1rem] [--slide:88%] sm:[--gap:1.5rem] sm:[--slide:84%] lg:[--slide:88%]"
+        class="flex gap-(--gap) [--gap:1rem] [--slide:90%] sm:[--gap:1.5rem] sm:[--slide:84%] lg:[--slide:88%]"
         :class="
           !dragging && 'transition-transform duration-700 ease-glide motion-reduce:transition-none'
         "
@@ -192,11 +192,11 @@ const trackStyle = computed(() => ({
           aria-roledescription="slide"
           :aria-label="`${i + 1} of ${AREA_CODES.length}`"
           :aria-hidden="active !== i"
-          class="flex shrink-0 basis-(--slide)"
+          class="flex min-w-0 shrink-0 basis-(--slide)"
           @click="onSlideClick(i)"
         >
           <article
-            class="slide grid w-full overflow-hidden rounded-[1.5rem] bg-white/[0.05] ring-1 ring-white/12 transition-[opacity,scale] duration-700 ease-glide motion-reduce:transition-none lg:grid-cols-[minmax(0,1fr)_minmax(0,27rem)]"
+            class="slide grid w-full grid-cols-[minmax(0,1fr)] overflow-hidden rounded-[1.5rem] bg-white/[0.05] ring-1 ring-white/12 transition-[opacity,scale] duration-700 ease-glide motion-reduce:transition-none lg:grid-cols-[minmax(0,1fr)_minmax(0,27rem)]"
             :class="active === i ? 'is-active' : 'scale-[0.96] opacity-45'"
           >
             <div class="order-2 flex flex-col p-6 sm:p-10 lg:order-1 lg:p-12">
@@ -244,7 +244,7 @@ const trackStyle = computed(() => ({
             </div>
 
             <div
-              class="order-1 grid place-items-center border-b border-white/10 bg-white/[0.03] px-5 py-8 sm:px-10 sm:py-10 lg:order-2 lg:border-b-0 lg:border-l lg:px-8"
+              class="order-1 grid grid-cols-[minmax(0,1fr)] place-items-center border-b border-white/10 bg-white/[0.03] px-3 py-8 sm:px-10 sm:py-10 lg:order-2 lg:border-b-0 lg:border-l lg:px-8"
             >
               <AreaScene :area="code" :playing="active === i" />
             </div>
@@ -259,11 +259,19 @@ const trackStyle = computed(() => ({
 
 <style scoped>
 /* The right side: margin out to the screen's edge, padding back in by the same amount. The
-   peeking slide fades out toward the edge. */
+   peeking slide fades out toward the edge; on phones the fade is narrower, so it stays off the
+   current slide. */
 .slides-viewport {
+  --fade: 2rem;
   margin-right: calc(50% - 50vw);
   padding-right: calc(50vw - 50%);
-  mask-image: linear-gradient(90deg, #000 calc(100% - 4rem), transparent);
+  mask-image: linear-gradient(90deg, #000 calc(100% - var(--fade)), transparent);
+}
+
+@media (width >= 40rem) {
+  .slides-viewport {
+    --fade: 4rem;
+  }
 }
 
 /* The current slide's text comes in one piece after another, from the side it's moving to. */

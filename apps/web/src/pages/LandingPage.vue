@@ -120,15 +120,14 @@ onBeforeUnmount(() => observer?.disconnect())
       </nav>
     </header>
 
-    <!-- Hero: fills the rest of the first screen, with the bridge as its floor. -->
-    <section
-      class="relative flex min-h-[calc(100svh-var(--spacing-header))] flex-col"
-      aria-labelledby="hero-title"
-    >
+    <!-- Hero: as tall as its content, with the bridge right under it as its floor. Phones stack
+         it; tablets put the heading across the top and the card beside the buttons; desktops put
+         the card beside everything. -->
+    <section class="relative" aria-labelledby="hero-title">
       <div
-        class="mx-auto grid w-full max-w-7xl flex-1 items-center gap-12 px-4 pt-6 pb-14 sm:px-6 sm:pt-10 lg:grid-cols-[minmax(0,1fr)_minmax(0,27rem)] lg:gap-16 lg:px-8 lg:pb-16"
+        class="hero-grid mx-auto grid w-full max-w-7xl px-4 pt-6 pb-14 sm:px-6 sm:pt-10 md:grid-cols-[minmax(0,1fr)_minmax(0,22rem)] md:gap-x-10 lg:grid-cols-[minmax(0,1fr)_minmax(0,27rem)] lg:grid-rows-[auto_1fr] lg:gap-x-16 lg:px-8 lg:pb-16"
       >
-        <div class="lg:self-start">
+        <div class="[grid-area:intro]">
           <h1
             id="hero-title"
             class="isolate text-[clamp(2.75rem,1.5rem+4.6vw,5.25rem)] leading-[0.95] font-extrabold tracking-[-0.02em] text-balance motion-safe:animate-rise"
@@ -162,10 +161,12 @@ onBeforeUnmount(() => observer?.disconnect())
             work well with others. DigiBridge checks your digital skills, shows your level, and
             gives you lessons that match it.
           </p>
+        </div>
 
+        <div class="mt-8 [grid-area:actions] md:self-center lg:self-start">
           <div
             ref="heroCta"
-            class="mt-8 flex flex-wrap items-center gap-x-2 gap-y-3 motion-safe:animate-rise motion-safe:[animation-delay:240ms]"
+            class="flex flex-wrap items-center gap-x-2 gap-y-3 motion-safe:animate-rise motion-safe:[animation-delay:240ms]"
           >
             <RouterLink
               :to="{ name: 'sign-in' }"
@@ -215,7 +216,7 @@ onBeforeUnmount(() => observer?.disconnect())
         </div>
 
         <div
-          class="w-full max-w-md motion-safe:animate-rise motion-safe:[animation-delay:280ms] lg:self-start"
+          class="mt-12 w-full max-w-md [grid-area:card] motion-safe:animate-rise motion-safe:[animation-delay:280ms] md:mt-8 lg:mt-0 lg:self-start"
         >
           <SampleQuestion />
         </div>
@@ -414,6 +415,22 @@ onBeforeUnmount(() => observer?.disconnect())
 </template>
 
 <style scoped>
+.hero-grid {
+  grid-template-areas: 'intro' 'actions' 'card';
+}
+
+@media (width >= 48rem) {
+  .hero-grid {
+    grid-template-areas: 'intro intro' 'actions card';
+  }
+}
+
+@media (width >= 64rem) {
+  .hero-grid {
+    grid-template-areas: 'intro card' 'actions card';
+  }
+}
+
 @media (prefers-reduced-motion: no-preference) {
   .hero-swash {
     stroke-dasharray: 1;

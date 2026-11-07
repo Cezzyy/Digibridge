@@ -37,7 +37,7 @@ const PASSWORD_LENGTH = 12
     <!-- Information: a search, then the results with their sources checked. -->
     <div
       v-if="area === 'info_literacy'"
-      class="rounded-2xl bg-surface p-4 text-ink shadow-[0_30px_60px_-30px_rgb(0_0_0/0.6)]"
+      class="rounded-2xl bg-surface p-3 text-ink sm:p-4 shadow-[0_30px_60px_-30px_rgb(0_0_0/0.6)]"
     >
       <div class="flex items-center gap-2 rounded-full bg-mist-soft px-3.5 py-2.5 ring-1 ring-line">
         <svg viewBox="0 0 20 20" class="size-4 shrink-0 fill-none stroke-quiet stroke-2">
@@ -84,7 +84,7 @@ const PASSWORD_LENGTH = 12
     <!-- Communication: three people writing one shared report. -->
     <div
       v-else-if="area === 'communication'"
-      class="rounded-2xl bg-surface p-4 text-ink shadow-[0_30px_60px_-30px_rgb(0_0_0/0.6)]"
+      class="rounded-2xl bg-surface p-3 text-ink sm:p-4 shadow-[0_30px_60px_-30px_rgb(0_0_0/0.6)]"
     >
       <div class="flex items-center justify-between gap-3">
         <p class="flex items-center gap-2 text-sm font-semibold">
@@ -143,7 +143,7 @@ const PASSWORD_LENGTH = 12
     <!-- Safety: a strong password, two-step sign-in, and a scam link caught. -->
     <div
       v-else
-      class="rounded-2xl bg-surface p-4 text-ink shadow-[0_30px_60px_-30px_rgb(0_0_0/0.6)]"
+      class="rounded-2xl bg-surface p-3 text-ink sm:p-4 shadow-[0_30px_60px_-30px_rgb(0_0_0/0.6)]"
     >
       <p class="text-xs font-semibold text-quiet">New password</p>
       <div
