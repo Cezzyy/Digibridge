@@ -5,7 +5,8 @@ import { SAMPLE_QUESTIONS } from './sample-questions'
 
 // "Try a sample question" card on the landing page: one made-up item per area, laid out like
 // the real assessment. All 3 panels sit in one grid cell so the card keeps its height when the
-// tab changes, and the page beside it doesn't jump.
+// tab changes, and the page beside it doesn't jump. Hidden panels are `inert`: their inner boxes
+// set `visible` for the fade, which would otherwise let them catch clicks on the panel shown.
 
 const id = useId()
 const current = ref(0)
@@ -144,6 +145,7 @@ const announcement = computed(() => {
         :key="s.area"
         role="tabpanel"
         :aria-labelledby="tabId(i)"
+        :inert="current !== i"
         class="col-start-1 row-start-1 transition-[opacity,translate,visibility] duration-300 ease-out motion-reduce:transition-none"
         :class="current === i ? 'visible opacity-100' : 'invisible translate-y-1 opacity-0'"
       >
