@@ -10,8 +10,8 @@ export function createDb(env: Pick<Bindings, 'HYPERDRIVE'>) {
   const client = postgres(env.HYPERDRIVE.connectionString, {
     // Hyperdrive's recommended cap for one Worker invocation.
     max: 5,
-    // Skip the type lookup on connect; the schema uses only built-in array types.
-    fetch_types: false,
+    // Keep the default type lookup on connect (fetch_types): without it postgres.js parses
+    // no arrays at all, so raw queries would return uuid[] and text[] columns as strings.
   })
   return drizzle(client, { schema })
 }
