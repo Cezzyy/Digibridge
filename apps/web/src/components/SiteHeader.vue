@@ -1,8 +1,8 @@
 <script setup lang="ts">
 import BrandMark from './BrandMark.vue'
 
-// The top bar on signed-out pages (landing, sign in): the logo on the left, the page's own
-// links in the slot on the right. It stays at the top while the page scrolls.
+// The top bar on signed-out pages (landing, sign in) and ErrorScreen: the logo on the left, the
+// page's own links in the slot on the right. It stays at the top while the page scrolls.
 </script>
 
 <template>

@@ -18,24 +18,18 @@ const starting = computed(() => route.matched.length === 0)
 const showHeader = computed(() => !route.meta.hideHeader)
 
 // When signing in fails or the API can't be reached, the error screen takes the whole page.
+// Going to another page closes it (router.ts).
 const failureScreen = computed(() => {
   const failure = session.failure
   if (!failure) return null
 
-  const home: ErrorAction = {
-    label: 'Back to the home page',
-    to: { name: 'landing' },
-    onClick: session.clearFailure,
-  }
+  const home: ErrorAction = { label: 'Back to the home page', to: { name: 'landing' } }
   if (failure.kind === 'sign-in') {
     return {
       title: "We couldn't sign you in",
       message:
         "Google sign-in didn't finish. This happens if you cancel on Google's page or wait too long. Please try again.",
-      actions: [
-        { label: 'Try again', to: { name: 'sign-in' }, onClick: session.clearFailure },
-        home,
-      ],
+      actions: [{ label: 'Try again', to: { name: 'sign-in' } }, home],
     }
   }
   return {
