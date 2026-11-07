@@ -4,7 +4,7 @@ import type { InferResponseType } from 'hono/client'
 import { defineStore } from 'pinia'
 import { computed, ref, shallowRef } from 'vue'
 import { api, ApiRequestError, call } from '../lib/api'
-import { returningFromGoogle, supabase } from '../lib/supabase'
+import { markSignInStarted, returningFromGoogle, supabase } from '../lib/supabase'
 
 export type Me = InferResponseType<typeof api.me.$get, 200>
 
@@ -76,11 +76,15 @@ export const useSessionStore = defineStore('session', () => {
   /** Leaves for Google's sign-in page; Supabase brings the user back to this site. */
   async function signIn() {
     error.value = null
+    markSignInStarted(true)
     const { error: signInError } = await supabase.auth.signInWithOAuth({
       provider: 'google',
       options: { redirectTo: window.location.origin },
     })
-    if (signInError) error.value = "We couldn't open Google sign-in. Please try again."
+    if (signInError) {
+      markSignInStarted(false)
+      error.value = "We couldn't open Google sign-in. Please try again."
+    }
   }
 
   /** Signs out on this device only, so a facilitator stays signed in on their other devices. */

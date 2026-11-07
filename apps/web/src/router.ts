@@ -6,7 +6,7 @@ import {
   START_LOCATION,
   type RouteLocationNormalized,
 } from 'vue-router'
-import { AUTH_CALLBACK_PARAMS } from './lib/supabase'
+import { AUTH_CALLBACK_PARAMS, returningFromGoogle } from './lib/supabase'
 import HomePage from './pages/HomePage.vue'
 import LandingPage from './pages/LandingPage.vue'
 import NotFoundPage from './pages/NotFoundPage.vue'
@@ -61,7 +61,9 @@ export const router = createRouter({
 
 // Google's leftovers in the address bar (?code=, ?error=), which Supabase has read on page load.
 // On success Supabase removes them itself; on failure they'd stay, so the guard drops them.
-function withoutCallbackParams(to: RouteLocationNormalized) {
+// Only on the page load that returns from Google, so other pages can still use these names.
+function withoutCallbackParams(to: RouteLocationNormalized, from: RouteLocationNormalized) {
+  if (!returningFromGoogle || from !== START_LOCATION) return null
   const keys: readonly string[] = AUTH_CALLBACK_PARAMS
   const inQuery = Object.keys(to.query).some((key) => keys.includes(key))
   const inHash = [...new URLSearchParams(to.hash.slice(1)).keys()].some((key) => keys.includes(key))
@@ -71,7 +73,7 @@ function withoutCallbackParams(to: RouteLocationNormalized) {
 }
 
 router.beforeEach(async (to, from) => {
-  const clean = withoutCallbackParams(to)
+  const clean = withoutCallbackParams(to, from)
   if (clean) return clean
 
   const requires = to.meta.requires
