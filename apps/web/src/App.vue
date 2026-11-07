@@ -4,6 +4,7 @@ import { useRoute, useRouter } from 'vue-router'
 import AppHeader from './components/AppHeader.vue'
 import AppSplash from './components/AppSplash.vue'
 import ErrorScreen, { type ErrorAction } from './components/ErrorScreen.vue'
+import IntroSplash from './components/IntroSplash.vue'
 import { useSessionStore } from './stores/session'
 
 // Load the session for every page, including public ones that have no guard.
@@ -56,4 +57,5 @@ const failureScreen = computed(() => {
     <AppHeader v-if="showHeader" />
     <RouterView />
   </template>
+  <IntroSplash />
 </template>
