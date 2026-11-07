@@ -50,6 +50,23 @@
       transform: translateY(1.25rem);
     }
   }
+
+  /* AppSplash: fades in after 0.25s (only slow loads see it), with a sliding loading bar. */
+  --animate-splash: splash-in 0.4s ease-out 0.25s both;
+  @keyframes splash-in {
+    from {
+      opacity: 0;
+    }
+  }
+  --animate-deck: deck 1.4s ease-in-out infinite;
+  @keyframes deck {
+    from {
+      transform: translateX(-100%);
+    }
+    to {
+      transform: translateX(300%);
+    }
+  }
 }
 
 /* Screen height, for pages that must fit on one screen without scrolling (sign in):
