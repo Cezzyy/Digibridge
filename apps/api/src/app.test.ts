@@ -1,5 +1,5 @@
 import { attempts, profiles, respondents } from '@digibridge/db'
-import { COURSES, STUDENT_NUMBER_EXAMPLE, YEAR_LEVELS } from '@digibridge/shared'
+import { AGE_MAX, AGE_MIN, COURSES, STUDENT_NUMBER_EXAMPLE, YEAR_LEVELS } from '@digibridge/shared'
 import { OpenAPIHono, createRoute, z } from '@hono/zod-openapi'
 import { eq } from 'drizzle-orm'
 import { bodyLimit } from 'hono/body-limit'
@@ -423,29 +423,30 @@ describe('GET /api/v1/me', () => {
   })
 })
 
+// Respondent rows inserted straight into the database, to test its checks.
+const base = {
+  fullName: 'Juan Dela Cruz',
+  age: 19,
+  sex: 'male',
+  consentVersion: '1',
+  consentedAt: new Date(),
+} as const
+const school = {
+  studentNumber: STUDENT_NUMBER_EXAMPLE,
+  course: COURSES[0],
+  yearLevel: YEAR_LEVELS[0],
+}
+
+// The Postgres error sits under Drizzle's wrapper, as `cause`.
+const insertError = async (values: typeof respondents.$inferInsert) => {
+  try {
+    await testDb.insert(respondents).values(values)
+  } catch (error) {
+    return (error as { cause?: { constraint?: string } }).cause?.constraint
+  }
+}
+
 describe('respondents_school_fields_by_mode', () => {
-  const base = {
-    fullName: 'Juan Dela Cruz',
-    age: 19,
-    sex: 'male',
-    consentVersion: '1',
-    consentedAt: new Date(),
-  } as const
-  const school = {
-    studentNumber: STUDENT_NUMBER_EXAMPLE,
-    course: COURSES[0],
-    yearLevel: YEAR_LEVELS[0],
-  }
-
-  // The Postgres error sits under Drizzle's wrapper, as `cause`.
-  const insertError = async (values: typeof respondents.$inferInsert) => {
-    try {
-      await testDb.insert(respondents).values(values)
-    } catch (error) {
-      return (error as { cause?: { constraint?: string } }).cause?.constraint
-    }
-  }
-
   it('takes a kiosk row with school details and an online row without', async () => {
     const user = await signedIn()
     expect(await insertError({ ...base, ...school, mode: 'kiosk' })).toBeUndefined()
@@ -477,6 +478,20 @@ describe('respondents_school_fields_by_mode', () => {
     const user = await signedIn()
     expect(await insertError({ ...base, ...fields, mode: 'online', profileId: user.id })).toBe(
       'respondents_school_fields_by_mode',
+    )
+  })
+})
+
+describe('respondents_age_range', () => {
+  it.each([AGE_MIN, AGE_MAX])('takes age %i', async (age) => {
+    const user = await signedIn()
+    expect(await insertError({ ...base, age, mode: 'online', profileId: user.id })).toBeUndefined()
+  })
+
+  it.each([AGE_MIN - 1, AGE_MAX + 1])('refuses age %i', async (age) => {
+    const user = await signedIn()
+    expect(await insertError({ ...base, age, mode: 'online', profileId: user.id })).toBe(
+      'respondents_age_range',
     )
   })
 })
