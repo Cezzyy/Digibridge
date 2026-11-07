@@ -30,12 +30,16 @@ export const useSessionStore = defineStore('session', () => {
   const isAdmin = computed(() => role.value === 'admin')
 
   async function loadMe() {
+    // A load that ends signed out or signed in replaces any earlier failure (e.g. after a sign-in
+    // or sign-out in another tab); only a failed /me sets a new one.
     if (!session.value) {
       me.value = null
+      failure.value = null
       return
     }
     try {
       me.value = await call(api.me.$get())
+      failure.value = null
     } catch (err) {
       me.value = null
       if (err instanceof ApiRequestError && err.code === 'unauthorized') {
