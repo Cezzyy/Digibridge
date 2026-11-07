@@ -74,6 +74,17 @@ describe('errors', () => {
     })
   })
 
+  it('sends the default message when the schema has none', async () => {
+    const res = await postJson(JSON.stringify({}))
+    expect(res.status).toBe(400)
+    expect(await res.json()).toEqual({
+      error: {
+        code: 'validation_failed',
+        message: 'Some of the details sent are missing or not valid.',
+      },
+    })
+  })
+
   it('sends bad_request for malformed JSON', async () => {
     const res = await postJson('{')
     expect(res.status).toBe(400)

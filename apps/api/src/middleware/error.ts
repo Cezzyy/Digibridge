@@ -1,5 +1,5 @@
 import type { ErrorCode } from '@digibridge/shared'
-import type { OpenAPIHonoOptions } from '@hono/zod-openapi'
+import { z, type OpenAPIHonoOptions } from '@hono/zod-openapi'
 import type { Context, ErrorHandler, NotFoundHandler } from 'hono'
 import { HTTPException } from 'hono/http-exception'
 import type { ContentfulStatusCode } from 'hono/utils/http-status'
@@ -83,6 +83,10 @@ export const handleError: ErrorHandler<AppEnv> = (err, c) => {
 
 /** app.notFound: no route matched. */
 export const handleNotFound: NotFoundHandler<AppEnv> = (c) => sendError(c, 'not_found')
+
+// A schema's own message outranks customError, so only fields without one fall back to the
+// plain-English default instead of Zod's technical text ("expected string, received undefined").
+z.config({ customError: () => DEFAULT_MESSAGES.validation_failed })
 
 /**
  * defaultHook for OpenAPIHono: a request that fails its route's Zod schema gets a 400.
