@@ -359,10 +359,7 @@ describe('GET /api/v1/me', () => {
       .insert(respondents)
       .values({
         profileId,
-        studentNumber: 'C23-01-7557-MAN121',
         fullName: 'Juan Dela Cruz',
-        course: 'BSIT',
-        yearLevel: 2,
         age: 19,
         sex: 'male',
         mode: 'online',
@@ -409,11 +406,7 @@ describe('GET /api/v1/me', () => {
     const attempt = await addAttempt(respondent.id, 'in_progress')
     const body = await (await get('/api/v1/me', user.headers)).json()
     expect(body).toMatchObject({
-      respondent: {
-        id: respondent.id,
-        fullName: 'Juan Dela Cruz',
-        studentNumber: 'C23-01-7557-MAN121',
-      },
+      respondent: { id: respondent.id, fullName: 'Juan Dela Cruz' },
       attempt: { id: attempt.id, status: 'in_progress' },
     })
   })

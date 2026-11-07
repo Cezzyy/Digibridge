@@ -26,20 +26,22 @@ export const profiles = pgTable('profiles', {
   lastSignInAt: timestamp('last_sign_in_at', { withTimezone: true }).notNull().defaultNow(),
 }).enableRLS()
 
-// A student taking the assessment, online (linked to a profile) or on a kiosk (no profile).
-// Keyed by student number, so the one-attempt rule holds across both modes.
+// Someone taking the assessment, online (linked to a profile) or on a kiosk (no profile).
+// Online rows are keyed by profile, kiosk rows by student number. School details
+// (student number, course, year level) are kiosk only; the mode check enforces it.
 export const respondents = pgTable(
   'respondents',
   {
     id: uuid('id').primaryKey().defaultRandom(),
-    // Unique allows many nulls in Postgres, so kiosk respondents don't clash.
+    // Unique allows many nulls in Postgres, so kiosk rows (no profile) and
+    // online rows (no student number) don't clash.
     profileId: uuid('profile_id')
       .unique()
       .references(() => profiles.id, { onDelete: 'set null' }),
-    studentNumber: text('student_number').notNull().unique(),
+    studentNumber: text('student_number').unique(),
     fullName: text('full_name').notNull(),
-    course: text('course').notNull(),
-    yearLevel: smallint('year_level').notNull(),
+    course: text('course'),
+    yearLevel: smallint('year_level'),
     age: smallint('age').notNull(),
     sex: sexEnum('sex').notNull(),
     devices: text('devices')
@@ -61,6 +63,14 @@ export const respondents = pgTable(
     check(
       'respondents_year_level_range',
       sql`${t.yearLevel} between ${sql.raw(String(YEAR_LEVELS[0]))} and ${sql.raw(String(YEAR_LEVELS.at(-1)))}`,
+    ),
+    // No profile_id check for online: it turns null when the account is deleted.
+    check(
+      'respondents_school_fields_by_mode',
+      sql`(${t.mode} = 'kiosk' and ${t.studentNumber} is not null and ${t.course} is not null
+          and ${t.yearLevel} is not null and ${t.profileId} is null)
+        or (${t.mode} = 'online' and ${t.studentNumber} is null and ${t.course} is null
+          and ${t.yearLevel} is null)`,
     ),
     index('respondents_course_year_level_idx').on(t.course, t.yearLevel),
   ],

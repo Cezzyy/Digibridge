@@ -1,6 +1,7 @@
 import { z } from 'zod'
 
-// Courses and year levels (PRO-04). Stored as text, so these lists are the only check.
+// Courses and year levels (PRO-04), asked in kiosk mode only.
+// Stored as text, so these lists are the only check.
 
 /** Regular courses run 1st to 4th year; TESDA scholar courses (HRT, WADT) run 1st to 3rd. */
 export const COURSES = ['BSIT', 'BSCS', 'BSBA', 'BSA', 'BSHM', 'HRT', 'WADT'] as const
