@@ -1,22 +1,12 @@
-<!-- Placeholder page until the router and real pages are added. -->
+<script setup lang="ts">
+import AppHeader from './components/AppHeader.vue'
+import { useSessionStore } from './stores/session'
+
+// Load the session for every page, including public ones that have no guard.
+void useSessionStore().init()
+</script>
+
 <template>
-  <main class="placeholder">
-    <h1>DigiBridge</h1>
-    <p>Check your digital skills and get lessons that match your level.</p>
-    <p class="note">This site is still being built.</p>
-  </main>
+  <AppHeader />
+  <RouterView />
 </template>
-
-<style scoped>
-.placeholder {
-  max-width: 32rem;
-  margin: 20vh auto 0;
-  padding: 0 1rem;
-  font-family: system-ui, sans-serif;
-  text-align: center;
-}
-
-.note {
-  color: #6b7280;
-}
-</style>

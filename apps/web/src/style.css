@@ -1,0 +1,50 @@
+@import 'tailwindcss';
+
+/* Design tokens from docs/design.md (Evergreen and Marigold).
+   Tailwind's own palette is turned off, so only these colors can be used. */
+@theme {
+  --color-*: initial;
+  --color-white: #ffffff;
+
+  --color-evergreen: #1e5b44;
+  --color-evergreen-hover: #174a37;
+  --color-evergreen-soft: #edf6f0;
+  --color-marigold: #f4a51c;
+  --color-marigold-text: #8a5a00;
+  --color-marigold-soft: #fdf1da;
+  --color-ink: #12241c;
+  --color-quiet: #4f6459;
+  --color-line: #d4e3da;
+  --color-line-strong: #6f8a7c;
+  --color-surface: #ffffff;
+  --color-mist: #e4efe8;
+  --color-mist-soft: #f2f7f4;
+  --color-track: #e7f1eb;
+  --color-error: #c2412d;
+  --color-error-soft: #fbedea;
+  --color-level-1: #d6ebdf;
+  --color-level-2: #8cc5a6;
+  --color-level-3: #2f7d58;
+  --color-level-4: #1e5b44;
+
+  /* Bricolage Grotesque for headings, Source Sans 3 for everything else (self-hosted, see main.ts). */
+  --font-sans: 'Source Sans 3 Variable', ui-sans-serif, system-ui, sans-serif;
+  --font-display:
+    'Bricolage Grotesque Variable', 'Source Sans 3 Variable', ui-sans-serif, sans-serif;
+
+  /* rounded-control for buttons and inputs, rounded-card for cards and panels. */
+  --radius-control: 0.5rem;
+  --radius-card: 0.75rem;
+}
+
+@layer base {
+  body {
+    @apply bg-mist font-sans text-ink antialiased;
+  }
+
+  h1,
+  h2,
+  h3 {
+    @apply font-display;
+  }
+}
