@@ -1,6 +1,7 @@
 import { z } from 'zod'
 
-// ACLC student number (PRO-02). Saved in uppercase and unique across online and kiosk.
+// ACLC student number (PRO-02), asked in kiosk mode only. Saved in uppercase and unique
+// among kiosk respondents.
 
 /** 1 letter and 2 digits, 2 digits, 4 digits, then 3 letters and 3 digits, with dashes. */
 export const STUDENT_NUMBER_REGEX = /^[A-Z]\d{2}-\d{2}-\d{4}-[A-Z]{3}\d{3}$/

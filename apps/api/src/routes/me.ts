@@ -13,9 +13,8 @@ const MeSchema = z
       role: roleSchema,
     }),
     // Null until the user agrees to the consent notice and fills in their profile.
-    respondent: z
-      .object({ id: z.uuid(), fullName: z.string(), studentNumber: z.string() })
-      .nullable(),
+    // Online respondents have no school details, so none are sent (PRO-06).
+    respondent: z.object({ id: z.uuid(), fullName: z.string() }).nullable(),
     // Their one attempt, unless it was voided (then they can start again).
     attempt: z.object({ id: z.uuid(), status: attemptStatusSchema }).nullable(),
   })

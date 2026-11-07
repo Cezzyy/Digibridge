@@ -22,6 +22,13 @@
       "when": 1794041201350,
       "tag": "20261107084641_one_published_lesson_per_tier",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1794067107841,
+      "tag": "20261107155827_school_fields_kiosk_only",
+      "breakpoints": true
     }
   ]
 }

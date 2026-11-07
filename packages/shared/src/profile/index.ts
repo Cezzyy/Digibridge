@@ -1,3 +1,5 @@
 export * from './course'
 export * from './digital-access'
+export * from './general'
+export * from './kiosk'
 export * from './student-number'

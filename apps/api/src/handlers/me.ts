@@ -10,11 +10,7 @@ export const getMe: RouteHandler<typeof meRoute, AuthEnv> = async (c) => {
   // At most one row: one respondent per profile, one non-voided attempt per respondent.
   const [row] = await c.var.db
     .select({
-      respondent: {
-        id: respondents.id,
-        fullName: respondents.fullName,
-        studentNumber: respondents.studentNumber,
-      },
+      respondent: { id: respondents.id, fullName: respondents.fullName },
       attemptId: attempts.id,
       attemptStatus: attempts.status,
     })
