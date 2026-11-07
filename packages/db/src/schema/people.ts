@@ -1,4 +1,4 @@
-import { YEAR_LEVELS, type Mode } from '@digibridge/shared'
+import { AGE_MAX, AGE_MIN, YEAR_LEVELS, type Mode } from '@digibridge/shared'
 import { sql } from 'drizzle-orm'
 import {
   boolean,
@@ -64,6 +64,10 @@ export const respondents = pgTable(
   (t) => [
     check('respondents_student_number_upper', sql`${t.studentNumber} = upper(${t.studentNumber})`),
     check(
+      'respondents_age_range',
+      sql`${t.age} between ${sql.raw(String(AGE_MIN))} and ${sql.raw(String(AGE_MAX))}`,
+    ),
+    check(
       'respondents_year_level_range',
       sql`${t.yearLevel} between ${sql.raw(String(YEAR_LEVELS[0]))} and ${sql.raw(String(YEAR_LEVELS.at(-1)))}`,
     ),
@@ -75,7 +79,10 @@ export const respondents = pgTable(
         or (${t.mode} = ${modeLiteral('online')} and ${t.studentNumber} is null and ${t.course} is null
           and ${t.yearLevel} is null)`,
     ),
-    index('respondents_course_year_level_idx').on(t.course, t.yearLevel),
+    // Kiosk rows only: online rows have no course. A query on course = X still uses it.
+    index('respondents_course_year_level_idx')
+      .on(t.course, t.yearLevel)
+      .where(sql`${t.course} is not null`),
   ],
 ).enableRLS()
 
