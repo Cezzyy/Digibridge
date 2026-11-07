@@ -68,26 +68,35 @@ export const choices = pgTable(
 
 export type LessonResource = { label: string; url: string }
 
-export const lessons = pgTable('lessons', {
-  id: uuid('id').primaryKey().defaultRandom(),
-  areaId: uuid('area_id')
-    .notNull()
-    .references(() => competencyAreas.id),
-  tier: lessonTierEnum('tier').notNull(),
-  slug: text('slug').notNull().unique(),
-  title: text('title').notNull(),
-  summary: text('summary').notNull(),
-  bodyMd: text('body_md').notNull(),
-  imageUrl: text('image_url'),
-  videoUrl: text('video_url'),
-  resources: jsonb('resources')
-    .$type<LessonResource[]>()
-    .notNull()
-    .default(sql`'[]'::jsonb`),
-  isPublished: boolean('is_published').notNull().default(false),
-  sortOrder: smallint('sort_order').notNull().default(0),
-  updatedAt: timestamp('updated_at', { withTimezone: true })
-    .notNull()
-    .defaultNow()
-    .$onUpdate(() => new Date()),
-}).enableRLS()
+export const lessons = pgTable(
+  'lessons',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    areaId: uuid('area_id')
+      .notNull()
+      .references(() => competencyAreas.id),
+    tier: lessonTierEnum('tier').notNull(),
+    slug: text('slug').notNull().unique(),
+    title: text('title').notNull(),
+    summary: text('summary').notNull(),
+    bodyMd: text('body_md').notNull(),
+    imageUrl: text('image_url'),
+    videoUrl: text('video_url'),
+    resources: jsonb('resources')
+      .$type<LessonResource[]>()
+      .notNull()
+      .default(sql`'[]'::jsonb`),
+    isPublished: boolean('is_published').notNull().default(false),
+    sortOrder: smallint('sort_order').notNull().default(0),
+    updatedAt: timestamp('updated_at', { withTimezone: true })
+      .notNull()
+      .defaultNow()
+      .$onUpdate(() => new Date()),
+  },
+  (t) => [
+    // The 9-lesson set: 1 published lesson per area and tier (LES-01).
+    uniqueIndex('lessons_one_published_per_tier_idx')
+      .on(t.areaId, t.tier)
+      .where(sql`${t.isPublished}`),
+  ],
+).enableRLS()
