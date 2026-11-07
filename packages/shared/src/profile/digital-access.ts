@@ -4,7 +4,7 @@ import { z } from 'zod'
 // Stored as text arrays, so these lists are the only check.
 
 export const DEVICES = ['smartphone', 'laptop', 'desktop', 'tablet', 'none'] as const
-export const deviceSchema = z.enum(DEVICES)
+export const deviceSchema = z.enum(DEVICES, { error: 'Pick your devices from the list.' })
 export type Device = (typeof DEVICES)[number]
 
 export const DEVICE_LABELS = {
@@ -22,7 +22,9 @@ export const INTERNET_ACCESS = [
   'piso_wifi',
   'none',
 ] as const
-export const internetAccessSchema = z.enum(INTERNET_ACCESS)
+export const internetAccessSchema = z.enum(INTERNET_ACCESS, {
+  error: 'Pick how you get internet from the list.',
+})
 export type InternetAccess = (typeof INTERNET_ACCESS)[number]
 
 export const INTERNET_ACCESS_LABELS = {

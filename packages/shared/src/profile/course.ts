@@ -5,7 +5,7 @@ import { z } from 'zod'
 
 /** Regular courses run 1st to 4th year; TESDA scholar courses (HRT, WADT) run 1st to 3rd. */
 export const COURSES = ['BSIT', 'BSCS', 'BSBA', 'BSA', 'BSHM', 'HRT', 'WADT'] as const
-export const courseSchema = z.enum(COURSES)
+export const courseSchema = z.enum(COURSES, { error: 'Pick your course from the list.' })
 export type Course = (typeof COURSES)[number]
 
 export const TESDA_COURSES = ['HRT', 'WADT'] as const satisfies readonly Course[]
@@ -31,7 +31,9 @@ export const COURSE_MAX_YEAR_LEVEL = {
 } as const satisfies Record<Course, YearLevel>
 
 /** Any year level (1 to 4). Use `isYearLevelInCourse` to check it against the course. */
-export const yearLevelSchema = z.literal(YEAR_LEVELS)
+export const yearLevelSchema = z.literal(YEAR_LEVELS, {
+  error: 'Pick your year level from the list.',
+})
 
 /** The year levels a course offers, for the profile form's year-level picker. */
 export const yearLevelsFor = (course: Course): YearLevel[] =>
