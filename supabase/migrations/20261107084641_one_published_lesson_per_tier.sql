@@ -1,0 +1,1 @@
+CREATE UNIQUE INDEX "lessons_one_published_per_tier_idx" ON "lessons" USING btree ("area_id","tier") WHERE "lessons"."is_published";

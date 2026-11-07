@@ -15,6 +15,13 @@
       "when": 1794040476692,
       "tag": "20261107083436_fix_fk_constraints",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1794041201350,
+      "tag": "20261107084641_one_published_lesson_per_tier",
+      "breakpoints": true
     }
   ]
 }
