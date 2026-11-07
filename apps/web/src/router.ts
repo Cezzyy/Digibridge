@@ -29,10 +29,15 @@ declare module 'vue-router' {
 export const router = createRouter({
   history: createWebHistory(),
   // New pages open at the top; in-page links (#how) scroll to their section, smoothly unless
-  // the user asks for less motion (style.css).
+  // the user asks for less motion, and below the sticky top bar (both set in style.css).
+  // `scrollIntoView` instead of `{ el: to.hash }`: Vue Router turns `el` into `window.scrollTo()`,
+  // which ignores `scroll-padding-top`, so the section's heading would end up under the top bar.
   scrollBehavior(to, _from, saved) {
     if (saved) return saved
-    if (to.hash) return { el: to.hash }
+    if (to.hash) {
+      document.getElementById(decodeURIComponent(to.hash.slice(1)))?.scrollIntoView()
+      return false
+    }
     return { top: 0, behavior: 'instant' }
   },
   routes: [
