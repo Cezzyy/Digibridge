@@ -115,7 +115,7 @@ Done when the database holds only real content and no test data.
 
 ## Settle as we go
 
-- **Token check:** see whether the Supabase project signs tokens with the new asymmetric keys (JWKS) or the legacy JWT secret before writing the auth middleware.
+- **Token check:** settled Nov 7. The project signs tokens with an ES256 key published at `<SUPABASE_URL>/auth/v1/.well-known/jwks.json`, and the auth middleware verifies against it.
 - **Database connection:** Hyperdrive in production; locally `wrangler dev` points the `HYPERDRIVE` binding at the session pooler string in `apps/api/.env`. If Hyperdrive fights you on day 1, use the Supabase transaction pooler and add Hyperdrive later.
 - **Kiosk resume:** if a kiosk tablet refreshes mid-attempt, the attempt ID in memory is gone. Proposed: on the kiosk start screen, entering the same student number in the same kiosk session returns the in-progress attempt.
 - **Age field:** the PRD gives no range. Proposed: whole numbers from 15 to 60.

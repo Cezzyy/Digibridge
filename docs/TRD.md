@@ -52,7 +52,7 @@ TypeScript end to end: a Vue SPA on Cloudflare Pages calls a Hono API on Cloudfl
 | File storage | Cloudflare R2, private `digibridge-media` bucket bound to the API as `MEDIA`; the API serves images at `/api/v1/media/:key` | Images for scenario items and lessons. Uploads go through the binding, so no storage keys; a public R2 bucket would need a custom domain |
 | Scheduled jobs | Cloudflare Cron Trigger on the API Worker | Closes attempts whose time ran out |
 | Hosting | Cloudflare Pages (web), Cloudflare Workers (API) | Free tier fits the pilot |
-| Tests | Vitest: `app.test.ts` with `test-helpers.ts` for routes, plus unit tests for scoring | Fast, no server needed (`app.request()`) |
+| Tests | Vitest: `app.test.ts` with `test-helpers.ts` for routes, run against PGlite (in-memory Postgres with the real migrations), plus unit tests for scoring | Fast, no server or database needed (`app.request()`); SQL and constraints still tested |
 
 ## Repository structure
 
@@ -154,7 +154,7 @@ Every API request carries a Supabase access token. Kiosk requests carry the faci
 1. The web app calls `supabase.auth.signInWithOAuth({ provider: 'google' })` and gets a session back on the redirect.
 2. Every API call sends `Authorization: Bearer <access_token>`.
 3. The `auth` middleware verifies the token with `jose` against the project's JWKS (`<SUPABASE_URL>/auth/v1/.well-known/jwks.json`, ES256 signing keys), then loads or creates the `profiles` row.
-4. On first sign-in, if the email is in `ADMIN_EMAILS`, the role is set to admin. Everyone else starts as respondent.
+4. On first sign-in, if the email is in `ADMIN_EMAILS` and Google marks it verified, the role is set to admin. Everyone else starts as respondent. Later sign-ins don't change the role.
 5. `requireRole('admin')` and `requireRole('facilitator', 'admin')` guard routes. The Vue router mirrors these guards for display only; the API is the real check.
 
 **Kiosk mode**
