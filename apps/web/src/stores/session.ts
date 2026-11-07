@@ -4,16 +4,25 @@ import type { InferResponseType } from 'hono/client'
 import { defineStore } from 'pinia'
 import { computed, ref, shallowRef } from 'vue'
 import { api, ApiRequestError, call } from '../lib/api'
-import { supabase } from '../lib/supabase'
+import { returningFromGoogle, supabase } from '../lib/supabase'
 
 export type Me = InferResponseType<typeof api.me.$get, 200>
+
+/**
+ * Why the app can't go on, shown by App.vue as an ErrorScreen.
+ * `sign-in`: the return from Google didn't end signed in (cancelled, expired code, token refused).
+ * `unavailable`: signed in with Google, but /me failed (API down, no internet).
+ */
+export type SessionFailure = { kind: 'sign-in' } | { kind: 'unavailable'; message: string }
 
 // The Supabase session and the signed-in user from GET /api/v1/me.
 export const useSessionStore = defineStore('session', () => {
   const session = shallowRef<Session | null>(null)
   const me = ref<Me | null>(null)
   const loading = ref(true)
+  /** Google sign-in couldn't start; SignInPage shows it. */
   const error = ref<string | null>(null)
+  const failure = ref<SessionFailure | null>(null)
 
   const isSignedIn = computed(() => me.value !== null)
   const role = computed<Role | null>(() => me.value?.profile.role ?? null)
@@ -27,16 +36,17 @@ export const useSessionStore = defineStore('session', () => {
     }
     try {
       me.value = await call(api.me.$get())
-      error.value = null
     } catch (err) {
       me.value = null
       if (err instanceof ApiRequestError && err.code === 'unauthorized') {
-        // The API turned the token down (expired or revoked): start over.
+        // The API turned the token down (expired or revoked): start over, signed out.
         await supabase.auth.signOut({ scope: 'local' })
         session.value = null
+        return
       }
-      error.value =
+      const message =
         err instanceof ApiRequestError ? err.message : 'Something went wrong. Please try again.'
+      failure.value = { kind: 'unavailable', message }
     }
   }
 
@@ -48,6 +58,8 @@ export const useSessionStore = defineStore('session', () => {
       const { data } = await supabase.auth.getSession()
       session.value = data.session
       await loadMe()
+      // Back from Google but not signed in, and not because the API is down.
+      if (returningFromGoogle && !me.value && !failure.value) failure.value = { kind: 'sign-in' }
       loading.value = false
 
       supabase.auth.onAuthStateChange((_event, next) => {
@@ -77,7 +89,27 @@ export const useSessionStore = defineStore('session', () => {
     session.value = null
     me.value = null
     error.value = null
+    failure.value = null
   }
 
-  return { session, me, loading, error, isSignedIn, role, isStaff, isAdmin, init, signIn, signOut }
+  /** Hides the error screen, for its "go somewhere else" buttons. */
+  function clearFailure() {
+    failure.value = null
+  }
+
+  return {
+    session,
+    me,
+    loading,
+    error,
+    failure,
+    isSignedIn,
+    role,
+    isStaff,
+    isAdmin,
+    init,
+    signIn,
+    signOut,
+    clearFailure,
+  }
 })

@@ -1,4 +1,10 @@
-import { createRouter, createWebHistory } from 'vue-router'
+import {
+  createRouter,
+  createWebHistory,
+  START_LOCATION,
+  type RouteLocationNormalized,
+} from 'vue-router'
+import { AUTH_CALLBACK_PARAMS } from './lib/supabase'
 import HomePage from './pages/HomePage.vue'
 import LandingPage from './pages/LandingPage.vue'
 import NotFoundPage from './pages/NotFoundPage.vue'
@@ -42,16 +48,41 @@ export const router = createRouter({
       meta: { requires: 'guest', hideHeader: true },
     },
     { path: '/home', name: 'home', component: HomePage, meta: { requires: 'signedIn' } },
-    { path: '/:pathMatch(.*)*', name: 'not-found', component: NotFoundPage },
+    {
+      path: '/:pathMatch(.*)*',
+      name: 'not-found',
+      component: NotFoundPage,
+      meta: { hideHeader: true },
+    },
   ],
 })
 
-router.beforeEach(async (to) => {
+// Google's leftovers in the address bar (?code=, ?error=), which Supabase has read on page load.
+// On success Supabase removes them itself; on failure they'd stay, so the guard drops them.
+function withoutCallbackParams(to: RouteLocationNormalized) {
+  const keys: readonly string[] = AUTH_CALLBACK_PARAMS
+  const inQuery = Object.keys(to.query).some((key) => keys.includes(key))
+  const inHash = [...new URLSearchParams(to.hash.slice(1)).keys()].some((key) => keys.includes(key))
+  if (!inQuery && !inHash) return null
+  const query = Object.fromEntries(Object.entries(to.query).filter(([key]) => !keys.includes(key)))
+  return { path: to.path, query, hash: inHash ? '' : to.hash, replace: true }
+}
+
+router.beforeEach(async (to, from) => {
+  const clean = withoutCallbackParams(to)
+  if (clean) return clean
+
   const requires = to.meta.requires
   if (!requires) return true
 
   const session = useSessionStore()
   await session.init()
+  // App.vue shows the error screen over the first page, so stay there: "Try again" reloads it.
+  // Going to another page (the logo, the back button) closes the error screen.
+  if (session.failure) {
+    if (from === START_LOCATION) return true
+    session.clearFailure()
+  }
   switch (requires) {
     case 'guest':
       return !session.isSignedIn || { name: 'home' }
