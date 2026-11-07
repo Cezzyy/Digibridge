@@ -47,6 +47,44 @@ describe('generalProfileSchema', () => {
     }
     expect(generalProfileSchema.safeParse({ ...general, devices: ['none'] }).success).toBe(true)
   })
+
+  it('gives a repeated "none" only the repeat message', () => {
+    const result = generalProfileSchema.safeParse({ ...general, devices: ['none', 'none'] })
+    expect(result.error?.issues.map((issue) => issue.message)).toEqual([
+      'Pick each device only once.',
+    ])
+  })
+})
+
+// Zod's own text ("Invalid option: expected one of ...") isn't written for students.
+const ZOD_DEFAULT_TEXT = /invalid|expected|unrecognized|received/i
+
+describe('profile messages', () => {
+  const bad = {
+    fullName: undefined,
+    age: undefined,
+    sex: 'other',
+    devices: 'laptop',
+    internetAccess: ['wifi'],
+    email: 'a@b.c',
+  }
+
+  it.each([
+    ['general', generalProfileSchema, {}],
+    ['kiosk', kioskProfileSchema, { studentNumber: 7557, course: 'BSN', yearLevel: '2' }],
+  ] as const)('are plain English for every bad %s field', (_, schema, schoolFields) => {
+    const result = schema.safeParse({ ...bad, ...schoolFields })
+    expect(result.error?.issues.length).toBeGreaterThan(0)
+    for (const issue of result.error?.issues ?? []) {
+      expect(issue.message).not.toMatch(ZOD_DEFAULT_TEXT)
+    }
+  })
+
+  it('are plain English when the profile is not an object', () => {
+    expect(kioskProfileSchema.safeParse(null).error?.issues[0]?.message).toBe(
+      'Fill in your profile.',
+    )
+  })
 })
 
 describe('kioskProfileSchema', () => {

@@ -9,7 +9,7 @@ export const STUDENT_NUMBER_EXAMPLE = 'C23-01-7557-MAN121'
 
 /** Trims and uppercases the input, then checks the ACLC format. */
 export const studentNumberSchema = z
-  .string()
+  .string({ error: `Enter your student number like this: ${STUDENT_NUMBER_EXAMPLE}` })
   .trim()
   .toUpperCase()
   .regex(STUDENT_NUMBER_REGEX, {
