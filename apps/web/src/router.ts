@@ -13,14 +13,28 @@ export type Requirement = 'guest' | 'signedIn' | 'staff' | 'admin'
 declare module 'vue-router' {
   interface RouteMeta {
     requires?: Requirement
+    /** The page draws its own top bar instead of AppHeader. */
+    hideHeader?: boolean
   }
 }
 
 export const router = createRouter({
   history: createWebHistory(),
+  // New pages open at the top; in-page links (#how) scroll to their section, smoothly unless
+  // the user asks for less motion (style.css).
+  scrollBehavior(to, _from, saved) {
+    if (saved) return saved
+    if (to.hash) return { el: to.hash }
+    return { top: 0, behavior: 'instant' }
+  },
   routes: [
     // Google sends users back to `/`, and the `guest` guard there moves them on to /home.
-    { path: '/', name: 'landing', component: LandingPage, meta: { requires: 'guest' } },
+    {
+      path: '/',
+      name: 'landing',
+      component: LandingPage,
+      meta: { requires: 'guest', hideHeader: true },
+    },
     { path: '/sign-in', name: 'sign-in', component: SignInPage, meta: { requires: 'guest' } },
     { path: '/home', name: 'home', component: HomePage, meta: { requires: 'signedIn' } },
     { path: '/:pathMatch(.*)*', name: 'not-found', component: NotFoundPage },

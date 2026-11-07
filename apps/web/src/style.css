@@ -35,9 +35,27 @@
   /* rounded-control for buttons and inputs, rounded-card for cards and panels. */
   --radius-control: 0.5rem;
   --radius-card: 0.75rem;
+
+  /* Fast start, long soft stop: the curve for everything that slides or rises in (`ease-glide`). */
+  --ease-glide: cubic-bezier(0.16, 1, 0.3, 1);
+
+  /* Entrance motion, used as `motion-safe:animate-rise`. */
+  --animate-rise: rise 0.8s var(--ease-glide) both;
+  @keyframes rise {
+    from {
+      opacity: 0;
+      transform: translateY(1.25rem);
+    }
+  }
 }
 
 @layer base {
+  @media (prefers-reduced-motion: no-preference) {
+    html {
+      scroll-behavior: smooth;
+    }
+  }
+
   body {
     @apply bg-mist font-sans text-ink antialiased;
   }
@@ -46,5 +64,40 @@
   h2,
   h3 {
     @apply font-display;
+  }
+}
+
+/* `v-reveal` (lib/motion.ts): hidden until it first scrolls into view, then slides in from
+   `data-reveal` after `--reveal-delay`. Put it on wrappers that have no translate, scale or
+   transition classes of their own, since this sets those properties. */
+@layer components {
+  @media (prefers-reduced-motion: no-preference) {
+    [data-reveal] {
+      transition:
+        opacity 0.9s var(--ease-glide),
+        translate 0.9s var(--ease-glide),
+        scale 0.9s var(--ease-glide);
+      transition-delay: var(--reveal-delay, 0ms);
+    }
+
+    [data-reveal]:not([data-revealed]) {
+      opacity: 0;
+    }
+
+    [data-reveal='up']:not([data-revealed]) {
+      translate: 0 2.5rem;
+    }
+
+    [data-reveal='left']:not([data-revealed]) {
+      translate: -3rem 0;
+    }
+
+    [data-reveal='right']:not([data-revealed]) {
+      translate: 3rem 0;
+    }
+
+    [data-reveal='scale']:not([data-revealed]) {
+      scale: 0.94;
+    }
   }
 }

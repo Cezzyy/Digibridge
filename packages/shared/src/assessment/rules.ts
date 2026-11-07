@@ -6,6 +6,13 @@ import type { Difficulty } from '../enums'
 export const AREA_CODES = ['info_literacy', 'communication', 'safety'] as const
 export type AreaCode = (typeof AREA_CODES)[number]
 
+/** Area names shown to students, matching the `competency_areas.name` seed. */
+export const AREA_LABELS = {
+  info_literacy: 'Information and data literacy',
+  communication: 'Communication and collaboration',
+  safety: 'Online safety',
+} as const satisfies Record<AreaCode, string>
+
 /** Items picked per area for each difficulty: 4 basic, 4 intermediate, 2 advanced. */
 export const ITEMS_PER_DIFFICULTY = {
   basic: 4,

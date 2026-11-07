@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { useRoute, useRouter } from 'vue-router'
 import { useSessionStore } from '../stores/session'
+import BrandMark from './BrandMark.vue'
 
 // Top bar on every page, so users can sign in or out from anywhere (AUTH-03).
 const session = useSessionStore()
@@ -18,8 +19,9 @@ async function signOut() {
     <div class="mx-auto flex max-w-5xl items-center justify-between gap-4 px-4 py-2">
       <RouterLink
         :to="{ name: session.isSignedIn ? 'home' : 'landing' }"
-        class="flex min-h-11 items-center font-display text-xl font-bold text-evergreen"
+        class="flex min-h-11 items-center gap-2.5 font-display text-xl font-bold text-evergreen"
       >
+        <BrandMark class="size-8" />
         DigiBridge
       </RouterLink>
 
