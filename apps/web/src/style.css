@@ -32,6 +32,9 @@
   --font-display:
     'Bricolage Grotesque Variable', 'Source Sans 3 Variable', ui-sans-serif, sans-serif;
 
+  /* Height of the sticky top bar: `h-header`, and the offset for anything that must clear it. */
+  --spacing-header: 4.25rem;
+
   /* rounded-control for buttons and inputs, rounded-card for cards and panels. */
   --radius-control: 0.5rem;
   --radius-card: 0.75rem;
@@ -54,6 +57,11 @@
     html {
       scroll-behavior: smooth;
     }
+  }
+
+  /* Hash links land below the sticky top bar. */
+  html {
+    scroll-padding-top: var(--spacing-header);
   }
 
   body {

@@ -155,8 +155,13 @@ function screenClass(i: number) {
 
         <!-- Desktops: one phone starts beside step 1, then stays in the middle of the screen and
              changes screen as the steps go by. -->
-        <div class="relative hidden [--phone-h:min(36rem,80svh)] lg:block" aria-hidden="true">
-          <div class="sticky top-[calc((100svh-var(--phone-h))/2)] flex justify-center">
+        <div
+          class="relative hidden [--phone-h:min(36rem,calc(80svh-var(--spacing-header)))] lg:block"
+          aria-hidden="true"
+        >
+          <div
+            class="sticky top-[calc(var(--spacing-header)+(100svh-var(--spacing-header)-var(--phone-h))/2)] flex justify-center"
+          >
             <div class="phone-float relative">
               <div
                 class="absolute top-1/2 left-1/2 aspect-square w-[165%] -translate-1/2 rounded-full bg-evergreen-soft"
