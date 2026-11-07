@@ -15,6 +15,8 @@ export type Me = InferResponseType<typeof api.me.$get, 200>
  */
 export type SessionFailure = { kind: 'sign-in' } | { kind: 'unavailable'; message: string }
 
+const SOMETHING_WENT_WRONG = 'Something went wrong. Please try again.'
+
 // The Supabase session and the signed-in user from GET /api/v1/me.
 export const useSessionStore = defineStore('session', () => {
   const session = shallowRef<Session | null>(null)
@@ -48,8 +50,7 @@ export const useSessionStore = defineStore('session', () => {
         session.value = null
         return
       }
-      const message =
-        err instanceof ApiRequestError ? err.message : 'Something went wrong. Please try again.'
+      const message = err instanceof ApiRequestError ? err.message : SOMETHING_WENT_WRONG
       failure.value = { kind: 'unavailable', message }
     }
   }
@@ -59,9 +60,16 @@ export const useSessionStore = defineStore('session', () => {
   /** Loads the session once; later calls wait for the same load. Route guards await this. */
   function init() {
     ready ??= (async () => {
-      const { data } = await supabase.auth.getSession()
-      session.value = data.session
-      await loadMe()
+      try {
+        const { data } = await supabase.auth.getSession()
+        session.value = data.session
+        await loadMe()
+      } catch {
+        // Supabase itself threw (lock timeout, storage blocked). Never let this load reject: the
+        // first page would then never resolve and App.vue would show the splash for good.
+        me.value = null
+        failure.value = { kind: 'unavailable', message: SOMETHING_WENT_WRONG }
+      }
       // Back from Google but not signed in, and not because the API is down.
       if (returningFromGoogle && !me.value && !failure.value) failure.value = { kind: 'sign-in' }
       loading.value = false
@@ -100,7 +108,7 @@ export const useSessionStore = defineStore('session', () => {
     failure.value = null
   }
 
-  /** Hides the error screen, for its "go somewhere else" buttons. */
+  /** Hides the error screen; the router calls it when the user goes to another page. */
   function clearFailure() {
     failure.value = null
   }
