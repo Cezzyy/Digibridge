@@ -1,3 +1,5 @@
+// Imported, not global: the web app type-checks this file too (for AppType) without Worker globals.
+import type { Hyperdrive, R2Bucket } from '@cloudflare/workers-types'
 import type { Profile } from '@digibridge/db'
 import type { Db } from './config/db'
 

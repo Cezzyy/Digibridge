@@ -6,6 +6,8 @@ import { z } from 'zod'
 export const ROLES = ['respondent', 'facilitator', 'admin'] as const
 export const roleSchema = z.enum(ROLES)
 export type Role = (typeof ROLES)[number]
+// Roles that may open the dashboard and run kiosk sessions (requireRole(...STAFF_ROLES) in the API).
+export const STAFF_ROLES = ['facilitator', 'admin'] as const satisfies readonly Role[]
 
 export const MODES = ['online', 'kiosk'] as const
 export const modeSchema = z.enum(MODES)

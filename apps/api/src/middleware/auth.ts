@@ -90,7 +90,7 @@ export const auth = createMiddleware<AuthEnv>(async (c, next) => {
 
 /**
  * Blocks roles not in the list with 403 (AUTH-04). Put it after `auth`:
- * `middleware: [auth, requireRole('facilitator', 'admin')] as const`.
+ * `middleware: [auth, requireRole(...STAFF_ROLES)] as const`.
  */
 export function requireRole(...roles: Role[]) {
   return createMiddleware<AuthEnv>(async (c, next) => {
