@@ -16,8 +16,34 @@ function hasCallbackParams(location: Location) {
   return AUTH_CALLBACK_PARAMS.some((key) => query.has(key) || hash.has(key))
 }
 
-/** True when this page load is the return from Google. Read before the client below removes the code. */
-export const returningFromGoogle = hasCallbackParams(window.location)
+// Set just before leaving for Google, so a page that happens to have ?code= or ?error= in its
+// address isn't taken for the return from Google. sessionStorage lasts for this tab only.
+const SIGN_IN_STARTED_KEY = 'digibridge:sign-in-started'
+
+export function markSignInStarted(started: boolean) {
+  try {
+    if (started) sessionStorage.setItem(SIGN_IN_STARTED_KEY, '1')
+    else sessionStorage.removeItem(SIGN_IN_STARTED_KEY)
+  } catch {
+    // Storage blocked: the return from Google then looks like a normal page load.
+  }
+}
+
+function takeSignInStarted() {
+  try {
+    const started = sessionStorage.getItem(SIGN_IN_STARTED_KEY) !== null
+    sessionStorage.removeItem(SIGN_IN_STARTED_KEY)
+    return started
+  } catch {
+    return false
+  }
+}
+
+/**
+ * True when this page load is the return from Google: this tab left for Google and came back with
+ * its params. Read before the client below removes the code.
+ */
+export const returningFromGoogle = takeSignInStarted() && hasCallbackParams(window.location)
 
 // Used only to sign in and out (Google). Everything else goes through the API.
 // PKCE: Google sends the user back with ?code=..., which this client swaps for a session
