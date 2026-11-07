@@ -75,7 +75,7 @@ function sendHttpException(c: Context, err: HTTPException) {
 
 /** app.onError: turns anything thrown into the error shape. */
 export const handleError: ErrorHandler<AppEnv> = (err, c) => {
-  if (err instanceof ApiError) return sendError(c, err.code, err.message)
+  if (err instanceof ApiError) return sendError(c, err.code, err.message, err.status)
   if (err instanceof HTTPException) return sendHttpException(c, err)
   console.error(err)
   return sendError(c, 'internal_error')
