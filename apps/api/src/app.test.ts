@@ -1,4 +1,6 @@
 import { OpenAPIHono, createRoute, z } from '@hono/zod-openapi'
+import { bodyLimit } from 'hono/body-limit'
+import { HTTPException } from 'hono/http-exception'
 import { describe, expect, it, vi } from 'vitest'
 import { app } from './app'
 import type { AppEnv, Bindings } from './env'
@@ -45,6 +47,15 @@ describe('errors', () => {
     .get('/crash', () => {
       throw new Error('boom')
     })
+    .post('/upload', bodyLimit({ maxSize: 10 }), (c) => c.text('ok'))
+    .get('/busy', () => {
+      throw new HTTPException(429, {
+        res: new Response(null, { headers: { 'Retry-After': '60' } }),
+      })
+    })
+    .get('/down', () => {
+      throw new HTTPException(503, { message: 'db down' })
+    })
   testApp.onError(handleError)
   testApp.notFound(handleNotFound)
 
@@ -84,6 +95,31 @@ describe('errors', () => {
     const body = await res.json()
     expect(body).toMatchObject({ error: { code: 'internal_error' } })
     expect(JSON.stringify(body)).not.toContain('boom')
+    expect(log).toHaveBeenCalled()
+    log.mockRestore()
+  })
+
+  it('sends too_large when the body is over the limit', async () => {
+    const res = await testApp.request('/upload', { method: 'POST', body: 'x'.repeat(100) })
+    expect(res.status).toBe(413)
+    expect(await res.json()).toMatchObject({ error: { code: 'too_large' } })
+  })
+
+  it('keeps the status and headers of a thrown HTTPException', async () => {
+    const res = await testApp.request('/busy')
+    expect(res.status).toBe(429)
+    expect(res.headers.get('Retry-After')).toBe('60')
+    expect(res.headers.get('Content-Type')).toContain('application/json')
+    expect(await res.json()).toMatchObject({ error: { code: 'rate_limited' } })
+  })
+
+  it('keeps a 5xx status, hides its message and logs it', async () => {
+    const log = vi.spyOn(console, 'error').mockImplementation(() => {})
+    const res = await testApp.request('/down')
+    expect(res.status).toBe(503)
+    const body = await res.json()
+    expect(body).toMatchObject({ error: { code: 'internal_error' } })
+    expect(JSON.stringify(body)).not.toContain('db down')
     expect(log).toHaveBeenCalled()
     log.mockRestore()
   })
