@@ -1,42 +1,15 @@
 <script setup lang="ts">
-import { ATTEMPT_DURATION_MINUTES, ITEMS_PER_ATTEMPT } from '@digibridge/shared'
 import { onBeforeUnmount, onMounted, ref } from 'vue'
 import { vReveal } from '../../lib/motion'
 import BrandMark from '../BrandMark.vue'
 import SectionEyebrow from './SectionEyebrow.vue'
-import StepScreen, { type StepScreenId } from './StepScreen.vue'
+import StepScreen from './StepScreen.vue'
+import { STEPS } from './steps'
 
 // "How it works": the steps as a route that fills in as you scroll. The step that has reached
 // the middle of the screen is the current one, and its app screen plays: in the phone that
 // stays beside the steps on desktops, or under the step itself on phones.
 
-const STEPS: { screen: StepScreenId; title: string; body: string }[] = [
-  {
-    screen: 'sign-in',
-    title: 'Sign in with Google',
-    body: 'Your first sign-in makes your DigiBridge account.',
-  },
-  {
-    screen: 'consent',
-    title: 'Agree to the privacy notice',
-    body: 'It explains what we collect and why, under the Data Privacy Act of 2012.',
-  },
-  {
-    screen: 'profile',
-    title: 'Fill in your profile',
-    body: 'Your course and year level, and the devices and internet you use.',
-  },
-  {
-    screen: 'questions',
-    title: `Answer ${ITEMS_PER_ATTEMPT} questions`,
-    body: `You have ${ATTEMPT_DURATION_MINUTES} minutes. Go back and change answers anytime before you submit.`,
-  },
-  {
-    screen: 'results',
-    title: 'See your level and lessons',
-    body: 'Your results show up as soon as you submit.',
-  },
-]
 const LAST = STEPS.length - 1
 
 const active = ref(0)

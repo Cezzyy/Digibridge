@@ -35,7 +35,12 @@ export const router = createRouter({
       component: LandingPage,
       meta: { requires: 'guest', hideHeader: true },
     },
-    { path: '/sign-in', name: 'sign-in', component: SignInPage, meta: { requires: 'guest' } },
+    {
+      path: '/sign-in',
+      name: 'sign-in',
+      component: SignInPage,
+      meta: { requires: 'guest', hideHeader: true },
+    },
     { path: '/home', name: 'home', component: HomePage, meta: { requires: 'signedIn' } },
     { path: '/:pathMatch(.*)*', name: 'not-found', component: NotFoundPage },
   ],
