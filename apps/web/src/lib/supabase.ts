@@ -2,18 +2,24 @@ import { createClient } from '@supabase/supabase-js'
 
 // What Google sign-in leaves in the address bar on the way back: ?code=... when it worked,
 // ?error=... when the user cancelled or it failed. Supabase reads the query and the hash.
-export const AUTH_CALLBACK_PARAMS = [
+const AUTH_CALLBACK_PARAMS: readonly string[] = [
   'code',
   'sb_flow_id',
   'error',
   'error_code',
   'error_description',
-] as const
+]
 
-function hasCallbackParams(location: Location) {
-  const query = new URLSearchParams(location.search)
-  const hash = new URLSearchParams(location.hash.slice(1))
-  return AUTH_CALLBACK_PARAMS.some((key) => query.has(key) || hash.has(key))
+export function isCallbackParam(key: string) {
+  return AUTH_CALLBACK_PARAMS.includes(key)
+}
+
+/** Where Google's params are in an address, given its query keys and its hash ("#a=1&b=2"). */
+export function findCallbackParams(queryKeys: Iterable<string>, hash: string) {
+  return {
+    inQuery: [...queryKeys].some(isCallbackParam),
+    inHash: [...new URLSearchParams(hash.slice(1)).keys()].some(isCallbackParam),
+  }
 }
 
 // Set just before leaving for Google, so a page that happens to have ?code= or ?error= in its
@@ -43,7 +49,18 @@ function takeSignInStarted() {
  * True when this page load is the return from Google: this tab left for Google and came back with
  * its params. Read before the client below removes the code.
  */
-export const returningFromGoogle = takeSignInStarted() && hasCallbackParams(window.location)
+export const returningFromGoogle = (() => {
+  if (!takeSignInStarted()) return false
+  const { search, hash } = window.location
+  const found = findCallbackParams(new URLSearchParams(search).keys(), hash)
+  return found.inQuery || found.inHash
+})()
+
+// Back from Google's page without signing in: the browser may bring this page back as it was
+// left, without loading it again, so the sign-in didn't happen and the mark no longer applies.
+window.addEventListener('pageshow', (event) => {
+  if (event.persisted) markSignInStarted(false)
+})
 
 // Used only to sign in and out (Google). Everything else goes through the API.
 // PKCE: Google sends the user back with ?code=..., which this client swaps for a session

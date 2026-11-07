@@ -6,7 +6,7 @@ import {
   START_LOCATION,
   type RouteLocationNormalized,
 } from 'vue-router'
-import { AUTH_CALLBACK_PARAMS, returningFromGoogle } from './lib/supabase'
+import { findCallbackParams, isCallbackParam, returningFromGoogle } from './lib/supabase'
 import HomePage from './pages/HomePage.vue'
 import LandingPage from './pages/LandingPage.vue'
 import NotFoundPage from './pages/NotFoundPage.vue'
@@ -69,11 +69,11 @@ export const router = createRouter({
 // Only on the page load that returns from Google, so other pages can still use these names.
 function withoutCallbackParams(to: RouteLocationNormalized, from: RouteLocationNormalized) {
   if (!returningFromGoogle || from !== START_LOCATION) return null
-  const keys: readonly string[] = AUTH_CALLBACK_PARAMS
-  const inQuery = Object.keys(to.query).some((key) => keys.includes(key))
-  const inHash = [...new URLSearchParams(to.hash.slice(1)).keys()].some((key) => keys.includes(key))
+  const { inQuery, inHash } = findCallbackParams(Object.keys(to.query), to.hash)
   if (!inQuery && !inHash) return null
-  const query = Object.fromEntries(Object.entries(to.query).filter(([key]) => !keys.includes(key)))
+  const query = Object.fromEntries(
+    Object.entries(to.query).filter(([key]) => !isCallbackParam(key)),
+  )
   return { path: to.path, query, hash: inHash ? '' : to.hash, replace: true }
 }
 

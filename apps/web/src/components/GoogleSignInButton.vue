@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref } from 'vue'
+import { onBeforeUnmount, onMounted, ref } from 'vue'
 import { useSessionStore } from '../stores/session'
 
 const session = useSessionStore()
@@ -11,6 +11,14 @@ async function signIn() {
   // Still here means Google's page didn't open.
   if (session.error) redirecting.value = false
 }
+
+// Back from Google's page: the browser may bring this page back as it was left, still
+// "Opening Google…", so make the button usable again.
+function onPageShow(event: PageTransitionEvent) {
+  if (event.persisted) redirecting.value = false
+}
+onMounted(() => window.addEventListener('pageshow', onPageShow))
+onBeforeUnmount(() => window.removeEventListener('pageshow', onPageShow))
 </script>
 
 <template>
