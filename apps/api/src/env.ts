@@ -1,3 +1,6 @@
+import type { Profile } from '@digibridge/db'
+import type { Db } from './config/db'
+
 // Worker environment: [vars], bindings and secrets from wrangler.toml; .dev.vars overrides locally.
 export type Bindings = {
   SUPABASE_URL: string
@@ -7,4 +10,8 @@ export type Bindings = {
   MEDIA: R2Bucket
 }
 
-export type AppEnv = { Bindings: Bindings }
+// c.var.db is set for every /api/v1 request (middleware/db.ts).
+export type AppEnv = { Bindings: Bindings; Variables: { db: Db } }
+
+// Routes with the auth middleware also get the signed-in user's profile.
+export type AuthEnv = AppEnv & { Variables: { profile: Profile } }
