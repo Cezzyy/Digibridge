@@ -29,6 +29,13 @@
       "when": 1794067107841,
       "tag": "20261107155827_school_fields_kiosk_only",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1794068330247,
+      "tag": "20261107161850_age_range_and_kiosk_course_index",
+      "breakpoints": true
     }
   ]
 }
