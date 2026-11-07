@@ -1,9 +1,10 @@
 <script setup lang="ts">
-import { useRouter } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import { useSessionStore } from '../stores/session'
 
-// Top bar on every page, so users can sign out from anywhere (AUTH-03).
+// Top bar on every page, so users can sign in or out from anywhere (AUTH-03).
 const session = useSessionStore()
+const route = useRoute()
 const router = useRouter()
 
 async function signOut() {
@@ -16,7 +17,7 @@ async function signOut() {
   <header class="border-b border-line bg-surface">
     <div class="mx-auto flex max-w-5xl items-center justify-between gap-4 px-4 py-2">
       <RouterLink
-        :to="{ name: 'landing' }"
+        :to="{ name: session.isSignedIn ? 'home' : 'landing' }"
         class="flex min-h-11 items-center font-display text-xl font-bold text-evergreen"
       >
         DigiBridge
@@ -41,6 +42,14 @@ async function signOut() {
           Sign out
         </button>
       </div>
+
+      <RouterLink
+        v-else-if="!session.loading && route.name !== 'sign-in'"
+        :to="{ name: 'sign-in' }"
+        class="flex min-h-11 shrink-0 items-center rounded-control border border-line-strong px-4 font-semibold text-evergreen hover:bg-evergreen-soft"
+      >
+        Sign in
+      </RouterLink>
     </div>
   </header>
 </template>

@@ -20,6 +20,6 @@ async function signIn() {
     :disabled="redirecting"
     @click="signIn"
   >
-    {{ redirecting ? 'Opening Google…' : 'Sign in with Google' }}
+    {{ redirecting ? 'Opening Google…' : 'Continue with Google' }}
   </button>
 </template>
