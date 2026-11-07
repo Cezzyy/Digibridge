@@ -1,5 +1,7 @@
 <script setup lang="ts">
 import type { RouteLocationRaw } from 'vue-router'
+import { useSessionStore } from '../stores/session'
+import AccountControls from './AccountControls.vue'
 import SiteHeader from './SiteHeader.vue'
 
 // A full screen for when a page can't be shown: not found, sign-in failed, API unreachable.
@@ -17,6 +19,9 @@ defineProps<{
   actions: ErrorAction[]
 }>()
 
+// Signed-in users can still sign out from here, e.g. on the not-found page (AUTH-03).
+const session = useSessionStore()
+
 const BUTTON =
   'inline-flex min-h-12 items-center justify-center rounded-control px-6 font-semibold transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-evergreen'
 const PRIMARY = `${BUTTON} bg-evergreen text-white hover:bg-evergreen-hover`
@@ -25,7 +30,9 @@ const SECONDARY = `${BUTTON} border border-line-strong text-evergreen hover:bg-e
 
 <template>
   <div class="flex min-h-dvh flex-col">
-    <SiteHeader />
+    <SiteHeader>
+      <AccountControls v-if="session.isSignedIn" />
+    </SiteHeader>
     <main class="grid flex-1 place-items-center px-4 py-12">
       <div class="flex max-w-md flex-col items-center text-center motion-safe:animate-rise">
         <span class="grid size-14 place-items-center rounded-full bg-error-soft" aria-hidden="true">

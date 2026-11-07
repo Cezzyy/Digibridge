@@ -1,17 +1,11 @@
 <script setup lang="ts">
-import { useRouter } from 'vue-router'
 import { useSessionStore } from '../stores/session'
+import AccountControls from './AccountControls.vue'
 import BrandMark from './BrandMark.vue'
 
 // Top bar on every page, so users can sign in or out from anywhere (AUTH-03). It stays at the
 // top while the page scrolls.
 const session = useSessionStore()
-const router = useRouter()
-
-async function signOut() {
-  await session.signOut()
-  await router.push({ name: 'landing' })
-}
 </script>
 
 <template>
@@ -25,25 +19,7 @@ async function signOut() {
         DigiBridge
       </RouterLink>
 
-      <div v-if="session.isSignedIn && session.me" class="flex min-w-0 items-center gap-3">
-        <img
-          v-if="session.me.profile.avatarUrl"
-          :src="session.me.profile.avatarUrl"
-          alt=""
-          class="size-8 shrink-0 rounded-full"
-          referrerpolicy="no-referrer"
-        />
-        <span class="hidden truncate text-quiet sm:inline">
-          {{ session.me.profile.fullName ?? session.me.profile.email }}
-        </span>
-        <button
-          type="button"
-          class="min-h-11 shrink-0 rounded-control border border-line-strong px-4 font-semibold text-evergreen hover:bg-evergreen-soft"
-          @click="signOut"
-        >
-          Sign out
-        </button>
-      </div>
+      <AccountControls v-if="session.isSignedIn" />
 
       <RouterLink
         v-else-if="!session.loading"

@@ -1,6 +1,8 @@
 import {
   createRouter,
   createWebHistory,
+  isNavigationFailure,
+  NavigationFailureType,
   START_LOCATION,
   type RouteLocationNormalized,
 } from 'vue-router'
@@ -78,11 +80,7 @@ router.beforeEach(async (to, from) => {
   const session = useSessionStore()
   await session.init()
   // App.vue shows the error screen over the first page, so stay there: "Try again" reloads it.
-  // Going to another page (the logo, the back button) closes the error screen.
-  if (session.failure) {
-    if (from === START_LOCATION) return true
-    session.clearFailure()
-  }
+  if (session.failure && from === START_LOCATION) return true
   switch (requires) {
     case 'guest':
       return !session.isSignedIn || { name: 'home' }
@@ -93,4 +91,13 @@ router.beforeEach(async (to, from) => {
     case 'admin':
       return session.isAdmin || { name: session.isSignedIn ? 'home' : 'sign-in' }
   }
+})
+
+// Going to any page after the first one (a button, the logo, the back button) closes the error
+// screen. This runs in afterEach because a link to the page already open (the logo on `/`, where
+// Google sends users back) skips beforeEach but still reaches afterEach, as a duplicate.
+router.afterEach((_to, from, failure) => {
+  if (from === START_LOCATION) return
+  if (failure && !isNavigationFailure(failure, NavigationFailureType.duplicated)) return
+  useSessionStore().clearFailure()
 })
