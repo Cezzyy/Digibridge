@@ -6,12 +6,11 @@ import SiteHeader from './SiteHeader.vue'
 
 // A full screen for when a page can't be shown: not found, sign-in failed, API unreachable.
 // Pages use it in place of their own content; the first action is the main button.
-export interface ErrorAction {
-  label: string
-  /** A page to go to, or `onClick` for anything else (retry, sign out). */
-  to?: RouteLocationRaw
-  onClick?: () => void
-}
+// A page to go to, or `onClick` for anything else (retry, sign out), never both: a link's click
+// handler also runs on Ctrl/Cmd/middle clicks, which open a new tab and leave this one as it is.
+export type ErrorAction = { label: string } & (
+  { to: RouteLocationRaw; onClick?: never } | { to?: never; onClick: () => void }
+)
 
 defineProps<{
   title: string
@@ -53,12 +52,7 @@ const SECONDARY = `${BUTTON} border border-line-strong text-evergreen hover:bg-e
 
         <div class="mt-8 flex w-full flex-col gap-3 sm:w-auto sm:flex-row sm:justify-center">
           <template v-for="(action, i) in actions" :key="action.label">
-            <RouterLink
-              v-if="action.to"
-              :to="action.to"
-              :class="i === 0 ? PRIMARY : SECONDARY"
-              @click="action.onClick?.()"
-            >
+            <RouterLink v-if="action.to" :to="action.to" :class="i === 0 ? PRIMARY : SECONDARY">
               {{ action.label }}
             </RouterLink>
             <button
