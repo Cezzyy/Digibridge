@@ -57,6 +57,8 @@ export const choices = pgTable(
   },
   (t) => [
     unique('choices_question_position_unique').on(t.questionId, t.position),
+    // Target of the answers foreign key that keeps a choice on its own question.
+    unique('choices_question_id_unique').on(t.questionId, t.id),
     uniqueIndex('choices_one_correct_idx')
       .on(t.questionId)
       .where(sql`${t.isCorrect}`),
