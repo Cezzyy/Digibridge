@@ -29,9 +29,9 @@ Done when you can sign in with Google on the deployed site and `/api/v1/me` answ
 - [ ] **Seeds:** `db:seed` for the 3 areas, `db:seed:dummy` for 5 dummy items per area.
 - [x] **Shared package:** enums, course and year-level lists, student number regex, scoring weights and level cut-offs.
 - [x] **API skeleton:** OpenAPIHono app, error handler that returns `{ error: { code, message } }`, CORS for the Pages origin, `config/db` connection, docs in `openapi/`.
-- [ ] **Auth middleware and `GET /api/v1/me`:** verify the Supabase token with `jose`, create the profile on first call, `ADMIN_EMAILS` makes you admin, `requireRole` (AUTH-01, AUTH-02, AUTH-04).
-- [ ] **Web skeleton:** Vue Router, Pinia, Tailwind v4 tokens in `@theme`, Supabase client, `hc` client, sign in and sign out (AUTH-01, AUTH-03).
-- [ ] **Deploy both:** `pnpm --filter web run deploy` to Pages, `pnpm --filter api run deploy` for the API, cron trigger in `wrangler.toml`.
+- [x] **Auth middleware and `GET /api/v1/me`:** verify the Supabase token with `jose`, create the profile on first call, `ADMIN_EMAILS` makes you admin, `requireRole` (AUTH-01, AUTH-02, AUTH-04).
+- [x] **Web skeleton:** Vue Router, Pinia, Tailwind v4 tokens in `@theme`, Supabase client, `hc` client, sign in and sign out (AUTH-01, AUTH-03).
+- [x] **Deploy both:** `pnpm --filter web run deploy` to Pages, `pnpm --filter api run deploy` for the API, cron trigger in `wrangler.toml`.
 
 ## Stage 1: Respondent flow (Nov 1 to 2)
 
