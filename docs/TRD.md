@@ -107,7 +107,7 @@ Scoring constants live in `packages/shared` so the API, the tests and any displa
 
 ## Data model
 
-11 tables in the `public` schema. A respondent is keyed by student number, so online and kiosk respondents share one table and the one-attempt rule holds across both.
+11 tables in the `public` schema. Online and kiosk respondents share one table, but they're keyed differently: an online respondent by their Google account (`profile_id`), a kiosk respondent by student number. School details (`student_number`, `course`, `year_level`) are filled only for kiosk respondents and are null online, which a check constraint enforces.
 
 **Enums**
 
@@ -124,7 +124,7 @@ Scoring constants live in `packages/shared` so the API, the tests and any displa
 | Table | Key columns | Constraints and notes |
 | --- | --- | --- |
 | `profiles` | `id` (uuid, = `auth.users.id`), `email`, `full_name`, `avatar_url`, `role`, `created_at`, `last_sign_in_at` | Created on first API call after Google sign-in. `role` defaults to respondent. |
-| `respondents` | `id`, `profile_id` (null for kiosk), `student_number`, `full_name`, `course`, `year_level`, `age`, `sex`, `devices` (text\[\]), `internet_access` (text\[\]), `show_identity` (boolean), `mode`, `consent_version`, `consented_at`, `created_at` | `student_number` unique, stored uppercase. `profile_id` unique when not null. `show_identity` false hides name and student number from all team views and the CSV. Consent is saved together with the profile, so declining stores nothing. |
+| `respondents` | `id`, `profile_id` (null for kiosk), `student_number`, `full_name`, `course`, `year_level`, `age`, `sex`, `devices` (text\[\]), `internet_access` (text\[\]), `show_identity` (boolean), `mode`, `consent_version`, `consented_at`, `created_at` | `student_number`, `course` and `year_level` are nullable. Check `respondents_school_fields_by_mode`: kiosk rows have all three and no `profile_id`; online rows have none of the three. `student_number` unique when not null, stored uppercase. `profile_id` unique when not null, so one respondent per Google account. `show_identity` false hides name and student number from all team views and the CSV. Consent is saved together with the profile, so declining stores nothing. |
 | `kiosk_sessions` | `id`, `facilitator_id`, `device_label`, `pin_hash`, `started_at`, `ended_at` | One open session per device. PIN stored hashed. `facilitator_id` set to null if the facilitator's account is deleted. |
 | `competency_areas` | `id`, `code`, `name`, `description`, `sort_order` | Seeded with 3 rows: `info_literacy`, `communication`, `safety`. |
 | `questions` | `id`, `area_id`, `difficulty`, `stem`, `image_url`, `is_scenario`, `explanation`, `is_active`, `created_by`, `created_at`, `updated_at` | Never hard-deleted once answered; set `is_active` false instead. |
@@ -137,11 +137,18 @@ Scoring constants live in `packages/shared` so the API, the tests and any displa
 
 **Fixed option lists** (stored as text, validated by Zod in `packages/shared`)
 
+Both modes:
+
+- `devices`: smartphone, laptop, desktop, tablet, none
+- `internet_access`: home\_wifi, mobile\_data, school\_wifi, piso\_wifi, none
+
+Kiosk mode only (the school details):
+
 - `student_number`: trimmed and uppercased, must match `^[A-Z]\d{2}-\d{2}-\d{4}-[A-Z]{3}\d{3}$` (e.g. C23-01-7557-MAN121)
 - `course`: BSIT, BSCS, BSBA, BSA, BSHM (regular, year 1 to 4); HRT, WADT (TESDA scholars, year 1 to 3)
 - `year_level`: 1 to 4, and at most 3 for HRT and WADT, checked in the Zod schema and again in the API
-- `devices`: smartphone, laptop, desktop, tablet, none
-- `internet_access`: home\_wifi, mobile\_data, school\_wifi, piso\_wifi, none
+
+`packages/shared` has two profile schemas: a general one for online, which rejects the school fields, and a kiosk one that extends it with the three school fields, all required. The school lists are ACLC's; keeping them in their own module means another school's lists could be added later without touching the online profile.
 
 **Indexes for the dashboard:** `attempts(status, submitted_at)`, `respondents(course, year_level)`, `answers(question_id)` for item analysis.
 
@@ -162,7 +169,7 @@ Every API request carries a Supabase access token. Kiosk requests carry the faci
 1. A signed-in facilitator opens `/kiosk`, enters a device label ("Tablet 1") and a 4-digit PIN. `POST /api/v1/kiosk/sessions` stores the session with the PIN hashed.
 2. The `kiosk` Pinia store keeps `kioskSessionId` in `localStorage`, and the router locks the device to `/kiosk/*` routes.
 3. Kiosk calls send the facilitator's token plus an `X-Kiosk-Session` header. The `kiosk` middleware checks the session is open and belongs to that facilitator.
-4. A kiosk respondent row has `mode = kiosk` and no `profile_id`. Their attempt stores `kiosk_session_id`.
+4. A kiosk respondent row has `mode = kiosk`, no `profile_id`, and the school details (student number, course, year level), which only the kiosk profile form asks for. Their attempt stores `kiosk_session_id`.
 5. Done, after results and the SUS survey, clears the attempt store and returns to `/kiosk`. Nothing about the student stays in the browser.
 6. Exit calls `POST /api/v1/kiosk/sessions/:id/end` with the PIN. A wrong PIN 5 times in a row locks exit for 1 minute.
 
@@ -185,7 +192,7 @@ All routes live under `/api/v1` (only the OpenAPI spec and docs page sit at `/ap
 | Method | Path | Auth | Purpose |
 | --- | --- | --- | --- |
 | GET | `/api/v1/me` | Signed in | Profile, role, own respondent record and attempt status |
-| POST | `/api/v1/respondents` | Self | Save consent, profile and identity choice. Returns 409 if the student number already has a completed attempt. |
+| POST | `/api/v1/respondents` | Self | Save consent, profile and identity choice. Online: general profile only, 400 if school fields are sent, 409 if the account already has a respondent. Kiosk (`X-Kiosk-Session`): school fields required, 409 if the student number is already used. |
 | POST | `/api/v1/attempts` | Self | Start the attempt: pick items, shuffle, set `expires_at`. Returns the existing attempt if one is in progress. |
 | GET | `/api/v1/attempts/:id` | Self | Items in shuffled order (no correct answers), saved answers, `expires_at`, server time |
 | PUT | `/api/v1/attempts/:id/answers/:questionId` | Self | Save or change one answer. Rejected after `expires_at` + 30 s. |
@@ -210,7 +217,7 @@ Kiosk respondents use the same respondent-flow routes with the `X-Kiosk-Session`
 
 | Method | Path | Auth | Purpose |
 | --- | --- | --- | --- |
-| GET | `/api/v1/admin/stats` | Facilitator, admin | Summary cards (including mean SUS and SUS count), level counts, comparison by a `groupBy` field. Takes all dashboard filters as query params. |
+| GET | `/api/v1/admin/stats` | Facilitator, admin | Summary cards (including mean SUS and SUS count), level counts, comparison by a `groupBy` field. Takes all dashboard filters as query params. A course or year-level filter or grouping counts kiosk respondents only. |
 | GET | `/api/v1/admin/respondents` | Facilitator, admin | Paged, filtered, sorted list. Name and student number show as Hidden unless the respondent allowed them. |
 | GET | `/api/v1/admin/respondents/:id` | Facilitator, admin | Profile and area results of one respondent |
 | GET | `/api/v1/admin/export.csv` | Admin | Filtered respondents with profile, area scores, levels and SUS score; hidden identities stay hidden |
@@ -309,6 +316,8 @@ One Vue app serves respondents, kiosk devices and admins, split by route guards.
 | `guest` | `/`, `/sign-in` | Signed out only, else to `/home` |
 | `signedIn` | `/home`, `/start/*`, `/assessment`, `/results` | Supabase session required, else to `/sign-in` |
 | `step` | `/start/profile`, `/start/ready`, `/assessment`, `/results` | Sends the user to the right step from `/api/v1/me` (no profile → consent; attempt submitted → results) |
+
+The profile page is one component with a `mode` prop: online shows the general fields only; under `/kiosk/*` it adds student number, course and year level.
 | `kioskLock` | Every route | If a kiosk session is open on this device, anything outside `/kiosk/*` redirects to `/kiosk` |
 | `staff` | `/admin`, `/admin/respondents` | Role facilitator or admin |
 | `admin` | `/admin/questions`, `/admin/lessons`, `/admin/users` | Role admin |
@@ -347,7 +356,8 @@ The browser never talks to the database directly, and only the fields the study 
 - **Kiosk PIN** is hashed with SHA-256 plus a per-session salt and rate limited (5 tries, then 1 minute).
 - **Uploads** accept only PNG, JPEG and WebP up to 2 MB.
 - **Data Privacy Act of 2012:**
-  - Consent notice versioned (`consent_version`) and stored with a timestamp.
+  - Consent notice versioned (`consent_version`) and stored with a timestamp. Online and kiosk can show different notice text, since only kiosk collects school details.
+  - Online collects no school details at all; the API refuses them.
   - Name and student number are shown to the team only if the respondent allowed it (show\_identity). Otherwise they read Hidden everywhere, including the CSV.
   - CSV export is admin only.
   - Respondent deletion on request (USR-03).
@@ -425,7 +435,8 @@ One case per Must requirement, written as ID, steps, expected result, pass or fa
 
 | Case | What to check |
 | --- | --- |
-| One attempt | Same student number online, then on kiosk: the second is blocked |
+| One attempt | Same Google account twice online: the second goes to results. Same student number in two kiosk sessions: the second is blocked |
+| School details | The online profile has no student number, course or year level fields; posting them to the API gives 400. The kiosk profile can't be saved without them |
 | Resume | Answer 10 items, refresh, close and reopen: answers and timer intact |
 | Timeout | Wait out the timer (set to 2 minutes on a test build): auto-submits; a closed tab is closed by the cron within 5 minutes |
 | Kiosk handover | Finish as student A, press Done, start student B: nothing from A visible |
@@ -446,5 +457,6 @@ Bugs go in GitHub Issues with the requirement ID, steps, expected and actual res
 | Google sign-in blocked in Messenger's in-app browser | Online respondents can't sign in | Show an "Open in Chrome or Safari" notice when the in-app browser is detected |
 | Content arrives late (Nov 6 to 8) | Real assessment not ready | Build and test on dummy items; CSV import makes loading real content a 10-minute job |
 | Cloudflare free-tier limits | Requests blocked | 30 to 100 respondents is far below the free limits; watch usage in the dashboard |
-| Someone takes it twice with a fake student number | Duplicate data | Student number format check; facilitators confirm IDs in person; admin can void |
+| Someone takes it twice with a fake student number (kiosk) | Duplicate data | Student number format check; facilitators confirm IDs in person; admin can void |
+| Someone takes it twice online with a second Google account | Duplicate online data | Online data isn't the study's ACLC sample; the dashboard can filter by mode; admin can void |
 | One developer | Cez sick or busy | Keep the repo, `.env.example` and this TRD current so Morales can take over fixes |

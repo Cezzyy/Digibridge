@@ -56,6 +56,7 @@ At the root: `tsconfig.base.json` (shared TypeScript settings; every package's `
 - Work in small steps and check with the user before starting the next stage.
 - The browser talks to Supabase only to sign in. Everything else goes through the API, which checks the role on every route.
 - Scoring numbers, enums and option lists live in `packages/shared`. Don't hard-code them anywhere else.
+- School details (student number, course, year level) belong to kiosk mode only. Online mode (public Google sign-in, landing and sign-in pages) is general: it never asks for or shows them, and the API refuses them. Online is one attempt per Google account; kiosk is one per student number.
 - `apps/web` imports only types from `apps/api` (`import type`), never runtime code.
 - Internal packages are used as TypeScript source (`exports` point at `src/*.ts`), with no build step.
 - A dependency used by more than one package gets its version in the `catalog:` in `pnpm-workspace.yaml`.
