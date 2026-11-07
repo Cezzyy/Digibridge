@@ -9,6 +9,8 @@ export const ERROR_CODES = [
   'forbidden',
   'not_found',
   'conflict',
+  'too_large',
+  'rate_limited',
   'internal_error',
 ] as const
 export const errorCodeSchema = z.enum(ERROR_CODES)
