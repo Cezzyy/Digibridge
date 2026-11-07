@@ -52,6 +52,11 @@
   }
 }
 
+/* Screen height, for pages that must fit on one screen without scrolling (sign in):
+   `short:` below 48rem tall (most laptops), `tall:` from 56rem (large monitors). */
+@custom-variant short (@media (height < 48rem));
+@custom-variant tall (@media (height >= 56rem));
+
 @layer base {
   @media (prefers-reduced-motion: no-preference) {
     html {

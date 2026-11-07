@@ -8,18 +8,20 @@ import {
   LEVELS,
 } from '@digibridge/shared'
 import { computed, onBeforeUnmount, onMounted, ref, useTemplateRef } from 'vue'
-import BrandMark from '../components/BrandMark.vue'
 import AreaSlides from '../components/landing/AreaSlides.vue'
 import BridgeArt from '../components/landing/BridgeArt.vue'
 import HowItWorks from '../components/landing/HowItWorks.vue'
 import LevelExplorer from '../components/landing/LevelExplorer.vue'
 import SampleQuestion from '../components/landing/SampleQuestion.vue'
 import SectionEyebrow from '../components/landing/SectionEyebrow.vue'
+import SiteFooter from '../components/SiteFooter.vue'
+import SiteHeader from '../components/SiteHeader.vue'
+import SwashWord from '../components/SwashWord.vue'
 import { prefersReducedMotion, tween, vReveal } from '../lib/motion'
 import { useSessionStore } from '../stores/session'
 
 // What DigiBridge is, for signed-out visitors. Signed-in users never see it; the `guest` guard
-// sends them to /home. The page draws its own sticky top bar (`hideHeader` in router.ts).
+// sends them to /home. The page draws its own top bar (`hideHeader` in router.ts).
 const session = useSessionStore()
 
 const NAV_LINKS = [
@@ -88,37 +90,22 @@ onBeforeUnmount(() => observer?.disconnect())
 
 <template>
   <div class="overflow-x-clip">
-    <!-- Top bar: stays at the top while the page scrolls. -->
-    <header class="sticky top-0 z-30 h-header border-b border-line bg-mist/90 backdrop-blur">
-      <nav
-        aria-label="Main"
-        class="mx-auto flex h-full w-full max-w-7xl items-center justify-between gap-4 px-4 sm:px-6 lg:px-8"
+    <SiteHeader>
+      <RouterLink
+        v-for="link in NAV_LINKS"
+        :key="link.hash"
+        :to="{ hash: link.hash }"
+        class="hidden min-h-11 items-center rounded-control px-3 font-semibold text-quiet transition-colors hover:text-ink md:inline-flex"
       >
-        <RouterLink
-          :to="{ name: 'landing' }"
-          class="flex min-h-11 items-center gap-2.5 font-display text-xl font-bold text-evergreen"
-        >
-          <BrandMark class="size-8" />
-          DigiBridge
-        </RouterLink>
-        <div class="flex items-center gap-1">
-          <RouterLink
-            v-for="link in NAV_LINKS"
-            :key="link.hash"
-            :to="{ hash: link.hash }"
-            class="hidden min-h-11 items-center rounded-control px-3 font-semibold text-quiet transition-colors hover:text-ink md:inline-flex"
-          >
-            {{ link.label }}
-          </RouterLink>
-          <RouterLink
-            :to="{ name: 'sign-in' }"
-            class="ml-2 inline-flex min-h-11 items-center rounded-control border border-line-strong px-4 font-semibold text-evergreen transition-colors hover:bg-evergreen-soft"
-          >
-            Sign in
-          </RouterLink>
-        </div>
-      </nav>
-    </header>
+        {{ link.label }}
+      </RouterLink>
+      <RouterLink
+        :to="{ name: 'sign-in' }"
+        class="ml-2 inline-flex min-h-11 items-center rounded-control border border-line-strong px-4 font-semibold text-evergreen transition-colors hover:bg-evergreen-soft"
+      >
+        Sign in
+      </RouterLink>
+    </SiteHeader>
 
     <!-- Hero: as tall as its content, with the bridge right under it as its floor. Phones stack
          it; tablets put the heading across the top and the card beside the buttons; desktops put
@@ -130,27 +117,11 @@ onBeforeUnmount(() => observer?.disconnect())
         <div class="[grid-area:intro]">
           <h1
             id="hero-title"
-            class="isolate text-[clamp(2.75rem,1.5rem+4.6vw,5.25rem)] leading-[0.95] font-extrabold tracking-[-0.02em] text-balance motion-safe:animate-rise"
+            class="text-[clamp(2.75rem,1.5rem+4.6vw,5.25rem)] leading-[0.95] font-extrabold tracking-[-0.02em] text-balance motion-safe:animate-rise"
           >
             How good are you
             <!-- nowrap keeps the comma on the same line as "online". -->
-            <span class="whitespace-nowrap"
-              ><span class="relative inline-block text-evergreen"
-                >online<svg
-                  viewBox="0 0 200 16"
-                  preserveAspectRatio="none"
-                  aria-hidden="true"
-                  class="absolute -bottom-[0.06em] left-[-3%] -z-10 h-[0.3em] w-[106%]"
-                >
-                  <path
-                    d="M4 11 C 50 4, 140 2, 196 8"
-                    pathLength="1"
-                    class="hero-swash fill-none stroke-marigold"
-                    stroke-width="7"
-                    stroke-linecap="round"
-                  /></svg></span
-              >,</span
-            >
+            <span class="whitespace-nowrap"><SwashWord>online</SwashWord>,</span>
             really?
           </h1>
 
@@ -369,21 +340,7 @@ onBeforeUnmount(() => observer?.disconnect())
         </div>
       </div>
 
-      <footer class="bg-ink text-sm text-white/65">
-        <div
-          class="mx-auto flex max-w-7xl flex-col gap-4 px-4 py-8 sm:flex-row sm:items-center sm:justify-between sm:gap-10 sm:px-6 lg:px-8"
-        >
-          <p class="flex items-center gap-2 font-display text-base font-bold text-white">
-            <BrandMark class="size-6" />
-            DigiBridge
-          </p>
-          <p class="max-w-2xl leading-relaxed sm:text-right">
-            A research prototype for the study
-            <i>DigiBridge: Digital Literacy Assessment Framework and Digital Inclusion</i>, 2026.
-            Built on DigComp 2.2.
-          </p>
-        </div>
-      </footer>
+      <SiteFooter />
     </div>
 
     <!-- Phones only: keeps Get started in reach between the hero and the closing section. -->
@@ -432,12 +389,6 @@ onBeforeUnmount(() => observer?.disconnect())
 }
 
 @media (prefers-reduced-motion: no-preference) {
-  .hero-swash {
-    stroke-dasharray: 1;
-    stroke-dashoffset: 1;
-    animation: draw 0.9s cubic-bezier(0.65, 0, 0.35, 1) 0.7s forwards;
-  }
-
   /* Privacy icons act out their point once their line has slid in. */
   [data-revealed] .shackle {
     animation: shackle 0.7s var(--ease-glide) calc(var(--reveal-delay, 0ms) + 0.35s) both;
