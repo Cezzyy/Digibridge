@@ -65,9 +65,8 @@ export const respondents = pgTable(
 // A tablet or laptop a facilitator has locked into kiosk mode.
 export const kioskSessions = pgTable('kiosk_sessions', {
   id: uuid('id').primaryKey().defaultRandom(),
-  facilitatorId: uuid('facilitator_id')
-    .notNull()
-    .references(() => profiles.id),
+  // Null once the facilitator's account is deleted; the session and its attempts stay.
+  facilitatorId: uuid('facilitator_id').references(() => profiles.id, { onDelete: 'set null' }),
   deviceLabel: text('device_label').notNull(),
   pinHash: text('pin_hash').notNull(),
   startedAt: timestamp('started_at', { withTimezone: true }).notNull().defaultNow(),

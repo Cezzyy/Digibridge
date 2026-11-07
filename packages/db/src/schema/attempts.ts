@@ -1,6 +1,7 @@
 import { sql } from 'drizzle-orm'
 import {
   check,
+  foreignKey,
   index,
   jsonb,
   numeric,
@@ -59,14 +60,18 @@ export const answers = pgTable(
     questionId: uuid('question_id')
       .notNull()
       .references(() => questions.id),
-    choiceId: uuid('choice_id')
-      .notNull()
-      .references(() => choices.id),
+    choiceId: uuid('choice_id').notNull(),
     points: smallint('points'),
     answeredAt: timestamp('answered_at', { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [
     primaryKey({ columns: [t.attemptId, t.questionId] }),
+    // The chosen choice must belong to the answered question.
+    foreignKey({
+      name: 'answers_choice_fk',
+      columns: [t.questionId, t.choiceId],
+      foreignColumns: [choices.questionId, choices.id],
+    }),
     index('answers_question_id_idx').on(t.questionId),
   ],
 ).enableRLS()

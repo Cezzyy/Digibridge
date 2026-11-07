@@ -8,6 +8,13 @@
       "when": 1793852350116,
       "tag": "20261105041910_init_schema",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1794040476692,
+      "tag": "20261107083436_fix_fk_constraints",
+      "breakpoints": true
     }
   ]
 }
