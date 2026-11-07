@@ -3,7 +3,8 @@ import { useRoute, useRouter } from 'vue-router'
 import { useSessionStore } from '../stores/session'
 import BrandMark from './BrandMark.vue'
 
-// Top bar on every page, so users can sign in or out from anywhere (AUTH-03).
+// Top bar on every page, so users can sign in or out from anywhere (AUTH-03). It stays at the
+// top while the page scrolls.
 const session = useSessionStore()
 const route = useRoute()
 const router = useRouter()
@@ -15,7 +16,7 @@ async function signOut() {
 </script>
 
 <template>
-  <header class="border-b border-line bg-surface">
+  <header class="sticky top-0 z-30 border-b border-line bg-surface">
     <div class="mx-auto flex max-w-5xl items-center justify-between gap-4 px-4 py-2">
       <RouterLink
         :to="{ name: session.isSignedIn ? 'home' : 'landing' }"

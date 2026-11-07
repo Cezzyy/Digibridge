@@ -19,7 +19,7 @@ import { prefersReducedMotion, tween, vReveal } from '../lib/motion'
 import { useSessionStore } from '../stores/session'
 
 // What DigiBridge is, for signed-out visitors. Signed-in users never see it; the `guest` guard
-// sends them to /home. The page draws its own top bar (`hideHeader` in router.ts).
+// sends them to /home. The page draws its own sticky top bar (`hideHeader` in router.ts).
 const session = useSessionStore()
 
 const NAV_LINKS = [
@@ -88,11 +88,11 @@ onBeforeUnmount(() => observer?.disconnect())
 
 <template>
   <div class="overflow-x-clip">
-    <!-- Hero: fills the first screen, with the bridge as its floor. -->
-    <section class="relative flex min-h-svh flex-col" aria-labelledby="hero-title">
+    <!-- Top bar: stays at the top while the page scrolls. -->
+    <header class="sticky top-0 z-30 h-header border-b border-line bg-mist/90 backdrop-blur">
       <nav
         aria-label="Main"
-        class="mx-auto flex w-full max-w-7xl items-center justify-between gap-4 px-4 py-3 sm:px-6 lg:px-8"
+        class="mx-auto flex h-full w-full max-w-7xl items-center justify-between gap-4 px-4 sm:px-6 lg:px-8"
       >
         <RouterLink
           :to="{ name: 'landing' }"
@@ -118,7 +118,13 @@ onBeforeUnmount(() => observer?.disconnect())
           </RouterLink>
         </div>
       </nav>
+    </header>
 
+    <!-- Hero: fills the rest of the first screen, with the bridge as its floor. -->
+    <section
+      class="relative flex min-h-[calc(100svh-var(--spacing-header))] flex-col"
+      aria-labelledby="hero-title"
+    >
       <div
         class="mx-auto grid w-full max-w-7xl flex-1 items-center gap-12 px-4 pt-6 pb-14 sm:px-6 sm:pt-10 lg:grid-cols-[minmax(0,1fr)_minmax(0,27rem)] lg:gap-16 lg:px-8 lg:pb-16"
       >
@@ -332,12 +338,8 @@ onBeforeUnmount(() => observer?.disconnect())
           <section
             v-reveal:scale="150"
             aria-labelledby="ready-title"
-            class="relative isolate flex flex-col justify-center overflow-hidden rounded-[1.25rem] bg-white/[0.06] p-6 ring-1 ring-white/15 sm:p-10 lg:p-12"
+            class="flex flex-col justify-center rounded-[1.25rem] bg-white/[0.06] p-6 ring-1 ring-white/15 sm:p-10 lg:p-12"
           >
-            <span
-              aria-hidden="true"
-              class="ready-glow absolute -top-1/2 -right-1/3 -z-10 aspect-square w-[130%] rounded-full bg-radial from-marigold/25 to-transparent to-65%"
-            />
             <h2
               id="ready-title"
               class="text-4xl leading-[1.05] font-bold tracking-[-0.025em] sm:text-5xl"
@@ -436,10 +438,6 @@ onBeforeUnmount(() => observer?.disconnect())
     animation: swing 0.9s ease-out calc(var(--reveal-delay, 0ms) + 0.35s) both;
   }
 
-  .ready-glow {
-    animation: drift 9s ease-in-out infinite;
-  }
-
   /* The closing button's arrow nudges now and then, and holds still on hover. */
   .nudge {
     animation: nudge 2.6s ease-in-out 1.5s infinite;
@@ -474,13 +472,6 @@ onBeforeUnmount(() => observer?.disconnect())
   }
   70% {
     rotate: -3deg;
-  }
-}
-
-@keyframes drift {
-  50% {
-    translate: -12% 10%;
-    scale: 1.12;
   }
 }
 
