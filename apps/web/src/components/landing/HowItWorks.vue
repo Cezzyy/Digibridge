@@ -101,12 +101,14 @@ function screenClass(i: number) {
         From sign-in to your lessons in {{ STEPS.length }} steps.
       </h2>
 
-      <div class="mt-14 grid sm:mt-20 lg:grid-cols-[minmax(0,1fr)_minmax(0,28rem)] lg:gap-16">
+      <div
+        class="mt-14 grid [--phone-h:min(36rem,calc(80svh-var(--spacing-header)))] sm:mt-20 lg:grid-cols-[minmax(0,1fr)_minmax(0,28rem)] lg:gap-16"
+      >
         <ol>
           <li
             v-for="(step, i) in STEPS"
             :key="step.title"
-            class="relative flex gap-5 pb-14 last:pb-0 lg:min-h-[38svh] lg:pb-0 lg:last:min-h-[48svh]"
+            class="relative flex gap-5 pb-14 last:pb-0 lg:min-h-[30svh] lg:pb-0 lg:last:min-h-[calc(var(--phone-h)/2+2rem)]"
           >
             <!-- The route to the next step, drawn as far as you've scrolled. -->
             <span
@@ -134,18 +136,22 @@ function screenClass(i: number) {
               {{ i + 1 }}
             </span>
 
-            <div class="min-w-0 flex-1 pt-1.5">
-              <h3
-                class="text-xl leading-snug font-bold transition-colors duration-500 sm:text-2xl"
-                :class="i === active ? 'text-evergreen' : 'text-ink'"
-              >
-                {{ step.title }}
-              </h3>
-              <p class="mt-1.5 max-w-md leading-relaxed text-quiet sm:text-lg">{{ step.body }}</p>
+            <div
+              class="min-w-0 flex-1 pt-1.5 md:grid md:grid-cols-[minmax(0,1fr)_17rem] md:gap-x-8 lg:block"
+            >
+              <div>
+                <h3
+                  class="text-xl leading-snug font-bold transition-colors duration-500 sm:text-2xl"
+                  :class="i === active ? 'text-evergreen' : 'text-ink'"
+                >
+                  {{ step.title }}
+                </h3>
+                <p class="mt-1.5 max-w-md leading-relaxed text-quiet sm:text-lg">{{ step.body }}</p>
+              </div>
 
-              <!-- Phones and tablets: each step shows its own screen. -->
+              <!-- Phones and tablets: each step shows its own screen, beside the text on tablets. -->
               <div
-                class="mt-6 h-[24rem] max-w-[19rem] overflow-hidden rounded-[1.75rem] border border-line bg-surface shadow-[0_30px_50px_-30px_rgb(18_36_28/0.45)] lg:hidden"
+                class="mt-6 h-[24rem] max-w-[19rem] overflow-hidden rounded-[1.75rem] border border-line bg-surface shadow-[0_30px_50px_-30px_rgb(18_36_28/0.45)] md:mt-0 lg:hidden"
               >
                 <StepScreen :screen="step.screen" :playing="active === i" />
               </div>
@@ -155,10 +161,7 @@ function screenClass(i: number) {
 
         <!-- Desktops: one phone starts beside step 1, then stays in the middle of the screen and
              changes screen as the steps go by. -->
-        <div
-          class="relative hidden [--phone-h:min(36rem,calc(80svh-var(--spacing-header)))] lg:block"
-          aria-hidden="true"
-        >
+        <div class="relative hidden lg:block" aria-hidden="true">
           <div
             class="sticky top-[calc(var(--spacing-header)+(100svh-var(--spacing-header)-var(--phone-h))/2)] flex justify-center"
           >
