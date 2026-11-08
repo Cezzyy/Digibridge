@@ -1,11 +1,13 @@
 <script setup lang="ts">
-import { AREA_LABELS, LESSON_TIER_LABELS, type Level } from '@digibridge/shared'
+import { AREA_CODES, AREA_LABELS, LESSON_TIER_LABELS, type Level } from '@digibridge/shared'
 import { computed } from 'vue'
 import { useRouter } from 'vue-router'
 import LessonCard from '../../components/results/LessonCard.vue'
 import LevelBadge from '../../components/results/LevelBadge.vue'
 import RadarChart from '../../components/results/RadarChart.vue'
+import RadarChartSkeleton from '../../components/results/RadarChartSkeleton.vue'
 import ScoreBar from '../../components/results/ScoreBar.vue'
+import SkeletonText from '../../components/results/SkeletonText.vue'
 import StartLayout from '../../components/start/StartLayout.vue'
 import StartSteps from '../../components/start/StartSteps.vue'
 import { useResult, type AreaResult } from '../../composables/useResult'
@@ -46,15 +48,35 @@ function nextSteps(area: AreaResult) {
     : `The ${first} lesson is the one for you.`
 }
 
+const number = (i: number) => String(i + 1).padStart(2, '0')
+
 const areas = computed(
   () =>
     result.value?.areas.map((area, i) => ({
       ...area,
-      number: String(i + 1).padStart(2, '0'),
+      number: number(i),
       label: AREA_LABELS[area.area],
       shown: wholePct(area.pct),
       advice: `${LEVEL_NOTE[area.level]} ${nextSteps(area)}`,
     })) ?? [],
+)
+
+// While loading, the area cards already show each area's number and name: the API lists the
+// areas in this order too. Keyed by area, so each card stays in place when its scores come in.
+const cards = computed(() =>
+  result.value
+    ? areas.value.map((area) => ({
+        key: area.area,
+        number: area.number,
+        label: area.label,
+        data: area,
+      }))
+    : AREA_CODES.map((code, i) => ({
+        key: code,
+        number: number(i),
+        label: AREA_LABELS[code],
+        data: null,
+      })),
 )
 
 // The highest and lowest area, when they differ. Ties go to the first in the areas' order.
@@ -96,26 +118,56 @@ const finishedOn = computed(() =>
         Here’s your level in each skill area, and the lessons that fit it.
       </p>
 
-      <!-- The overall level, on white so every level's color shows on the green panel. -->
+      <!-- The overall level, on white so every level's color shows on the green panel. While
+           loading, the card is already there with placeholders where the level and score go. -->
       <div
-        v-if="result"
+        v-if="result || !error"
         class="mt-6 rounded-card bg-surface p-5 text-ink shadow-[0_8px_24px_rgb(0_0_0/0.18)] motion-safe:animate-rise motion-safe:[animation-delay:160ms] sm:max-w-md lg:max-w-none"
       >
         <p class="text-sm font-semibold text-quiet">Your overall level</p>
         <div class="mt-2 flex flex-wrap items-center justify-between gap-3">
-          <LevelBadge :level="result.overall.level" large />
-          <p class="font-display text-4xl leading-none font-bold tabular-nums">
-            {{ wholePct(result.overall.pct) }}%
-          </p>
+          <template v-if="result">
+            <LevelBadge :level="result.overall.level" large />
+            <p class="font-display text-4xl leading-none font-bold tabular-nums">
+              {{ wholePct(result.overall.pct) }}%
+            </p>
+          </template>
+          <template v-else>
+            <span
+              aria-hidden="true"
+              class="h-11 w-40 rounded-full bg-mist motion-safe:animate-skeleton"
+            />
+            <p class="font-display text-4xl leading-none font-bold">
+              <SkeletonText class="w-[1.9em]" />
+            </p>
+          </template>
         </div>
-        <ScoreBar :pct="result.overall.pct" :level="result.overall.level" class="mt-4" />
+        <ScoreBar
+          v-if="result"
+          :pct="result.overall.pct"
+          :level="result.overall.level"
+          class="mt-4"
+        />
+        <div
+          v-else
+          aria-hidden="true"
+          class="mt-4 h-2.5 rounded-full bg-track motion-safe:animate-skeleton"
+        />
         <p class="mt-2 text-sm text-quiet">
-          {{ result.overall.points }} of {{ result.overall.maxPoints }} points across all areas
+          <template v-if="result">
+            {{ result.overall.points }} of {{ result.overall.maxPoints }} points across all areas
+          </template>
+          <SkeletonText v-else class="w-[12.5em]" />
         </p>
       </div>
 
-      <p v-if="result" class="mt-auto hidden pt-10 text-sm text-white/80 lg:order-2 lg:block">
-        Finished {{ finishedOn }}
+      <p
+        v-if="result || !error"
+        class="mt-auto hidden pt-10 text-sm text-white/80 lg:order-2 lg:block"
+      >
+        Finished
+        <template v-if="result">{{ finishedOn }}</template>
+        <SkeletonText v-else tone="rail" class="w-[12em]" />
       </p>
     </template>
 
@@ -132,14 +184,11 @@ const finishedOn = computed(() =>
       <button type="button" :class="PRIMARY_BUTTON" @click="fetchResult">Try again</button>
     </div>
 
-    <!-- Loading: the page's shape, quietly pulsing. -->
-    <div v-else-if="!result" class="space-y-6" aria-busy="true">
-      <p class="sr-only" role="status">Loading your results</p>
-      <div class="h-96 animate-pulse rounded-card bg-mist-soft motion-reduce:animate-none" />
-      <div class="h-56 animate-pulse rounded-card bg-mist-soft motion-reduce:animate-none" />
-    </div>
+    <!-- The page is drawn at once: headings, area names and notes are known before the scores
+         come in, and each part that waits on them holds a placeholder of its own size. -->
+    <div v-else class="space-y-10" :aria-busy="!result">
+      <p class="sr-only" role="status">{{ result ? '' : 'Loading your results' }}</p>
 
-    <div v-else class="space-y-10">
       <!-- The 3 areas at a glance. -->
       <section
         aria-labelledby="map-title"
@@ -153,7 +202,8 @@ const finishedOn = computed(() =>
         <div
           class="mt-6 grid grid-cols-[minmax(0,1fr)] items-center gap-8 md:grid-cols-[minmax(0,1fr)_16rem] lg:grid-cols-1 xl:grid-cols-[minmax(0,1fr)_17rem] 2xl:grid-cols-[minmax(0,1fr)_20rem]"
         >
-          <RadarChart :areas="result.areas" />
+          <RadarChart v-if="result" :areas="result.areas" />
+          <RadarChartSkeleton v-else />
 
           <dl
             v-if="highlights"
@@ -176,9 +226,25 @@ const finishedOn = computed(() =>
               </dd>
             </div>
           </dl>
-          <p v-else class="rounded-control bg-mist-soft px-4 py-3.5 leading-relaxed">
+          <p v-else-if="result" class="rounded-control bg-mist-soft px-4 py-3.5 leading-relaxed">
             You scored the same in every area, so start with whichever one you like.
           </p>
+          <div
+            v-else
+            aria-hidden="true"
+            class="grid gap-3 sm:grid-cols-2 md:grid-cols-1 lg:grid-cols-2 xl:grid-cols-1"
+          >
+            <div class="rounded-control bg-mist-soft px-4 py-3.5">
+              <p class="text-sm font-semibold text-quiet">Your strongest area</p>
+              <p class="mt-1 font-semibold"><SkeletonText tone="soft" class="w-[12em]" /></p>
+              <p class="mt-0.5 text-sm"><SkeletonText tone="soft" class="w-[10em]" /></p>
+            </div>
+            <div class="rounded-control bg-marigold-soft px-4 py-3.5">
+              <p class="text-sm font-semibold text-marigold-text">Work on this first</p>
+              <p class="mt-1 font-semibold"><SkeletonText tone="marigold" class="w-[9em]" /></p>
+              <p class="mt-0.5 text-sm"><SkeletonText tone="marigold" class="w-[10em]" /></p>
+            </div>
+          </div>
         </div>
       </section>
 
@@ -191,33 +257,70 @@ const finishedOn = computed(() =>
 
         <ol class="mt-6 grid gap-4 2xl:grid-cols-3">
           <li
-            v-for="(area, i) in areas"
-            :key="area.area"
+            v-for="(card, i) in cards"
+            :key="card.key"
             class="@container flex flex-col rounded-card border border-line bg-surface p-5 motion-safe:animate-rise sm:p-6"
             :style="{ animationDelay: `${200 + i * 80}ms` }"
           >
             <div class="flex flex-wrap items-start justify-between gap-x-4 gap-y-2">
               <h3 class="flex min-w-0 gap-3 text-xl leading-snug font-bold">
-                <span class="font-display text-marigold-text tabular-nums">{{ area.number }}</span>
-                <span>{{ area.label }}</span>
+                <span class="font-display text-marigold-text tabular-nums">{{ card.number }}</span>
+                <span>{{ card.label }}</span>
               </h3>
-              <LevelBadge :level="area.level" />
+              <LevelBadge v-if="card.data" :level="card.data.level" />
+              <span
+                v-else
+                aria-hidden="true"
+                class="h-6 w-26 rounded-full bg-mist motion-safe:animate-skeleton"
+              />
             </div>
 
-            <div class="mt-4 flex items-center gap-4">
-              <ScoreBar :pct="area.pct" :level="area.level" class="flex-1" />
-              <p class="font-display text-lg font-bold tabular-nums">{{ area.shown }}%</p>
-            </div>
-            <p class="mt-1.5 text-sm text-quiet">
-              {{ area.points }} of {{ area.maxPoints }} points
-            </p>
+            <template v-if="card.data">
+              <div class="mt-4 flex items-center gap-4">
+                <ScoreBar :pct="card.data.pct" :level="card.data.level" class="flex-1" />
+                <p class="font-display text-lg font-bold tabular-nums">{{ card.data.shown }}%</p>
+              </div>
+              <p class="mt-1.5 text-sm text-quiet">
+                {{ card.data.points }} of {{ card.data.maxPoints }} points
+              </p>
 
-            <p class="mt-4 leading-relaxed">{{ area.advice }}</p>
-            <ul class="mt-4 grid flex-1 gap-3 @lg:grid-cols-2">
-              <li v-for="pick in area.lessons" :key="pick.tier">
-                <LessonCard :pick="pick" />
-              </li>
-            </ul>
+              <p class="mt-4 leading-relaxed">{{ card.data.advice }}</p>
+              <ul class="mt-4 grid flex-1 gap-3 @lg:grid-cols-2">
+                <li v-for="pick in card.data.lessons" :key="pick.tier">
+                  <LessonCard :pick="pick" />
+                </li>
+              </ul>
+            </template>
+
+            <!-- Most levels get 2 lessons, so the placeholder shows 2, shaped like the "Coming
+                 soon" card. The advice fits on one line in a wide card and takes about two in a
+                 narrow one. -->
+            <div v-else aria-hidden="true" class="flex flex-1 flex-col">
+              <div class="mt-4 flex items-center gap-4">
+                <div class="h-2.5 flex-1 rounded-full bg-track motion-safe:animate-skeleton" />
+                <p class="font-display text-lg font-bold"><SkeletonText class="w-[2.2em]" /></p>
+              </div>
+              <p class="mt-1.5 text-sm"><SkeletonText class="w-[8em]" /></p>
+
+              <p class="mt-4 leading-relaxed">
+                <SkeletonText class="w-full @2xl:w-[37em]" />
+                <br class="@2xl:hidden" />
+                <SkeletonText class="w-1/2 @2xl:hidden" />
+              </p>
+              <ul class="mt-4 grid flex-1 gap-3 @lg:grid-cols-2">
+                <li
+                  v-for="n in 2"
+                  :key="n"
+                  class="flex flex-col rounded-card border border-line bg-surface p-4"
+                >
+                  <p class="flex text-sm">
+                    <span class="h-6 w-20 rounded-full bg-mist motion-safe:animate-skeleton" />
+                  </p>
+                  <p class="mt-3 font-semibold"><SkeletonText class="w-[9em]" /></p>
+                  <p class="mt-1 leading-relaxed"><SkeletonText class="w-[16em]" /></p>
+                </li>
+              </ul>
+            </div>
           </li>
         </ol>
       </section>
