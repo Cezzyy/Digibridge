@@ -1,24 +1,11 @@
-import {
-  answers,
-  areaResults,
-  attempts,
-  choices,
-  competencyAreas,
-  questions,
-  respondents,
-} from '@digibridge/db'
-import {
-  ANSWER_GRACE_SECONDS,
-  ATTEMPT_DURATION_MINUTES,
-  type AreaCode,
-  type AttemptStatus,
-} from '@digibridge/shared'
+import { answers, attempts, choices, competencyAreas, questions, respondents } from '@digibridge/db'
+import { ATTEMPT_DURATION_MINUTES, type AreaCode, type AttemptStatus } from '@digibridge/shared'
 import type { RouteHandler } from '@hono/zod-openapi'
-import { and, eq, inArray, ne, sql } from 'drizzle-orm'
+import { and, eq, inArray, ne } from 'drizzle-orm'
 import type { Db } from '../config/db'
 import type { AuthEnv } from '../env'
 import { pickItems, type PoolItem } from '../lib/pick-items'
-import { roundPct, scoreAttempt, type ScoredItem } from '../lib/scoring'
+import { scoreAndClose, timeIsUp, type Tx } from '../lib/close-attempt'
 import { ApiError } from '../middleware'
 import type {
   getAttemptRoute,
@@ -128,8 +115,6 @@ export const startAttempt: RouteHandler<typeof startAttemptRoute, AuthEnv> = asy
 
 // ---- Reading, answering and submitting ----
 
-type Tx = Parameters<Parameters<Db['transaction']>[0]>[0]
-
 const NOT_FOUND = 'We couldn’t find this assessment.'
 
 /**
@@ -160,10 +145,6 @@ async function ownAttempt(
   if (!row) throw new ApiError('not_found', NOT_FOUND)
   return row
 }
-
-/** Answers are taken until `expires_at` plus the grace period, for saves already in flight. */
-const timeIsUp = (expiresAt: Date, now: Date) =>
-  now.getTime() > expiresAt.getTime() + ANSWER_GRACE_SECONDS * 1000
 
 export const getAttempt: RouteHandler<typeof getAttemptRoute, AuthEnv> = async (c) => {
   const db = c.var.db
@@ -265,80 +246,6 @@ export const saveAnswer: RouteHandler<typeof saveAnswerRoute, AuthEnv> = async (
     },
     200,
   )
-}
-
-/** Scores the attempt and closes it, in the caller's transaction (the attempt row is locked). */
-async function scoreAndClose(
-  tx: Tx,
-  attempt: { id: string; expiresAt: Date; questionOrder: string[] },
-  now: Date,
-) {
-  const items = await tx
-    .select({
-      questionId: questions.id,
-      areaId: questions.areaId,
-      area: competencyAreas.code,
-      difficulty: questions.difficulty,
-      correctChoiceId: choices.id,
-    })
-    .from(questions)
-    .innerJoin(competencyAreas, eq(competencyAreas.id, questions.areaId))
-    .leftJoin(choices, and(eq(choices.questionId, questions.id), eq(choices.isCorrect, true)))
-    .where(inArray(questions.id, attempt.questionOrder))
-  const saved = await tx
-    .select({ questionId: answers.questionId, choiceId: answers.choiceId })
-    .from(answers)
-    .where(eq(answers.attemptId, attempt.id))
-
-  const score = scoreAttempt(
-    items.map((item): ScoredItem => ({ ...item, area: item.area as AreaCode })),
-    new Map(saved.map((a) => [a.questionId, a.choiceId])),
-  )
-
-  if (score.answerPoints.size > 0) {
-    const values = [...score.answerPoints].map(
-      ([questionId, points]) => sql`(${questionId}::uuid, ${points}::smallint)`,
-    )
-    await tx.execute(sql`
-      update ${answers} set points = v.points
-      from (values ${sql.join(values, sql`, `)}) as v(question_id, points)
-      where ${answers.attemptId} = ${attempt.id} and ${answers.questionId} = v.question_id`)
-  }
-
-  const areaIds = new Map(items.map((item) => [item.area, item.areaId]))
-  if (score.areas.length > 0) {
-    await tx.insert(areaResults).values(
-      score.areas.map((area) => ({
-        attemptId: attempt.id,
-        areaId: areaIds.get(area.area)!,
-        points: area.points,
-        maxPoints: area.maxPoints,
-        pct: roundPct(area.pct),
-        level: area.level,
-      })),
-    )
-  }
-
-  // Sent in time (or within the grace period), it's submitted. Later, the clock already closed it:
-  // expired, at expires_at, as the cron would have done.
-  const late = timeIsUp(attempt.expiresAt, now)
-  const [closed] = await tx
-    .update(attempts)
-    .set({
-      status: late ? 'expired' : 'submitted',
-      submittedAt: late ? attempt.expiresAt : now,
-      totalPoints: score.overall.points,
-      overallPct: roundPct(score.overall.pct),
-      overallLevel: score.overall.level,
-    })
-    .where(eq(attempts.id, attempt.id))
-    .returning({
-      id: attempts.id,
-      status: attempts.status,
-      expiresAt: attempts.expiresAt,
-      submittedAt: attempts.submittedAt,
-    })
-  return closed!
 }
 
 export const submitAttempt: RouteHandler<typeof submitAttemptRoute, AuthEnv> = async (c) => {
