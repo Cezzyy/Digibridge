@@ -2,6 +2,7 @@ import { attempts, profiles, respondents } from '@digibridge/db'
 import {
   AGE_MAX,
   AGE_MIN,
+  toIsoDate,
   COURSES,
   ONLINE_CONSENT_NOTICE,
   STUDENT_NUMBER_EXAMPLE,
@@ -368,7 +369,7 @@ describe('GET /api/v1/me', () => {
       .values({
         profileId,
         fullName: 'Juan Dela Cruz',
-        age: 19,
+        birthDate: '2007-06-15',
         sex: 'male',
         mode: 'online',
         consentVersion: '1',
@@ -433,7 +434,7 @@ describe('GET /api/v1/me', () => {
 describe('POST /api/v1/respondents', () => {
   const profile = {
     fullName: '  Juan Dela Cruz ',
-    age: 19,
+    birthDate: '2007-06-15',
     sex: 'male',
     devices: ['smartphone', 'laptop'],
     internetAccess: ['mobile_data'],
@@ -466,7 +467,7 @@ describe('POST /api/v1/respondents', () => {
       id: body.id,
       mode: 'online',
       fullName: 'Juan Dela Cruz',
-      age: 19,
+      birthDate: '2007-06-15',
       sex: 'male',
       devices: ['smartphone', 'laptop'],
       internetAccess: ['mobile_data'],
@@ -520,6 +521,32 @@ describe('POST /api/v1/respondents', () => {
     })
   })
 
+  it.each([
+    ['a date that does not exist', '2007-02-30', 'That date doesn’t exist'],
+    ['someone too young', '2025-01-01', `${AGE_MIN} to ${AGE_MAX} years old`],
+    ['no date', undefined, 'Enter your date of birth.'],
+  ])('refuses %s as the birth date', async (_, birthDate, message) => {
+    const user = await signedIn()
+    const res = await post({ ...profile, birthDate }, user.headers)
+    expect(res.status).toBe(400)
+    expect(await res.json()).toMatchObject({
+      error: { code: 'validation_failed', message: expect.stringContaining(message) },
+    })
+    expect(await respondentsOf(user.id)).toHaveLength(0)
+  })
+
+  it.each([
+    ['one word', 'Juan', 'Enter your first and last name.'],
+    ['numbers', 'Juan 2 Cruz', 'Use letters only.'],
+  ])('refuses a full name with %s', async (_, fullName, message) => {
+    const user = await signedIn()
+    const res = await post({ ...profile, fullName }, user.headers)
+    expect(res.status).toBe(400)
+    expect(await res.json()).toMatchObject({
+      error: { code: 'validation_failed', message: expect.stringContaining(message) },
+    })
+  })
+
   it('refuses consent to an old notice (CON-02)', async () => {
     const user = await signedIn()
     const res = await post({ ...profile, consentVersion: 'online-0' }, user.headers)
@@ -562,7 +589,7 @@ describe('API docs', () => {
 // Respondent rows inserted straight into the database, to test its checks.
 const base = {
   fullName: 'Juan Dela Cruz',
-  age: 19,
+  birthDate: '2007-06-15',
   sex: 'male',
   consentVersion: '1',
   consentedAt: new Date(),
@@ -618,16 +645,38 @@ describe('respondents_school_fields_by_mode', () => {
   })
 })
 
-describe('respondents_age_range', () => {
-  it.each([AGE_MIN, AGE_MAX])('takes age %i', async (age) => {
+describe('respondents_birth_date_range', () => {
+  // Noon on Nov 8, 2026 in Manila (UTC+8). The check counts age on the day of consent there.
+  const consentedAt = new Date('2026-11-08T04:00:00Z')
+  const row = (birthDate: string, profileId: string) =>
+    ({ ...base, birthDate, consentedAt, mode: 'online', profileId }) as const
+
+  it.each([
+    ['turned AGE_MIN that day', toIsoDate(2026 - AGE_MIN, 11, 8)],
+    ['is a day short of AGE_MAX + 1', toIsoDate(2026 - AGE_MAX - 1, 11, 9)],
+  ])('takes someone who %s', async (_, birthDate) => {
     const user = await signedIn()
-    expect(await insertError({ ...base, age, mode: 'online', profileId: user.id })).toBeUndefined()
+    expect(await insertError(row(birthDate, user.id))).toBeUndefined()
   })
 
-  it.each([AGE_MIN - 1, AGE_MAX + 1])('refuses age %i', async (age) => {
+  it.each([
+    ['is a day short of AGE_MIN', toIsoDate(2026 - AGE_MIN, 11, 9)],
+    ['turned AGE_MAX + 1 that day', toIsoDate(2026 - AGE_MAX - 1, 11, 8)],
+    ['is born after consenting', '2026-11-09'],
+  ])('refuses someone who %s', async (_, birthDate) => {
     const user = await signedIn()
-    expect(await insertError({ ...base, age, mode: 'online', profileId: user.id })).toBe(
-      'respondents_age_range',
-    )
+    expect(await insertError(row(birthDate, user.id))).toBe('respondents_birth_date_range')
+  })
+
+  it('counts the day in the Philippines, not UTC', async () => {
+    // 4:30 PM UTC on Nov 7 is already Nov 8 in Manila, so this person just turned AGE_MIN.
+    const user = await signedIn()
+    const lateUtc = new Date('2026-11-07T16:30:00Z')
+    expect(
+      await insertError({
+        ...row(toIsoDate(2026 - AGE_MIN, 11, 8), user.id),
+        consentedAt: lateUtc,
+      }),
+    ).toBeUndefined()
   })
 })
