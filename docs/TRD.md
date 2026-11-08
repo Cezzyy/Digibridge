@@ -66,7 +66,7 @@ digibridge/
 │  │  │  ├─ pages/           one folder per route group: start, assessment, results, lessons, kiosk, admin
 │  │  │  ├─ components/      QuestionCard, CountdownTimer, QuestionGrid, RadarChart, SusForm, ResultsQr, StatCard, DataTable
 │  │  │  ├─ composables/     useAuth, useAttempt, useCountdown, useKiosk, useApi
-│  │  │  ├─ stores/          session.ts, kiosk.ts, attempt.ts
+│  │  │  ├─ stores/          session.ts, consent.ts, kiosk.ts, attempt.ts
 │  │  │  ├─ lib/             api.ts (hc client), supabase.ts, markdown.ts
 │  │  │  ├─ router.ts        routes + role guards
 │  │  │  └─ main.ts
@@ -327,6 +327,7 @@ The profile page is one component with a `mode` prop: online shows the general f
 | Store | Holds | Persisted |
 | --- | --- | --- |
 | `session` | Supabase session, `/api/v1/me` result, role | Supabase handles it |
+| `consent` | Which account agreed to which notice version, until the profile saves it | Memory only, so declining or a refresh saves nothing |
 | `kiosk` | `kioskSessionId`, device label | `localStorage`, cleared on exit |
 | `attempt` | Attempt ID, items, answers, `expiresAt`, server time offset, current index | Memory only; refetched on reload |
 
