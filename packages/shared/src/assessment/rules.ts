@@ -1,9 +1,11 @@
+import { z } from 'zod'
 import type { Difficulty } from '../enums'
 
 // Rules of one assessment attempt (ASM-01, ASM-03, ASM-09, CMS-07).
 
 /** Codes of the 3 DigComp 2.2 areas, matching `competency_areas.code`. */
 export const AREA_CODES = ['info_literacy', 'communication', 'safety'] as const
+export const areaCodeSchema = z.enum(AREA_CODES)
 export type AreaCode = (typeof AREA_CODES)[number]
 
 /** Area names shown to students, matching the `competency_areas.name` seed. */
