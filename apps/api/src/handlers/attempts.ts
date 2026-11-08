@@ -340,6 +340,8 @@ export const getResult: RouteHandler<typeof getResultRoute, AuthEnv> = async (c)
     throw new Error(`Attempt ${attempt.id} is closed but has no scores`)
   }
 
+  // Each area with its published lessons in the same query: one row per lesson, or one with no
+  // lesson. At most one published lesson per area and tier (lessons_one_published_per_tier_idx).
   const rows = await db
     .select({
       areaId: areaResults.areaId,
@@ -348,37 +350,36 @@ export const getResult: RouteHandler<typeof getResultRoute, AuthEnv> = async (c)
       maxPoints: areaResults.maxPoints,
       pct: areaResults.pct,
       level: areaResults.level,
+      lessonTier: lessons.tier,
+      lessonSlug: lessons.slug,
+      lessonTitle: lessons.title,
+      lessonSummary: lessons.summary,
     })
     .from(areaResults)
     .innerJoin(competencyAreas, eq(competencyAreas.id, areaResults.areaId))
+    .leftJoin(lessons, and(eq(lessons.areaId, areaResults.areaId), eq(lessons.isPublished, true)))
     .where(eq(areaResults.attemptId, attempt.id))
     .orderBy(competencyAreas.sortOrder)
 
-  // At most one published lesson per area and tier (lessons_one_published_per_tier_idx).
-  const published =
-    rows.length === 0
-      ? []
-      : await db
-          .select({
-            areaId: lessons.areaId,
-            tier: lessons.tier,
-            slug: lessons.slug,
-            title: lessons.title,
-            summary: lessons.summary,
-          })
-          .from(lessons)
-          .where(
-            and(
-              eq(lessons.isPublished, true),
-              inArray(
-                lessons.areaId,
-                rows.map((row) => row.areaId),
-              ),
-            ),
-          )
-  const lessonFor = new Map(published.map((l) => [`${l.areaId}:${l.tier}`, l]))
+  type Lesson = { slug: string; title: string; summary: string }
+  const byArea = new Map<string, { row: (typeof rows)[number]; lessons: Map<string, Lesson> }>()
+  for (const row of rows) {
+    let entry = byArea.get(row.areaId)
+    if (!entry) {
+      entry = { row, lessons: new Map() }
+      byArea.set(row.areaId, entry)
+    }
+    if (row.lessonTier !== null) {
+      entry.lessons.set(row.lessonTier, {
+        slug: row.lessonSlug!,
+        title: row.lessonTitle!,
+        summary: row.lessonSummary!,
+      })
+    }
+  }
 
-  const areas = rows.map((row) => ({
+  // Map keeps insertion order, so the areas stay in sortOrder.
+  const areas = [...byArea.values()].map(({ row, lessons: published }) => ({
     // Area codes are the seeded AREA_CODES.
     area: row.area as AreaCode,
     points: row.points,
@@ -386,14 +387,11 @@ export const getResult: RouteHandler<typeof getResultRoute, AuthEnv> = async (c)
     pct: row.pct,
     level: row.level,
     // The level's tiers, the first one to start with (PRD "Levels").
-    lessons: LESSON_TIERS_FOR_LEVEL[row.level].map((tier, i) => {
-      const lesson = lessonFor.get(`${row.areaId}:${tier}`)
-      return {
-        tier,
-        nextStep: i > 0,
-        lesson: lesson ? { slug: lesson.slug, title: lesson.title, summary: lesson.summary } : null,
-      }
-    }),
+    lessons: LESSON_TIERS_FOR_LEVEL[row.level].map((tier, i) => ({
+      tier,
+      nextStep: i > 0,
+      lesson: published.get(tier) ?? null,
+    })),
   }))
 
   return c.json(
@@ -403,7 +401,7 @@ export const getResult: RouteHandler<typeof getResultRoute, AuthEnv> = async (c)
       submittedAt: closedAt(attempt).toISOString(),
       overall: {
         points: totalPoints,
-        maxPoints: rows.reduce((sum, row) => sum + row.maxPoints, 0),
+        maxPoints: areas.reduce((sum, area) => sum + area.maxPoints, 0),
         pct: overallPct,
         level: overallLevel,
       },

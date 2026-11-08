@@ -1167,13 +1167,32 @@ describe('attempts in progress', () => {
       }
       await submit(attempt.id, user.headers)
 
-      // Published: safety's Foundations lesson. A draft of communication's doesn't count.
+      // Published: safety's Foundations and Intermediate lessons (2 rows for safety in the join;
+      // Beginner shows only Foundations) and communication's Intermediate one. A draft of
+      // communication's Foundations lesson doesn't count.
       const lesson = { slug: 'safety-foundations', title: 'Staying safe', summary: 'The basics' }
+      const nextLesson = { slug: 'communication-intermediate', title: 'Talk', summary: 'More' }
       await testDb.insert(lessons).values([
         {
           ...lesson,
           areaId: await areaId('safety'),
           tier: 'foundations',
+          bodyMd: '#',
+          isPublished: true,
+        },
+        {
+          slug: 'safety-intermediate',
+          title: 'Safer',
+          summary: 'Next',
+          areaId: await areaId('safety'),
+          tier: 'intermediate',
+          bodyMd: '#',
+          isPublished: true,
+        },
+        {
+          ...nextLesson,
+          areaId: await areaId('communication'),
+          tier: 'intermediate',
           bodyMd: '#',
           isPublished: true,
         },
@@ -1213,7 +1232,7 @@ describe('attempts in progress', () => {
             level: 'basic',
             lessons: [
               { tier: 'foundations', nextStep: false, lesson: null },
-              { tier: 'intermediate', nextStep: true, lesson: null },
+              { tier: 'intermediate', nextStep: true, lesson: nextLesson },
             ],
           },
           {
