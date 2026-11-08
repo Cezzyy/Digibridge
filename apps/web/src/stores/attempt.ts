@@ -202,11 +202,39 @@ export const useAttemptStore = defineStore('attempt', () => {
    * Sends the saves still on their way and tries failed ones again, then submits (ASM-08).
    * If an answer still won't save, it stops with `submitError` set, so no answer on screen is
    * lost, unless `evenIfUnsaved` (time is up: wait a few seconds at most, then send what the
-   * server has). Resolves to the closed
-   * attempt, or null with `submitError` set. Safe to call twice: the server returns the closed
-   * attempt.
+   * server has). Resolves to the closed attempt, or null with `submitError` set. A call made
+   * while one is running gets the same result; if it says `evenIfUnsaved`, the running one
+   * switches to the time-up rules (time ran out while a manual submit waited on a save).
    */
-  async function submit({ evenIfUnsaved = false } = {}): Promise<SubmittedAttempt | null> {
+  function submit({ evenIfUnsaved = false } = {}): Promise<SubmittedAttempt | null> {
+    if (!inFlight) {
+      let resolveTimeUp = () => {}
+      const run: SubmitRun = {
+        timeUp: false,
+        timeIsUp: new Promise<void>((resolve) => (resolveTimeUp = resolve)),
+        markTimeUp: () => {
+          run.timeUp = true
+          resolveTimeUp()
+        },
+        result: Promise.resolve(null),
+      }
+      run.result = sendSubmit(run).finally(() => (inFlight = null))
+      inFlight = run
+    }
+    if (evenIfUnsaved) inFlight.markTimeUp()
+    return inFlight.result
+  }
+
+  /** The submit on its way: a second call joins it instead of sending again. */
+  type SubmitRun = {
+    timeUp: boolean
+    timeIsUp: Promise<void>
+    markTimeUp: () => void
+    result: Promise<SubmittedAttempt | null>
+  }
+  let inFlight: SubmitRun | null = null
+
+  async function sendSubmit(run: SubmitRun): Promise<SubmittedAttempt | null> {
     const id = attempt.value?.id
     if (!id) return null
     submitting.value = true
@@ -218,9 +246,10 @@ export const useAttemptStore = defineStore('attempt', () => {
           if (state === 'failed' && choiceId) queue(questionId, choiceId)
         }
       }
-      await (evenIfUnsaved ? Promise.race([flush(), sleep(TIME_UP_SAVE_WAIT_MS)]) : flush())
+      // Once time is up, wait a few seconds at most for the saves.
+      await Promise.race([flush(), run.timeIsUp.then(() => sleep(TIME_UP_SAVE_WAIT_MS))])
       const failed = failedCount()
-      if (failed > 0 && !closed.value && !evenIfUnsaved) {
+      if (failed > 0 && !closed.value && !run.timeUp) {
         submitError.value = `${failed === 1 ? '1 answer' : `${failed} answers`} didn’t save. Check your connection, then try again.`
         return null
       }
