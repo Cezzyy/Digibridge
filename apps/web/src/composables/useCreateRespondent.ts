@@ -26,7 +26,12 @@ export function useCreateRespondent() {
       if (err instanceof ApiRequestError && err.code === 'conflict') {
         consent.clear()
         await session.loadMe()
-        return Boolean(session.me?.respondent)
+        if (session.me?.respondent) return true
+        // The follow-up /me failed. A 401 there signs the user out without leaving the page.
+        error.value = session.session
+          ? 'Something went wrong. Please try again.'
+          : 'You were signed out. Please sign in again.'
+        return false
       }
       error.value =
         err instanceof ApiRequestError ? err.message : 'Something went wrong. Please try again.'
