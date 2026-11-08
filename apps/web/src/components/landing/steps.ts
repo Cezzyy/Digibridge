@@ -16,7 +16,7 @@ export const STEPS: readonly { screen: StepScreenId; title: string; body: string
   {
     screen: 'profile',
     title: 'Fill in your profile',
-    body: 'Your course and year level, and the devices and internet you use.',
+    body: 'Your age and sex, and the devices and internet you use.',
   },
   {
     screen: 'questions',

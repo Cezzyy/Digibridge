@@ -4,7 +4,6 @@ import {
   AREA_LABELS,
   AREA_MAX_POINTS,
   ATTEMPT_DURATION_MINUTES,
-  COURSES,
   DEVICE_LABELS,
   INTERNET_ACCESS_LABELS,
   ITEMS_PER_ATTEMPT,
@@ -13,7 +12,7 @@ import {
   LEVEL_LABELS,
   levelForPct,
   OVERALL_MAX_POINTS,
-  YEAR_LEVEL_LABELS,
+  SEX_LABELS,
   type AreaCode,
 } from '@digibridge/shared'
 import { computed, onBeforeUnmount, ref, watch } from 'vue'
@@ -122,8 +121,7 @@ const PICKED = 1
         />
       </div>
       <div class="note mt-4 rounded-card bg-marigold-soft p-3 text-[0.6875rem] leading-snug">
-        <span class="font-bold">What we collect:</span> your answers, your profile, and only what
-        the study needs.
+        <span class="font-bold">What we collect:</span> your answers and your profile, nothing more.
       </div>
       <div class="mt-auto grid grid-cols-2 gap-2 pt-4 text-xs font-semibold">
         <span
@@ -148,17 +146,12 @@ const PICKED = 1
       <p class="font-display text-base font-bold">Your profile</p>
       <p class="mt-1 text-[0.6875rem] text-quiet">This helps us see who needs more help.</p>
       <div class="mt-4 grid grid-cols-2 gap-2">
-        <div
-          v-for="(f, k) in ['Course', 'Year level']"
-          :key="f"
-          class="field"
-          :style="{ '--k': k }"
-        >
+        <div v-for="(f, k) in ['Age', 'Sex']" :key="f" class="field" :style="{ '--k': k }">
           <p class="text-[0.625rem] font-semibold text-quiet">{{ f }}</p>
           <p
             class="mt-1 flex h-9 items-center rounded-control border border-line-strong px-2.5 text-xs font-semibold"
           >
-            <span class="typed">{{ k === 0 ? COURSES[0] : YEAR_LEVEL_LABELS[2] }}</span>
+            <span class="typed">{{ k === 0 ? '19' : SEX_LABELS.female }}</span>
           </p>
         </div>
       </div>
