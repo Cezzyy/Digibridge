@@ -1,4 +1,10 @@
-import { ANSWER_GRACE_SECONDS, areaCodeSchema, attemptStatusSchema } from '@digibridge/shared'
+import {
+  ANSWER_GRACE_SECONDS,
+  areaCodeSchema,
+  attemptStatusSchema,
+  lessonTierSchema,
+  levelSchema,
+} from '@digibridge/shared'
 import { createRoute, z } from '@hono/zod-openapi'
 import { auth, requireRole } from '../middleware'
 import { errorResponse } from '../openapi'
@@ -155,5 +161,62 @@ export const submitAttemptRoute = createRoute({
     403: errorResponse('Signed in as staff'),
     404: errorResponse('No such attempt for this respondent'),
     409: errorResponse('The attempt was voided'),
+  },
+})
+
+const ScoreSchema = z.object({
+  points: z.int(),
+  maxPoints: z.int(),
+  // Rounded to 2 decimals, as saved; the level comes from the unrounded one.
+  pct: z.number(),
+  level: levelSchema,
+})
+
+/** A lesson tier recommended for the area's level, with its published lesson if there is one. */
+const LessonPickSchema = z.object({
+  tier: lessonTierSchema,
+  // The second tier for a Basic or Intermediate level: the step after the first lesson.
+  nextStep: z.boolean(),
+  lesson: z
+    .object({ slug: z.string(), title: z.string(), summary: z.string() })
+    .nullable()
+    .openapi({ description: 'Null until the team publishes this area’s lesson for the tier' }),
+})
+
+/** What the results page shows: scores and levels, never which items were right (RES-05). */
+export const AttemptResultSchema = z
+  .object({
+    id: z.uuid(),
+    status: z.enum(['submitted', 'expired']),
+    submittedAt: z.iso.datetime(),
+    overall: ScoreSchema,
+    // In the areas' order.
+    areas: z.array(
+      ScoreSchema.extend({ area: areaCodeSchema, lessons: z.array(LessonPickSchema) }),
+    ),
+    // Set at submit once the QR code link is built (RES-04); null until then.
+    resultsToken: z.string().nullable(),
+    susAnswered: z.boolean(),
+  })
+  .openapi('AttemptResult')
+
+export const getResultRoute = createRoute({
+  method: 'get',
+  path: '/attempts/{id}/result',
+  tags: ['Results'],
+  summary: 'The closed attempt’s scores, levels and lessons',
+  description: `The overall score and level, and each area’s score, level and recommended lessons (RES-01, RES-02). Scores only: which items were right or wrong is never sent (RES-05). ${SELF_ONLY}`,
+  middleware: [auth, requireRole('respondent')] as const,
+  security: [{ Bearer: [] }],
+  request: { params: AttemptParamsSchema },
+  responses: {
+    200: {
+      description: 'The result',
+      content: { 'application/json': { schema: AttemptResultSchema } },
+    },
+    401: errorResponse('Not signed in, or the sign-in has expired'),
+    403: errorResponse('Signed in as staff'),
+    404: errorResponse('No such attempt for this respondent'),
+    409: errorResponse('The attempt is still in progress, or was voided'),
   },
 })
