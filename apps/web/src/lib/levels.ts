@@ -12,3 +12,10 @@ export const LEVEL_TONE = {
 export const LEVEL_BANDS: readonly { level: Level; from: number; to: number }[] = LEVEL_CUTOFFS.map(
   (cutoff, i) => ({ level: cutoff.level, from: cutoff.min, to: LEVEL_CUTOFFS[i - 1]?.min ?? 100 }),
 ).reverse()
+
+/** A level's range in words: "Below 40%", "40% to 59%", "80% and up". */
+export function levelRange(band: { from: number; to: number }) {
+  if (band.from === 0) return `Below ${band.to}%`
+  if (band.to === 100) return `${band.from}% and up`
+  return `${band.from}% to ${band.to - 1}%`
+}

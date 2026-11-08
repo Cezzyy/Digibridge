@@ -1,33 +1,11 @@
 <script setup lang="ts">
-import { AREA_CODES, AREA_LABELS, ITEMS_PER_AREA, type AreaCode } from '@digibridge/shared'
+import { AREA_CODES, AREA_LABELS, ITEMS_PER_AREA } from '@digibridge/shared'
 import { computed, ref, useTemplateRef } from 'vue'
 import AreaScene from './AreaScene.vue'
+import { AREA_DETAILS } from './areas'
 
 // "What it checks" as slides, one per area. Move with the arrow buttons, the area buttons, the
 // arrow keys, or by swiping (or dragging) the slides. The next slide peeks in at the side.
-
-const AREA_DETAILS: Record<AreaCode, { summary: string; topics: string[] }> = {
-  info_literacy: {
-    summary: 'Finding what you need online, and knowing whether you can trust it.',
-    topics: ['Searching smarter', 'Telling real news from fake', 'Keeping files and data in order'],
-  },
-  communication: {
-    summary: 'Working with others online, and knowing how to act in chats, groups and classes.',
-    topics: [
-      'Working on shared files',
-      'Netiquette in chats and classes',
-      'Your digital footprint',
-    ],
-  },
-  safety: {
-    summary: 'Keeping your accounts, your devices, your personal data and yourself safe.',
-    topics: [
-      'Scam texts and fake links',
-      'Passwords and privacy settings',
-      'Screen time and wellbeing',
-    ],
-  },
-}
 
 const props = defineProps<{ labelledby: string }>()
 
