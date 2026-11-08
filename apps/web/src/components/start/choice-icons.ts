@@ -1,7 +1,8 @@
-import type { Device, InternetAccess } from '@digibridge/shared'
+import type { Device, InternetAccess, ONLINE_CONSENT_NOTICE } from '@digibridge/shared'
 
-// Line icons for the profile's answer tiles: 24 × 24 paths, drawn with a round stroke and no
-// fill (see OptionGroup). Only decoration: the label always says what the answer is.
+// Line icons for the start pages: the profile's answer tiles and the privacy notice's sections.
+// 24 × 24 paths, drawn with a round stroke and no fill (see OptionGroup). Only decoration: the
+// text next to them always says what they mean.
 
 /** The `d` of each path in one icon. */
 export type ChoiceIcon = readonly string[]
@@ -65,3 +66,21 @@ export const IDENTITY_ICONS = {
     'm2 2 20 20',
   ],
 } as const satisfies Record<'show' | 'hide', ChoiceIcon>
+
+type NoticeSectionTitle = (typeof ONLINE_CONSENT_NOTICE)['sections'][number]['title']
+
+const CIRCLE = 'M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18Z'
+
+/** One per privacy notice section, by title, so renaming a section asks for its icon here. */
+export const NOTICE_ICONS = {
+  'Why we ask': [CIRCLE, 'M9.5 9a2.5 2.5 0 1 1 3.5 2.3c-.6.3-1 .9-1 1.6v.4', 'M12 17h.01'],
+  'What we collect': [
+    'M9 3h6a1 1 0 0 1 1 1v2H8V4a1 1 0 0 1 1-1Z',
+    'M8 5H6a1 1 0 0 0-1 1v14a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V6a1 1 0 0 0-1-1h-2',
+    'M9 11h6',
+    'M9 15h4',
+  ],
+  'Who sees it': IDENTITY_ICONS.show,
+  'How long we keep it': [CIRCLE, 'M12 7v5l3 2'],
+  'Your choice': [CIRCLE, 'm8.5 12 2.5 2.5 4.5-5'],
+} as const satisfies Record<NoticeSectionTitle, ChoiceIcon>

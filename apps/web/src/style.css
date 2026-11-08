@@ -32,6 +32,9 @@
   --font-display:
     'Bricolage Grotesque Variable', 'Source Sans 3 Variable', ui-sans-serif, sans-serif;
 
+  /* Very wide screens (1792 px and up), where the start pages' side panel gets wider. */
+  --breakpoint-3xl: 112rem;
+
   /* Height of the sticky top bar: `h-header`, and the offset for anything that must clear it. */
   --spacing-header: 4.25rem;
 
