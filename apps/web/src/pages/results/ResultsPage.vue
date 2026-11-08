@@ -236,7 +236,7 @@ const finishedOn = computed(() =>
         </svg>
         <span>
           Your results show your level, not which answers were right or wrong. That keeps the
-          questions fair for the students who take it after you.
+          questions fair for everyone who takes it after you.
         </span>
       </p>
     </div>

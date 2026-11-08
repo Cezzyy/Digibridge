@@ -34,14 +34,14 @@ const faded = (hex: string, alpha: number) =>
     .padStart(2, '0')
 const FONT = getComputedStyle(document.body).fontFamily
 
-// Each level's ring, lightest in the middle. The darker levels get less alpha, so the student's
-// shape stays easy to see on top of them. `swatch` is the same color for the key under the chart.
+// Each level's ring in its full color, lightest in the middle. `swatch` is the same color for the
+// key under the chart.
 const RING = {
-  beginner: { color: 'level-1', alpha: 0.7, swatch: 'bg-level-1/70' },
-  basic: { color: 'level-2', alpha: 0.45, swatch: 'bg-level-2/45' },
-  intermediate: { color: 'level-3', alpha: 0.25, swatch: 'bg-level-3/25' },
-  advanced: { color: 'level-4', alpha: 0.2, swatch: 'bg-level-4/20' },
-} as const satisfies Record<Level, { color: string; alpha: number; swatch: string }>
+  beginner: { color: 'level-1', swatch: 'bg-level-1' },
+  basic: { color: 'level-2', swatch: 'bg-level-2' },
+  intermediate: { color: 'level-3', swatch: 'bg-level-3' },
+  advanced: { color: 'level-4', swatch: 'bg-level-4' },
+} as const satisfies Record<Level, { color: string; swatch: string }>
 
 const levelRings: Plugin<'radar'> = {
   id: 'levelRings',
@@ -68,7 +68,7 @@ const levelRings: Plugin<'radar'> = {
         2 * Math.PI,
         true,
       )
-      ctx.fillStyle = faded(token(RING[band.level].color), RING[band.level].alpha)
+      ctx.fillStyle = token(RING[band.level].color)
       ctx.fill()
     }
     ctx.restore()
@@ -92,23 +92,37 @@ function wrap(text: string, width = 18) {
 
 const shown = (pct: number) => `${wholePct(pct)}%`
 
-const data = computed<ChartData<'radar'>>(() => ({
-  labels: props.areas.map((a) => wrap(AREA_LABELS[a.area])),
-  datasets: [
-    {
-      data: props.areas.map((a) => a.pct),
-      fill: true,
-      backgroundColor: faded(token('marigold'), 0.45),
-      borderColor: token('ink'),
-      borderWidth: 2,
-      pointBackgroundColor: token('marigold'),
-      pointBorderColor: token('ink'),
-      pointBorderWidth: 2,
-      pointRadius: 5,
-      pointHoverRadius: 7,
-    },
-  ],
-}))
+const data = computed<ChartData<'radar'>>(() => {
+  const scores = props.areas.map((a) => a.pct)
+  return {
+    labels: props.areas.map((a) => wrap(AREA_LABELS[a.area])),
+    // Chart.js draws the first dataset on top: the score shape, then a wide white outline under
+    // it, so the shape's edge stays clear on the dark outer rings too.
+    datasets: [
+      {
+        data: scores,
+        fill: true,
+        backgroundColor: faded(token('marigold'), 0.7),
+        borderColor: token('ink'),
+        borderWidth: 2.5,
+        pointBackgroundColor: token('marigold'),
+        pointBorderColor: token('ink'),
+        pointBorderWidth: 2,
+        pointRadius: 6,
+        pointHoverRadius: 8,
+      },
+      {
+        data: scores,
+        fill: false,
+        borderColor: '#ffffff',
+        borderWidth: 7,
+        pointRadius: 0,
+        pointHoverRadius: 0,
+        pointHitRadius: 0,
+      },
+    ],
+  }
+})
 
 const options = computed<ChartOptions<'radar'>>(() => ({
   responsive: true,
@@ -125,8 +139,9 @@ const options = computed<ChartOptions<'radar'>>(() => ({
       },
       // No numbers on the rings: they'd sit under the top point, and the key names each ring.
       ticks: { display: false },
-      grid: { circular: true, color: token('line') },
-      angleLines: { color: token('line') },
+      // White lines show on every ring now that the rings are solid.
+      grid: { circular: true, color: faded('#ffffff', 0.6) },
+      angleLines: { color: faded('#ffffff', 0.6) },
       pointLabels: {
         color: token('ink'),
         // Smaller on phones, where the side labels would leave the chart little room.
@@ -147,6 +162,8 @@ const options = computed<ChartOptions<'radar'>>(() => ({
       titleFont: { family: FONT, weight: 600 },
       bodyFont: { family: FONT },
       displayColors: false,
+      // Only the score shape, not its outline.
+      filter: (item) => item.datasetIndex === 0,
       callbacks: {
         title: (items) => {
           const area = props.areas[items[0]?.dataIndex ?? -1]
