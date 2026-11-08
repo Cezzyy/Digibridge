@@ -54,6 +54,15 @@
     }
   }
 
+  /* The assessment's next question sliding in, quicker and shorter than rise (`animate-enter`). */
+  --animate-enter: enter 0.35s var(--ease-glide) both;
+  @keyframes enter {
+    from {
+      opacity: 0;
+      transform: translateY(0.5rem);
+    }
+  }
+
   /* A check mark or badge that grows in when an answer is right (`animate-pop`). */
   --animate-pop: pop 0.3s var(--ease-glide) both;
   @keyframes pop {
