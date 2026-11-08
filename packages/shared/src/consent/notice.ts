@@ -14,7 +14,7 @@ export const CONSENT_CONTACT = 'the DigiBridge team'
 export const DATA_KEPT_UNTIL = 'December 2026'
 
 export const ONLINE_CONSENT_NOTICE = {
-  version: 'online-1',
+  version: 'online-2',
   title: 'Privacy notice',
   sections: [
     {
@@ -28,7 +28,7 @@ export const ONLINE_CONSENT_NOTICE = {
       title: 'What we collect',
       body: [
         'From Google: your name, email and profile photo, to keep your account. Never your password.',
-        'From you: your name, age, sex, the devices you own and how you usually get internet.',
+        'From you: your name, date of birth, sex, the devices you own and how you usually get internet.',
         'From the assessment: your answers, your scores, how long you took and, if you choose to, your rating of DigiBridge.',
       ],
     },

@@ -1,10 +1,10 @@
 import { describe, expect, it } from 'vitest'
-import { AGE_MAX, AGE_MIN, generalProfileSchema } from './general'
+import { generalProfileSchema } from './general'
 import { kioskProfileSchema, SCHOOL_FIELDS } from './kiosk'
 
 const general = {
   fullName: '  Juan Dela Cruz ',
-  age: 19,
+  birthDate: '2007-06-15',
   sex: 'male',
   devices: ['smartphone', 'laptop'],
   internetAccess: ['mobile_data'],
@@ -23,14 +23,33 @@ describe('generalProfileSchema', () => {
     )
   })
 
-  it('refuses a blank name and ages outside the range', () => {
-    for (const bad of [
-      { fullName: '   ' },
-      { age: AGE_MIN - 1 },
-      { age: AGE_MAX + 1 },
-      { age: 19.5 },
-      { age: '19' },
-    ]) {
+  it.each([
+    ['  Juan   Dela  Cruz ', 'Juan Dela Cruz'],
+    ['José Peña-Ñoño', 'José Peña-Ñoño'],
+    ["Ma. Clara O'Neil", "Ma. Clara O'Neil"],
+    ['Juan Dela Cruz Jr.', 'Juan Dela Cruz Jr.'],
+  ])('takes the name %j as %j', (fullName, saved) => {
+    expect(generalProfileSchema.parse({ ...general, fullName }).fullName).toBe(saved)
+  })
+
+  it.each([
+    ['', 'Enter your full name.'],
+    ['   ', 'Enter your full name.'],
+    ['Juan', 'Enter your first and last name.'],
+    ['Juan .', 'Enter your first and last name.'],
+    ['Juan 2 Cruz', 'Use letters only.'],
+    ['-Juan Cruz', 'Use letters only.'],
+    ['Juan 😀 Cruz', 'Use letters only.'],
+    ['juan@mail.com', 'Use letters only.'],
+    [`Juan ${'a'.repeat(100)}`, 'at most 100 characters'],
+  ])('refuses the name %j with one message', (fullName, message) => {
+    const issues = generalProfileSchema.safeParse({ ...general, fullName }).error?.issues
+    expect(issues).toHaveLength(1)
+    expect(issues?.[0]?.message).toContain(message)
+  })
+
+  it('refuses a blank name, a missing birth date and the old age field', () => {
+    for (const bad of [{ fullName: '   ' }, { birthDate: undefined }, { age: 19 }]) {
       expect(generalProfileSchema.safeParse({ ...general, ...bad }).success).toBe(false)
     }
   })
@@ -62,7 +81,7 @@ const ZOD_DEFAULT_TEXT = /invalid|expected|unrecognized|received/i
 describe('profile messages', () => {
   const bad = {
     fullName: undefined,
-    age: undefined,
+    birthDate: '2007-02-30',
     sex: 'other',
     devices: 'laptop',
     internetAccess: ['wifi'],
