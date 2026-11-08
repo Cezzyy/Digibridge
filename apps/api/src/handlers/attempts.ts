@@ -1,5 +1,20 @@
-import { answers, attempts, choices, competencyAreas, questions, respondents } from '@digibridge/db'
-import { ATTEMPT_DURATION_MINUTES, type AreaCode, type AttemptStatus } from '@digibridge/shared'
+import {
+  answers,
+  areaResults,
+  attempts,
+  choices,
+  competencyAreas,
+  lessons,
+  questions,
+  respondents,
+  susResponses,
+} from '@digibridge/db'
+import {
+  ATTEMPT_DURATION_MINUTES,
+  LESSON_TIERS_FOR_LEVEL,
+  type AreaCode,
+  type AttemptStatus,
+} from '@digibridge/shared'
 import type { RouteHandler } from '@hono/zod-openapi'
 import { and, eq, inArray, ne } from 'drizzle-orm'
 import type { Db } from '../config/db'
@@ -9,6 +24,7 @@ import { scoreAndClose, timeIsUp, type Tx } from '../lib/close-attempt'
 import { ApiError } from '../middleware'
 import type {
   getAttemptRoute,
+  getResultRoute,
   saveAnswerRoute,
   startAttemptRoute,
   submitAttemptRoute,
@@ -268,6 +284,116 @@ export const submitAttempt: RouteHandler<typeof submitAttemptRoute, AuthEnv> = a
       id: closed.id,
       status: closed.status as 'submitted' | 'expired',
       submittedAt: (closed.submittedAt ?? closed.expiresAt).toISOString(),
+    },
+    200,
+  )
+}
+
+// ---- Results ----
+
+export const getResult: RouteHandler<typeof getResultRoute, AuthEnv> = async (c) => {
+  const db = c.var.db
+  const [attempt] = await db
+    .select({
+      id: attempts.id,
+      status: attempts.status,
+      expiresAt: attempts.expiresAt,
+      submittedAt: attempts.submittedAt,
+      totalPoints: attempts.totalPoints,
+      overallPct: attempts.overallPct,
+      overallLevel: attempts.overallLevel,
+      resultsToken: attempts.resultsToken,
+      susAttemptId: susResponses.attemptId,
+    })
+    .from(attempts)
+    .innerJoin(respondents, eq(respondents.id, attempts.respondentId))
+    .leftJoin(susResponses, eq(susResponses.attemptId, attempts.id))
+    .where(
+      and(eq(attempts.id, c.req.valid('param').id), eq(respondents.profileId, c.var.profile.id)),
+    )
+  if (!attempt) throw new ApiError('not_found', NOT_FOUND)
+  if (attempt.status === 'in_progress') {
+    throw new ApiError('conflict', 'Submit the assessment to see your results.')
+  }
+  if (attempt.status === 'voided') {
+    throw new ApiError('conflict', 'This assessment was cancelled by the team.')
+  }
+  const { totalPoints, overallPct, overallLevel } = attempt
+  // Submit and the cron always score before closing; a row closed some other way may not be.
+  if (totalPoints === null || overallPct === null || overallLevel === null) {
+    throw new Error(`Attempt ${attempt.id} is closed but has no scores`)
+  }
+
+  const rows = await db
+    .select({
+      areaId: areaResults.areaId,
+      area: competencyAreas.code,
+      points: areaResults.points,
+      maxPoints: areaResults.maxPoints,
+      pct: areaResults.pct,
+      level: areaResults.level,
+    })
+    .from(areaResults)
+    .innerJoin(competencyAreas, eq(competencyAreas.id, areaResults.areaId))
+    .where(eq(areaResults.attemptId, attempt.id))
+    .orderBy(competencyAreas.sortOrder)
+
+  // At most one published lesson per area and tier (lessons_one_published_per_tier_idx).
+  const published =
+    rows.length === 0
+      ? []
+      : await db
+          .select({
+            areaId: lessons.areaId,
+            tier: lessons.tier,
+            slug: lessons.slug,
+            title: lessons.title,
+            summary: lessons.summary,
+          })
+          .from(lessons)
+          .where(
+            and(
+              eq(lessons.isPublished, true),
+              inArray(
+                lessons.areaId,
+                rows.map((row) => row.areaId),
+              ),
+            ),
+          )
+  const lessonFor = new Map(published.map((l) => [`${l.areaId}:${l.tier}`, l]))
+
+  const areas = rows.map((row) => ({
+    // Area codes are the seeded AREA_CODES.
+    area: row.area as AreaCode,
+    points: row.points,
+    maxPoints: row.maxPoints,
+    pct: row.pct,
+    level: row.level,
+    // The level's tiers, the first one to start with (PRD "Levels").
+    lessons: LESSON_TIERS_FOR_LEVEL[row.level].map((tier, i) => {
+      const lesson = lessonFor.get(`${row.areaId}:${tier}`)
+      return {
+        tier,
+        nextStep: i > 0,
+        lesson: lesson ? { slug: lesson.slug, title: lesson.title, summary: lesson.summary } : null,
+      }
+    }),
+  }))
+
+  return c.json(
+    {
+      id: attempt.id,
+      status: attempt.status,
+      submittedAt: (attempt.submittedAt ?? attempt.expiresAt).toISOString(),
+      overall: {
+        points: totalPoints,
+        maxPoints: rows.reduce((sum, row) => sum + row.maxPoints, 0),
+        pct: overallPct,
+        level: overallLevel,
+      },
+      areas,
+      resultsToken: attempt.resultsToken,
+      susAnswered: attempt.susAttemptId !== null,
     },
     200,
   )
