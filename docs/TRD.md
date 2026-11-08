@@ -87,7 +87,7 @@ digibridge/
 ├─ packages/
 │  ├─ db/                     Drizzle schema and seeds (db:generate, db:seed)
 │  │  ├─ src/schema/        tables, enums, relations
-│  │  ├─ seed/              base.ts (3 areas), dummy.ts (dev items)
+│  │  ├─ seed/              dev-questions.sql (3 areas and 39 practice items)
 │  │  └─ drizzle.config.ts
 │  ├─ shared/                 Zod enums, option lists and scoring constants used by web and api
 │  └─ config/                 shared lint settings, used by the root eslint.config.ts
@@ -401,9 +401,9 @@ Local values live in `apps/web/.env`, `packages/db/.env`, `apps/api/.dev.vars` a
 - **API:** run `pnpm --filter api run deploy`, which is `wrangler deploy`, to `https://digibridge-api.casupananjohncez.workers.dev`. Use `run`: `pnpm --filter api deploy` would run pnpm's own `deploy` command.
 - **Database:** change the schema in `packages/db`, run `pnpm db:generate` to write a migration to `supabase/migrations`, read the SQL, then `pnpm db:push` (`supabase db push`) to apply it to the linked project. `pnpm db:status` lists which migrations are applied. Never edit a migration that has been pushed; generate a new one. Push before deploying an API change that needs it. The API picks up the new types through its import of `packages/db`; its connection setup in `config/db` doesn't change.
 - **Careful after Nov 11:** once real pilot data exists, read each generated migration before pushing. A migration can drop or rename columns that hold respondent data.
-- **Seeds:** `pnpm db:seed` loads the 3 areas; `pnpm db:seed:dummy` loads 5 dummy items per area for development only.
+- **Seeds:** `packages/db/seed/dev-questions.sql` loads the 3 areas and 39 practice items (5 basic, 5 intermediate and 3 advanced per area, so attempts still pick at random), for development and testing only. Run it once in the Supabase SQL editor after `db:push`; running it again adds nothing. Its items' IDs start with `de000000-`, so they can be switched off before the pilot. The route tests load it too and check its mix.
 
-**Before the pilot (Nov 11):** deactivate dummy items, delete test respondents and attempts, and confirm 10 active items per area.
+**Before the pilot (Nov 11):** deactivate the practice items (`update questions set is_active = false where id::text like 'de000000-%'`), delete test respondents and attempts, and confirm 10 active items per area.
 
 ## Testing and QA
 
