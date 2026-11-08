@@ -1041,6 +1041,22 @@ describe('attempts in progress', () => {
       })
     })
 
+    it('returns an attempt closed elsewhere without submitted_at, at expires_at', async () => {
+      const { user, attempt } = await started()
+      const expiresAt = new Date(Date.now() - (ANSWER_GRACE_SECONDS + 60) * 1000)
+      await testDb
+        .update(attempts)
+        .set({ status: 'expired', expiresAt, submittedAt: null })
+        .where(eq(attempts.id, attempt.id))
+      const res = await submit(attempt.id, user.headers)
+      expect(res.status).toBe(200)
+      expect(await res.json()).toEqual({
+        id: attempt.id,
+        status: 'expired',
+        submittedAt: expiresAt.toISOString(),
+      })
+    })
+
     it('sends conflict for a voided attempt', async () => {
       const { user, attempt } = await started()
       await testDb
