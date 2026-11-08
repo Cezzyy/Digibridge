@@ -8,7 +8,7 @@ export type ConsentSection = { title: string; body: string[] }
 export type ConsentNotice = { version: string; title: string; sections: ConsentSection[] }
 
 /** Who respondents contact about their data. */
-export const CONSENT_CONTACT = 'John Cez Casupanan of the DigiBridge team'
+export const CONSENT_CONTACT = 'the DigiBridge team'
 
 /** Respondents' data is deleted after this (CON-01). */
 export const DATA_KEPT_UNTIL = 'December 2026'
