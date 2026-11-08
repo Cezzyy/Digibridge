@@ -1,5 +1,12 @@
 import { attempts, profiles, respondents } from '@digibridge/db'
-import { AGE_MAX, AGE_MIN, COURSES, STUDENT_NUMBER_EXAMPLE, YEAR_LEVELS } from '@digibridge/shared'
+import {
+  AGE_MAX,
+  AGE_MIN,
+  COURSES,
+  ONLINE_CONSENT_NOTICE,
+  STUDENT_NUMBER_EXAMPLE,
+  YEAR_LEVELS,
+} from '@digibridge/shared'
 import { OpenAPIHono, createRoute, z } from '@hono/zod-openapi'
 import { eq } from 'drizzle-orm'
 import { bodyLimit } from 'hono/body-limit'
@@ -420,6 +427,135 @@ describe('GET /api/v1/me', () => {
     await addAttempt(respondent.id, 'voided')
     const body = await (await get('/api/v1/me', user.headers)).json()
     expect(body).toMatchObject({ respondent: { id: respondent.id }, attempt: null })
+  })
+})
+
+describe('POST /api/v1/respondents', () => {
+  const profile = {
+    fullName: '  Juan Dela Cruz ',
+    age: 19,
+    sex: 'male',
+    devices: ['smartphone', 'laptop'],
+    internetAccess: ['mobile_data'],
+    showIdentity: false,
+    consentVersion: ONLINE_CONSENT_NOTICE.version,
+  }
+  const post = (body: unknown, headers: Record<string, string> = {}) =>
+    app.request(
+      '/api/v1/respondents',
+      {
+        method: 'POST',
+        headers: { ...headers, 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      },
+      env,
+    )
+  const respondentsOf = (profileId: string) =>
+    testDb.select().from(respondents).where(eq(respondents.profileId, profileId))
+
+  it('saves consent, the general profile and the identity choice', async () => {
+    const user = await signedIn()
+    const before = Date.now()
+    const res = await post(profile, user.headers)
+    expect(res.status).toBe(201)
+    const body = (await res.json()) as { id: string; fullName: string }
+    expect(body).toEqual({ id: expect.any(String), fullName: 'Juan Dela Cruz' })
+
+    const [row] = await respondentsOf(user.id)
+    expect(row).toMatchObject({
+      id: body.id,
+      mode: 'online',
+      fullName: 'Juan Dela Cruz',
+      age: 19,
+      sex: 'male',
+      devices: ['smartphone', 'laptop'],
+      internetAccess: ['mobile_data'],
+      showIdentity: false,
+      consentVersion: ONLINE_CONSENT_NOTICE.version,
+      studentNumber: null,
+      course: null,
+      yearLevel: null,
+    })
+    expect(row!.consentedAt.getTime()).toBeGreaterThanOrEqual(before - 1000)
+
+    // The next /me knows the respondent, so the web app moves past the profile step.
+    expect(await (await get('/api/v1/me', user.headers)).json()).toMatchObject({
+      respondent: { id: body.id, fullName: 'Juan Dela Cruz' },
+    })
+  })
+
+  it('lets staff take it online too', async () => {
+    const user = await signedIn('admin')
+    expect((await post({ ...profile, showIdentity: true }, user.headers)).status).toBe(201)
+  })
+
+  it('sends unauthorized without a token', async () => {
+    expect((await post(profile)).status).toBe(401)
+  })
+
+  it.each([
+    ['studentNumber', STUDENT_NUMBER_EXAMPLE],
+    ['course', COURSES[0]],
+    ['yearLevel', YEAR_LEVELS[0]],
+  ])('refuses the school field %s and saves nothing (PRO-06)', async (field, value) => {
+    const user = await signedIn()
+    const res = await post({ ...profile, [field]: value }, user.headers)
+    expect(res.status).toBe(400)
+    expect(await res.json()).toEqual({
+      error: {
+        code: 'validation_failed',
+        message: "Your answers include a question this form doesn't ask.",
+      },
+    })
+    expect(await respondentsOf(user.id)).toHaveLength(0)
+  })
+
+  it('refuses a profile without the identity choice (PRO-05)', async () => {
+    const user = await signedIn()
+    const { showIdentity: _, ...withoutChoice } = profile
+    const res = await post(withoutChoice, user.headers)
+    expect(res.status).toBe(400)
+    expect(await res.json()).toMatchObject({
+      error: { message: 'Choose whether the research team may see your name.' },
+    })
+  })
+
+  it('refuses consent to an old notice (CON-02)', async () => {
+    const user = await signedIn()
+    const res = await post({ ...profile, consentVersion: 'online-0' }, user.headers)
+    expect(res.status).toBe(400)
+    expect(await respondentsOf(user.id)).toHaveLength(0)
+  })
+
+  it('sends conflict when the account already has a respondent (PRO-07)', async () => {
+    const user = await signedIn()
+    expect((await post(profile, user.headers)).status).toBe(201)
+    const res = await post({ ...profile, fullName: 'Someone Else' }, user.headers)
+    expect(res.status).toBe(409)
+    expect(await res.json()).toEqual({
+      error: { code: 'conflict', message: 'You already filled in your profile.' },
+    })
+    expect(await respondentsOf(user.id)).toMatchObject([{ fullName: 'Juan Dela Cruz' }])
+  })
+
+  it('saves one respondent when two arrive together', async () => {
+    const user = await signedIn()
+    const statuses = (
+      await Promise.all([post(profile, user.headers), post(profile, user.headers)])
+    ).map((res) => res.status)
+    expect(statuses.sort()).toEqual([201, 409])
+    expect(await respondentsOf(user.id)).toHaveLength(1)
+  })
+})
+
+describe('API docs', () => {
+  it('builds the OpenAPI spec with every route', async () => {
+    const res = await get('/api/openapi.json')
+    expect(res.status).toBe(200)
+    const spec = (await res.json()) as { paths: Record<string, unknown> }
+    expect(Object.keys(spec.paths)).toEqual(
+      expect.arrayContaining(['/api/v1/health', '/api/v1/me', '/api/v1/respondents']),
+    )
   })
 })
 
