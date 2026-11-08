@@ -42,9 +42,9 @@ Done when a test account goes from consent to results and lessons on a phone, us
 - [x] **Start an attempt:** `POST /api/v1/attempts`, pick 4 basic, 4 intermediate and 2 advanced per area, shuffle items and choices, set `expires_at`, return the in-progress attempt if there is one (ASM-01, ASM-02).
 - [x] **Read and save:** `GET /api/v1/attempts/:id` without correct answers but with server time; `PUT /answers/:questionId` that checks the item and choice belong to the attempt and refuses after `expires_at` + 30 s (ASM-04, ASM-07).
 - [x] **Assessment page:** switch on Start and Continue on home (`useStartAttempt` is ready), `QuestionCard`, `QuestionGrid`, Back and Next, `CountdownTimer` from server time (amber at 5 min, red at 1), saved indicator with 3 retries, submit dialog with unanswered count (ASM-03, ASM-05, ASM-06, ASM-08).
-- [ ] **Scoring:** `lib/scoring.ts` as a pure function with its unit tests first, then `POST /submit`, idempotent, all writes in one transaction (ASM-09).
-- [ ] **Cron:** `scheduled` handler in `index.ts` closes attempts past `expires_at` + 30 s as expired.
-- [ ] **Results page:** overall level, radar chart, score and level per area, recommended lessons, no per-item marks (RES-01 to RES-03, RES-05).
+- [x] **Scoring:** `lib/scoring.ts` as a pure function with its unit tests first, then `POST /submit`, idempotent, all writes in one transaction (ASM-09).
+- [x] **Cron:** `scheduled` handler in `index.ts` closes attempts past `expires_at` + 30 s as expired.
+- [x] **Results page:** overall level, radar chart, score and level per area, recommended lessons, no per-item marks (RES-01 to RES-03, RES-05).
 - [ ] **Lessons:** public library and lesson page with Markdown rendered through DOMPurify (LES-01 to LES-03).
 - [ ] **SUS:** `lib/sus.ts` with its tests, `POST /api/v1/attempts/:id/sus`, `SusForm` as an optional card under results (SUS-01, SUS-02, SUS-04).
 - [ ] **QR code:** `results_token` at submit, `GET /api/v1/results/:token`, `ResultsQr` on the results page (RES-04).
