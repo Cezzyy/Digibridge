@@ -5,7 +5,7 @@ import { onlineRespondentSchema } from './respondent'
 
 const online = {
   fullName: ' Juan Dela Cruz ',
-  age: 19,
+  birthDate: '2007-06-15',
   sex: 'male',
   devices: ['smartphone'],
   internetAccess: ['mobile_data', 'piso_wifi'],

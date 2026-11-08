@@ -1,3 +1,4 @@
+export * from './birth-date'
 export * from './course'
 export * from './digital-access'
 export * from './general'

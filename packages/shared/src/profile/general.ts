@@ -1,13 +1,12 @@
 import { z } from 'zod'
 import { SEXES } from '../enums'
+import { birthDateSchema } from './birth-date'
 import { deviceSchema, internetAccessSchema } from './digital-access'
 
 // The general profile (PRO-01), asked in both modes. Online uses it on its own; the
 // kiosk profile adds the school details (see kiosk.ts).
 
 export const FULL_NAME_MAX_LENGTH = 100
-export const AGE_MIN = 10
-export const AGE_MAX = 99
 
 /**
  * At least one pick, no repeats, and "none" only on its own. The "none" check counts
@@ -24,20 +23,35 @@ const pickList = <T extends string>(item: z.ZodType<T>, what: string) =>
       message: `"None" can't be picked with other answers.`,
     })
 
+export const FULL_NAME_MESSAGES = {
+  missing: 'Enter your full name.',
+  tooLong: `Your name can be at most ${FULL_NAME_MAX_LENGTH} characters.`,
+  characters: "Use letters only. Spaces, hyphens (-), apostrophes (') and periods (.) are fine.",
+  twoParts: 'Enter your first and last name.',
+} as const
+
+/** Starts with a letter; then letters (any language, ñ and accents too), spaces, - ' ’ and . */
+export const FULL_NAME_REGEX = /^\p{L}[\p{L}\p{M} '’.-]*$/u
+
+/**
+ * Trimmed, with runs of spaces made one, then checked one rule at a time: filled in, not too
+ * long, only name characters, and at least two words (first and last name).
+ */
+export const fullNameSchema = z
+  .string({ error: FULL_NAME_MESSAGES.missing })
+  .overwrite((name) => name.trim().replace(/\s+/g, ' '))
+  .min(1, { message: FULL_NAME_MESSAGES.missing, abort: true })
+  .max(FULL_NAME_MAX_LENGTH, { message: FULL_NAME_MESSAGES.tooLong, abort: true })
+  .regex(FULL_NAME_REGEX, { message: FULL_NAME_MESSAGES.characters, abort: true })
+  .refine((name) => name.split(' ').filter((word) => /\p{L}/u.test(word)).length >= 2, {
+    message: FULL_NAME_MESSAGES.twoParts,
+  })
+
 /** Strict: any field it doesn't list, such as a school field, fails (PRO-06). */
 export const generalProfileSchema = z.strictObject(
   {
-    fullName: z
-      .string({ error: 'Enter your full name.' })
-      .trim()
-      .min(1, { message: 'Enter your full name.' })
-      .max(FULL_NAME_MAX_LENGTH, {
-        message: `Your name can be at most ${FULL_NAME_MAX_LENGTH} characters.`,
-      }),
-    age: z
-      .int({ message: 'Enter your age as a whole number.' })
-      .min(AGE_MIN, { message: `Age must be from ${AGE_MIN} to ${AGE_MAX}.` })
-      .max(AGE_MAX, { message: `Age must be from ${AGE_MIN} to ${AGE_MAX}.` }),
+    fullName: fullNameSchema,
+    birthDate: birthDateSchema,
     sex: z.enum(SEXES, { error: 'Pick an answer for sex.' }),
     devices: pickList(deviceSchema, 'device'),
     internetAccess: pickList(internetAccessSchema, 'way you get internet'),
