@@ -9,6 +9,7 @@ import QuestionCard from '../../components/assessment/QuestionCard.vue'
 import QuestionGrid from '../../components/assessment/QuestionGrid.vue'
 import SubmitDialog from '../../components/assessment/SubmitDialog.vue'
 import ErrorScreen from '../../components/ErrorScreen.vue'
+import { RULE_ICONS } from '../../components/home/home-icons'
 import { useCountdown } from '../../composables/useCountdown'
 import { ApiRequestError } from '../../lib/api'
 import { PRIMARY_BUTTON, SECONDARY_BUTTON } from '../../lib/buttons'
@@ -337,9 +338,7 @@ function openDialog() {
             stroke-linecap="round"
             stroke-linejoin="round"
           >
-            <path d="M12 5a8 8 0 1 0 0 16 8 8 0 0 0 0-16Z" />
-            <path d="M12 9v4l2.5 1.5" />
-            <path d="M10 2h4" />
+            <path v-for="d in RULE_ICONS.timer" :key="d" :d="d" />
           </svg>
         </span>
         <h2 id="time-up-title" class="mt-4 text-2xl font-bold">Time’s up</h2>
