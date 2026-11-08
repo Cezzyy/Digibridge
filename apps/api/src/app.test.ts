@@ -1,10 +1,22 @@
-import { attempts, choices, profiles, questions, respondents } from '@digibridge/db'
+import {
+  answers,
+  areaResults,
+  attempts,
+  choices,
+  competencyAreas,
+  profiles,
+  questions,
+  respondents,
+} from '@digibridge/db'
 import {
   AGE_MAX,
   AGE_MIN,
+  ANSWER_GRACE_SECONDS,
+  AREA_CODES,
   ATTEMPT_DURATION_MINUTES,
   CHOICES_PER_QUESTION,
   ITEMS_PER_ATTEMPT,
+  MIN_SCENARIO_ITEMS_PER_AREA,
   toIsoDate,
   COURSES,
   ONLINE_CONSENT_NOTICE,
@@ -12,10 +24,12 @@ import {
   YEAR_LEVELS,
 } from '@digibridge/shared'
 import { OpenAPIHono, createRoute, z } from '@hono/zod-openapi'
-import { eq, inArray } from 'drizzle-orm'
+import { eq, inArray, sql } from 'drizzle-orm'
 import { bodyLimit } from 'hono/body-limit'
 import { HTTPException } from 'hono/http-exception'
 import { generateKeyPair } from 'jose'
+import { readFile } from 'node:fs/promises'
+import { fileURLToPath } from 'node:url'
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import { app } from './app'
 import type { AppEnv } from './env'
@@ -586,6 +600,31 @@ describe('POST /api/v1/respondents', () => {
   })
 })
 
+// ---- The assessment: start, read, answer, submit ----
+
+const start = (headers: Record<string, string> = {}) =>
+  app.request('/api/v1/attempts', { method: 'POST', headers }, env)
+
+/** A respondent who has agreed to the notice and saved their profile. */
+const respondent = async () => {
+  const user = await signedIn()
+  const [row] = await testDb
+    .insert(respondents)
+    .values({
+      profileId: user.id,
+      fullName: 'Juan Dela Cruz',
+      birthDate: '2007-06-15',
+      sex: 'male',
+      mode: 'online',
+      consentVersion: '1',
+      consentedAt: new Date(),
+    })
+    .returning({ id: respondents.id })
+  return { ...user, respondentId: row!.id }
+}
+const attemptsOf = (respondentId: string) =>
+  testDb.select().from(attempts).where(eq(attempts.respondentId, respondentId))
+
 describe('POST /api/v1/attempts', () => {
   // Before each test: clearAccounts empties questions too (questions.created_by points at
   // profiles, so its cascade reaches them), but leaves the areas.
@@ -595,29 +634,6 @@ describe('POST /api/v1/attempts', () => {
     bank = await addQuestionBank()
   })
   afterAll(clearQuestionBank)
-
-  const start = (headers: Record<string, string> = {}) =>
-    app.request('/api/v1/attempts', { method: 'POST', headers }, env)
-
-  /** A respondent who has agreed to the notice and saved their profile. */
-  const respondent = async () => {
-    const user = await signedIn()
-    const [row] = await testDb
-      .insert(respondents)
-      .values({
-        profileId: user.id,
-        fullName: 'Juan Dela Cruz',
-        birthDate: '2007-06-15',
-        sex: 'male',
-        mode: 'online',
-        consentVersion: '1',
-        consentedAt: new Date(),
-      })
-      .returning({ id: respondents.id })
-    return { ...user, respondentId: row!.id }
-  }
-  const attemptsOf = (respondentId: string) =>
-    testDb.select().from(attempts).where(eq(attempts.respondentId, respondentId))
 
   it('starts an attempt with the 30 active items and their choices shuffled (ASM-01, ASM-02)', async () => {
     const user = await respondent()
@@ -754,6 +770,344 @@ describe('POST /api/v1/attempts', () => {
   })
 })
 
+describe('attempts in progress', () => {
+  beforeEach(async () => {
+    await clearQuestionBank()
+    await addQuestionBank()
+  })
+  afterAll(clearQuestionBank)
+
+  const json = { 'Content-Type': 'application/json' }
+  const read = (id: string, headers: Record<string, string> = {}) =>
+    get(`/api/v1/attempts/${id}`, headers)
+  const save = (
+    id: string,
+    questionId: string,
+    choiceId: string,
+    headers: Record<string, string>,
+  ) =>
+    app.request(
+      `/api/v1/attempts/${id}/answers/${questionId}`,
+      { method: 'PUT', headers: { ...headers, ...json }, body: JSON.stringify({ choiceId }) },
+      env,
+    )
+  const submit = (id: string, headers: Record<string, string> = {}) =>
+    app.request(`/api/v1/attempts/${id}/submit`, { method: 'POST', headers }, env)
+
+  /** A respondent with a started attempt, and that attempt's row. */
+  const started = async () => {
+    const user = await respondent()
+    await start(user.headers)
+    const [attempt] = await attemptsOf(user.respondentId)
+    return { user, attempt: attempt! }
+  }
+  const choicesOf = (questionId: string) =>
+    testDb.select().from(choices).where(eq(choices.questionId, questionId))
+  /** addQuestionBank makes position 0 the right choice. */
+  const rightChoice = async (questionId: string) =>
+    (await choicesOf(questionId)).find((c) => c.isCorrect)!.id
+  const wrongChoice = async (questionId: string) =>
+    (await choicesOf(questionId)).find((c) => !c.isCorrect)!.id
+  const setExpiresAt = (attemptId: string, expiresAt: Date) =>
+    testDb.update(attempts).set({ expiresAt }).where(eq(attempts.id, attemptId))
+
+  describe('GET /api/v1/attempts/:id', () => {
+    it('sends the items and choices in the attempt’s order, without the answers (ASM-02, RES-05)', async () => {
+      const { user, attempt } = await started()
+      const res = await read(attempt.id, user.headers)
+      expect(res.status).toBe(200)
+      const body = (await res.json()) as {
+        items: { id: string; choices: { id: string }[] }[]
+        answers: unknown[]
+        serverTime: string
+        expiresAt: string
+      }
+      expect(body.items.map((i) => i.id)).toEqual(attempt.questionOrder)
+      for (const item of body.items) {
+        expect(item.choices.map((c) => c.id)).toEqual(attempt.choiceOrder[item.id])
+      }
+      // toEqual: no isCorrect, explanation or difficulty sneaks in.
+      expect(body.items[0]).toEqual({
+        id: expect.any(String),
+        area: expect.any(String),
+        stem: expect.any(String),
+        imageUrl: null,
+        isScenario: false,
+        choices: Array.from({ length: CHOICES_PER_QUESTION }, () => ({
+          id: expect.any(String),
+          label: expect.any(String),
+        })),
+      })
+      expect(body.answers).toEqual([])
+      expect(body.expiresAt).toBe(attempt.expiresAt.toISOString())
+      expect(body.serverTime).toEqual(expect.any(String))
+    })
+
+    it('sends not_found for another respondent’s attempt or an unknown ID', async () => {
+      const { attempt } = await started()
+      const other = await respondent()
+      for (const id of [attempt.id, crypto.randomUUID()]) {
+        const res = await read(id, other.headers)
+        expect(res.status).toBe(404)
+        expect(await res.json()).toMatchObject({ error: { code: 'not_found' } })
+      }
+    })
+
+    it('refuses staff and signed-out calls', async () => {
+      const { attempt } = await started()
+      expect((await read(attempt.id, (await signedIn('admin')).headers)).status).toBe(403)
+      expect((await read(attempt.id)).status).toBe(401)
+    })
+  })
+
+  describe('PUT /api/v1/attempts/:id/answers/:questionId', () => {
+    it('saves an answer and replaces it when changed (ASM-04, ASM-05)', async () => {
+      const { user, attempt } = await started()
+      const questionId = attempt.questionOrder[0]!
+      const [first, second] = attempt.choiceOrder[questionId]!
+
+      const res = await save(attempt.id, questionId, first!, user.headers)
+      expect(res.status).toBe(200)
+      expect(await res.json()).toEqual({
+        questionId,
+        choiceId: first,
+        answeredAt: expect.any(String),
+        serverTime: expect.any(String),
+      })
+      expect((await save(attempt.id, questionId, second!, user.headers)).status).toBe(200)
+
+      const rows = await testDb.select().from(answers).where(eq(answers.attemptId, attempt.id))
+      expect(rows).toHaveLength(1)
+      expect(rows[0]).toMatchObject({ questionId, choiceId: second, points: null })
+      // A reload gets it back (ASM-07).
+      expect(await (await read(attempt.id, user.headers)).json()).toMatchObject({
+        answers: [{ questionId, choiceId: second }],
+      })
+    })
+
+    it('refuses a question outside the attempt and a choice of another question', async () => {
+      const { user, attempt } = await started()
+      const [inAttempt, otherInAttempt] = attempt.questionOrder
+      const [inactive] = await testDb.select().from(questions).where(eq(questions.isActive, false))
+      const outside = await save(
+        attempt.id,
+        inactive!.id,
+        await rightChoice(inactive!.id),
+        user.headers,
+      )
+      expect(outside.status).toBe(400)
+      expect(await outside.json()).toEqual({
+        error: { code: 'bad_request', message: 'This question isn’t part of your assessment.' },
+      })
+      const foreign = await save(
+        attempt.id,
+        inAttempt!,
+        attempt.choiceOrder[otherInAttempt!]![0]!,
+        user.headers,
+      )
+      expect(foreign.status).toBe(400)
+      expect(await testDb.select().from(answers)).toHaveLength(0)
+    })
+
+    it('takes answers up to 30 s past expires_at, then refuses them (ASM-09)', async () => {
+      const { user, attempt } = await started()
+      const questionId = attempt.questionOrder[0]!
+      const choiceId = attempt.choiceOrder[questionId]![0]!
+
+      await setExpiresAt(attempt.id, new Date(Date.now() - (ANSWER_GRACE_SECONDS - 10) * 1000))
+      expect((await save(attempt.id, questionId, choiceId, user.headers)).status).toBe(200)
+
+      await setExpiresAt(attempt.id, new Date(Date.now() - (ANSWER_GRACE_SECONDS + 1) * 1000))
+      const res = await save(attempt.id, questionId, choiceId, user.headers)
+      expect(res.status).toBe(409)
+      expect(await res.json()).toEqual({
+        error: { code: 'conflict', message: 'Time is up, so this answer wasn’t saved.' },
+      })
+    })
+
+    it('refuses answers once the attempt is submitted', async () => {
+      const { user, attempt } = await started()
+      await submit(attempt.id, user.headers)
+      const questionId = attempt.questionOrder[0]!
+      const res = await save(attempt.id, questionId, await rightChoice(questionId), user.headers)
+      expect(res.status).toBe(409)
+      expect(await testDb.select().from(answers)).toHaveLength(0)
+    })
+
+    it('sends not_found for another respondent’s attempt, and refuses staff', async () => {
+      const { attempt } = await started()
+      const questionId = attempt.questionOrder[0]!
+      const choiceId = attempt.choiceOrder[questionId]![0]!
+      const other = await respondent()
+      expect((await save(attempt.id, questionId, choiceId, other.headers)).status).toBe(404)
+      const staff = await signedIn('facilitator')
+      expect((await save(attempt.id, questionId, choiceId, staff.headers)).status).toBe(403)
+    })
+
+    it('refuses a body without a valid choice ID', async () => {
+      const { user, attempt } = await started()
+      const res = await save(attempt.id, attempt.questionOrder[0]!, 'not-a-uuid', user.headers)
+      expect(res.status).toBe(400)
+      expect(await res.json()).toMatchObject({ error: { code: 'validation_failed' } })
+    })
+  })
+
+  describe('POST /api/v1/attempts/:id/submit', () => {
+    it('scores the saved answers, writes the area results and closes the attempt', async () => {
+      const { user, attempt } = await started()
+      const items = await testDb
+        .select({ id: questions.id, difficulty: questions.difficulty })
+        .from(questions)
+        .where(inArray(questions.id, attempt.questionOrder))
+      // Right on every basic item (12 points), wrong on 1 advanced, the rest unanswered.
+      const basics = items.filter((i) => i.difficulty === 'basic')
+      for (const item of basics) {
+        await save(attempt.id, item.id, await rightChoice(item.id), user.headers)
+      }
+      const advanced = items.find((i) => i.difficulty === 'advanced')!
+      await save(attempt.id, advanced.id, await wrongChoice(advanced.id), user.headers)
+
+      const res = await submit(attempt.id, user.headers)
+      expect(res.status).toBe(200)
+      expect(await res.json()).toEqual({
+        id: attempt.id,
+        status: 'submitted',
+        submittedAt: expect.any(String),
+      })
+
+      const [closed] = await attemptsOf(user.respondentId)
+      // 12 of 54 is 22.22%: Beginner.
+      expect(closed).toMatchObject({
+        status: 'submitted',
+        totalPoints: 12,
+        overallPct: 22.22,
+        overallLevel: 'beginner',
+      })
+      const results = await testDb
+        .select()
+        .from(areaResults)
+        .where(eq(areaResults.attemptId, attempt.id))
+      expect(results).toHaveLength(3)
+      // 4 of 18 in each area is 22.22%.
+      for (const r of results) {
+        expect(r).toMatchObject({ points: 4, maxPoints: 18, pct: 22.22, level: 'beginner' })
+      }
+      const saved = await testDb.select().from(answers).where(eq(answers.attemptId, attempt.id))
+      expect(saved.find((a) => a.questionId === advanced.id)?.points).toBe(0)
+      expect(saved.filter((a) => a.points === 1)).toHaveLength(basics.length)
+
+      // /me follows, and a new start is refused.
+      expect(await (await get('/api/v1/me', user.headers)).json()).toMatchObject({
+        attempt: { id: attempt.id, status: 'submitted' },
+      })
+      expect((await start(user.headers)).status).toBe(409)
+    })
+
+    it('is safe to call twice', async () => {
+      const { user, attempt } = await started()
+      const first = await (await submit(attempt.id, user.headers)).json()
+      const again = await submit(attempt.id, user.headers)
+      expect(again.status).toBe(200)
+      expect(await again.json()).toEqual(first)
+      const results = await testDb
+        .select()
+        .from(areaResults)
+        .where(eq(areaResults.attemptId, attempt.id))
+      expect(results).toHaveLength(3)
+    })
+
+    it('scores one attempt when two submits arrive together', async () => {
+      const { user, attempt } = await started()
+      const replies = await Promise.all([
+        submit(attempt.id, user.headers),
+        submit(attempt.id, user.headers),
+      ])
+      expect(replies.map((r) => r.status)).toEqual([200, 200])
+      const results = await testDb
+        .select()
+        .from(areaResults)
+        .where(eq(areaResults.attemptId, attempt.id))
+      expect(results).toHaveLength(3)
+    })
+
+    it('closes a late attempt as expired, at expires_at', async () => {
+      const { user, attempt } = await started()
+      const expiresAt = new Date(Date.now() - (ANSWER_GRACE_SECONDS + 60) * 1000)
+      await setExpiresAt(attempt.id, expiresAt)
+      expect(await (await submit(attempt.id, user.headers)).json()).toEqual({
+        id: attempt.id,
+        status: 'expired',
+        submittedAt: expiresAt.toISOString(),
+      })
+    })
+
+    it('sends conflict for a voided attempt', async () => {
+      const { user, attempt } = await started()
+      await testDb
+        .update(attempts)
+        .set({ status: 'voided', voidReason: 'Test' })
+        .where(eq(attempts.id, attempt.id))
+      const res = await submit(attempt.id, user.headers)
+      expect(res.status).toBe(409)
+      expect(await testDb.select().from(areaResults)).toHaveLength(0)
+    })
+
+    it('sends not_found for another respondent’s attempt, and refuses staff', async () => {
+      const { attempt } = await started()
+      expect((await submit(attempt.id, (await respondent()).headers)).status).toBe(404)
+      expect((await submit(attempt.id, (await signedIn('admin')).headers)).status).toBe(403)
+      expect((await attemptsOf(attempt.respondentId))[0]?.status).toBe('in_progress')
+    })
+  })
+})
+
+describe('dev question bank (packages/db/seed/dev-questions.sql)', () => {
+  const SEED = fileURLToPath(
+    new URL('../../../packages/db/seed/dev-questions.sql', import.meta.url).href,
+  )
+  const loadSeed = async () => testDb.$client.exec(await readFile(SEED, 'utf8'))
+
+  beforeEach(clearQuestionBank)
+  afterAll(clearQuestionBank)
+
+  it('loads 5 basic, 5 intermediate and 3 advanced items per area, each with 4 choices and 1 right', async () => {
+    await loadSeed()
+    // Running it again adds nothing.
+    await loadSeed()
+
+    const rows = await testDb
+      .select({
+        area: competencyAreas.code,
+        difficulty: questions.difficulty,
+        isScenario: questions.isScenario,
+        choices: sql<number>`count(${choices.id})::int`,
+        right: sql<number>`count(*) filter (where ${choices.isCorrect})::int`,
+      })
+      .from(questions)
+      .innerJoin(competencyAreas, eq(competencyAreas.id, questions.areaId))
+      .innerJoin(choices, eq(choices.questionId, questions.id))
+      .groupBy(questions.id, competencyAreas.code)
+    expect(rows).toHaveLength(39)
+    for (const row of rows) expect(row).toMatchObject({ choices: CHOICES_PER_QUESTION, right: 1 })
+    for (const area of AREA_CODES) {
+      const ofArea = rows.filter((r) => r.area === area)
+      const count = (d: string) => ofArea.filter((r) => r.difficulty === d).length
+      expect([count('basic'), count('intermediate'), count('advanced')]).toEqual([5, 5, 3])
+      expect(ofArea.filter((r) => r.isScenario).length).toBeGreaterThanOrEqual(
+        MIN_SCENARIO_ITEMS_PER_AREA,
+      )
+    }
+  })
+
+  it('fills an attempt', async () => {
+    await loadSeed()
+    const user = await respondent()
+    expect((await start(user.headers)).status).toBe(201)
+    const [attempt] = await attemptsOf(user.respondentId)
+    expect(attempt!.questionOrder).toHaveLength(ITEMS_PER_ATTEMPT)
+  })
+})
+
 describe('API docs', () => {
   it('builds the OpenAPI spec with every route', async () => {
     const res = await get('/api/openapi.json')
@@ -765,6 +1119,9 @@ describe('API docs', () => {
         '/api/v1/me',
         '/api/v1/respondents',
         '/api/v1/attempts',
+        '/api/v1/attempts/{id}',
+        '/api/v1/attempts/{id}/answers/{questionId}',
+        '/api/v1/attempts/{id}/submit',
       ]),
     )
   })
