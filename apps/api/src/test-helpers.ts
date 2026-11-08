@@ -1,8 +1,15 @@
 // Test setup for app.test.ts: an in-memory Postgres with the real migrations, and
 // Supabase-style access tokens signed with a test key.
 // Don't import app here: app.test.ts's mock of config/db imports this file.
-import { profiles, schema } from '@digibridge/db'
-import type { Role } from '@digibridge/shared'
+import { choices, competencyAreas, profiles, questions, schema } from '@digibridge/db'
+import {
+  AREA_CODES,
+  AREA_LABELS,
+  CHOICES_PER_QUESTION,
+  DIFFICULTIES,
+  ITEMS_PER_DIFFICULTY,
+  type Role,
+} from '@digibridge/shared'
 import { PGlite } from '@electric-sql/pglite'
 import { sql } from 'drizzle-orm'
 import { drizzle } from 'drizzle-orm/pglite'
@@ -46,6 +53,45 @@ export async function clearAccounts() {
 export async function addAuthUser(id = crypto.randomUUID()) {
   await testDb.execute(sql`insert into auth.users (id) values (${id})`)
   return id
+}
+
+/**
+ * The 3 areas with exactly the items an attempt needs (4 basic, 4 intermediate, 2 advanced
+ * each, every one with 4 choices and 1 correct), plus one inactive item per area and difficulty.
+ */
+export async function addQuestionBank() {
+  const active: string[] = []
+  const inactive: string[] = []
+  for (const [sortOrder, code] of AREA_CODES.entries()) {
+    const [area] = await testDb
+      .insert(competencyAreas)
+      .values({ code, name: AREA_LABELS[code], description: code, sortOrder })
+      .returning({ id: competencyAreas.id })
+    for (const difficulty of DIFFICULTIES) {
+      for (let n = 0; n <= ITEMS_PER_DIFFICULTY[difficulty]; n++) {
+        const isActive = n < ITEMS_PER_DIFFICULTY[difficulty]
+        const [question] = await testDb
+          .insert(questions)
+          .values({ areaId: area!.id, difficulty, stem: `${code} ${difficulty} ${n}`, isActive })
+          .returning({ id: questions.id })
+        await testDb.insert(choices).values(
+          Array.from({ length: CHOICES_PER_QUESTION }, (_, position) => ({
+            questionId: question!.id,
+            label: `Choice ${position + 1}`,
+            isCorrect: position === 0,
+            position,
+          })),
+        )
+        ;(isActive ? active : inactive).push(question!.id)
+      }
+    }
+  }
+  return { active, inactive }
+}
+
+/** Removes the areas, questions and choices that addQuestionBank added. */
+export async function clearQuestionBank() {
+  await testDb.execute(sql`truncate competency_areas, questions, choices cascade`)
 }
 
 // ---- Tokens ----
