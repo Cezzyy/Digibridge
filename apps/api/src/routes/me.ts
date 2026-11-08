@@ -2,6 +2,7 @@ import { attemptStatusSchema, roleSchema } from '@digibridge/shared'
 import { createRoute, z } from '@hono/zod-openapi'
 import { auth } from '../middleware'
 import { errorResponse } from '../openapi'
+import { RespondentSummarySchema } from './respondents'
 
 const MeSchema = z
   .object({
@@ -14,7 +15,7 @@ const MeSchema = z
     }),
     // Null until the user agrees to the consent notice and fills in their profile.
     // Online respondents have no school details, so none are sent (PRO-06).
-    respondent: z.object({ id: z.uuid(), fullName: z.string() }).nullable(),
+    respondent: RespondentSummarySchema.nullable(),
     // Their one attempt, unless it was voided (then they can start again).
     attempt: z.object({ id: z.uuid(), status: attemptStatusSchema }).nullable(),
   })
