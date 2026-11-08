@@ -53,7 +53,7 @@ const identityOptions: Option<boolean>[] = [
   {
     value: true,
     label: 'Yes, show my name',
-    hint: 'The research team sees your name with your answers.',
+    hint: 'The DigiBridge team sees your name with your answers.',
   },
   {
     value: false,
@@ -129,8 +129,8 @@ const inputClass = (field: Field) => [
     <p
       class="mt-3 text-lg leading-relaxed text-quiet motion-safe:animate-rise motion-safe:[animation-delay:80ms]"
     >
-      This helps the study see who needs more help with digital skills. There are no right or wrong
-      answers here.
+      This helps us see who needs more help with digital skills. There are no right or wrong answers
+      here.
     </p>
 
     <form
@@ -213,7 +213,7 @@ const inputClass = (field: Field) => [
       <div class="border-t border-line pt-8">
         <OptionGroup
           v-model="form.showIdentity"
-          legend="May the research team see your name?"
+          legend="May the DigiBridge team see your name?"
           hint="Either way, your answers count the same."
           :options="identityOptions"
           :columns="2"

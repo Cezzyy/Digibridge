@@ -123,8 +123,7 @@ async function signOut() {
       </article>
 
       <p class="mt-6 rounded-control bg-marigold-soft px-4 py-3 leading-relaxed">
-        By choosing <strong>I agree</strong>, you agree to take part in the study and let us use
-        your answers as this notice says.
+        By choosing <strong>I agree</strong>, you let us use your answers as this notice says.
       </p>
 
       <!-- On phones the buttons stack, with I agree on top. -->
