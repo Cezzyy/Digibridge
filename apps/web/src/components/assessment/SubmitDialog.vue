@@ -39,22 +39,19 @@ function onCancel(event: Event) {
     ref="dialog"
     :aria-labelledby="`${id}-title`"
     :aria-describedby="`${id}-body`"
-    class="m-auto w-[calc(100%-2rem)] max-w-md rounded-card bg-surface p-6 text-ink shadow-[0_30px_60px_-20px_rgb(18_36_28/0.45)] backdrop:bg-ink/55 sm:p-7"
+    class="m-auto w-[calc(100%-2rem)] max-w-md rounded-card bg-surface p-6 text-ink shadow-lg backdrop:bg-ink/50 sm:p-7"
     @cancel="onCancel"
     @close="emit('close')"
   >
-    <h2 :id="`${id}-title`" class="text-2xl leading-tight font-bold">Submit your answers?</h2>
-    <div :id="`${id}-body`" class="mt-4 space-y-3 leading-relaxed">
-      <p
-        v-if="unanswered > 0"
-        class="rounded-control bg-marigold-soft px-4 py-3 shadow-[inset_3px_0_0_var(--color-marigold)]"
-      >
-        You answered <strong>{{ answered }} of {{ total }}</strong
-        >. {{ unanswered === 1 ? '1 question has' : `${unanswered} questions have` }} no answer and
-        {{ unanswered === 1 ? 'counts' : 'count' }} as wrong.
+    <h2 :id="`${id}-title`" class="text-xl leading-tight font-bold">Submit your answers?</h2>
+    <div :id="`${id}-body`" class="mt-3 space-y-2 leading-relaxed text-quiet">
+      <p v-if="unanswered > 0">
+        You answered <strong class="text-ink">{{ answered }} of {{ total }}</strong> questions.
+        {{ unanswered === 1 ? 'The 1 left blank counts' : `The ${unanswered} left blank count` }}
+        as wrong.
       </p>
       <p v-else>You answered all {{ total }} questions.</p>
-      <p v-if="unsaved > 0" class="text-quiet">
+      <p v-if="unsaved > 0">
         {{ unsaved === 1 ? '1 answer is' : `${unsaved} answers are` }} still saving. We’ll send
         {{ unsaved === 1 ? 'it' : 'them' }} first.
       </p>
