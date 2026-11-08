@@ -19,3 +19,9 @@ export function levelRange(band: { from: number; to: number }) {
   if (band.to === 100) return `${band.from}% and up`
   return `${band.from}% to ${band.to - 1}%`
 }
+
+/**
+ * A score as a whole percentage, rounded down, so it never looks like a level it didn't reach:
+ * 79.6% shows as 79%, which is still Intermediate. Levels come from the unrounded score.
+ */
+export const wholePct = (pct: number) => Math.floor(pct)

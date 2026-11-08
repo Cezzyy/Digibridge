@@ -1,2 +1,2 @@
-// Shared UI components: QuestionCard, CountdownTimer, QuestionGrid, RadarChart, SusForm, ResultsQr, StatCard, DataTable.
+// Shared UI components: SusForm, ResultsQr, StatCard, DataTable (the others live in per-page folders).
 export {}
