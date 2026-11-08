@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from 'vitest'
 import {
+  addDays,
   AGE_MAX,
   AGE_MIN,
   ageOn,
@@ -8,7 +9,7 @@ import {
   birthDateSchema,
   daysInMonth,
   isRealDate,
-  nextDay,
+  parseIsoDate,
   todayInPhilippines,
   toIsoDate,
   yearsBefore,
@@ -93,7 +94,7 @@ describe('birthDateRange', () => {
     for (const today of ['2026-11-08', '2028-02-29', '2027-03-01', '2026-01-01']) {
       const { earliest, latest } = birthDateRange(today)
       expect(ageOn(latest, today)).toBe(AGE_MIN)
-      expect(ageOn(nextDay(latest), today)).toBe(AGE_MIN - 1)
+      expect(ageOn(addDays(latest, 1), today)).toBe(AGE_MIN - 1)
       expect(ageOn(earliest, today)).toBe(AGE_MAX)
       expect(ageOn(yearsBefore(today, AGE_MAX + 1), today)).toBe(AGE_MAX + 1)
     }
@@ -101,6 +102,23 @@ describe('birthDateRange', () => {
 
   it('moves February 29 to February 28 in other years', () => {
     expect(yearsBefore('2028-02-29', 10)).toBe('2018-02-28')
-    expect(nextDay('2026-12-31')).toBe('2027-01-01')
+  })
+})
+
+describe('addDays', () => {
+  it('crosses months and years both ways', () => {
+    expect(addDays('2026-12-31', 1)).toBe('2027-01-01')
+    expect(addDays('2027-01-01', -1)).toBe('2026-12-31')
+    expect(addDays('2028-02-26', 7)).toBe('2028-03-04')
+    expect(addDays('2026-03-01', -1)).toBe('2026-02-28')
+  })
+})
+
+describe('parseIsoDate', () => {
+  it('splits a YYYY-MM-DD date and refuses anything else', () => {
+    expect(parseIsoDate('2007-06-15')).toEqual({ year: 2007, month: 6, day: 15 })
+    expect(parseIsoDate('06/15/2007')).toBeNull()
+    expect(parseIsoDate('2007-6-15')).toBeNull()
+    expect(parseIsoDate('')).toBeNull()
   })
 })
