@@ -51,6 +51,15 @@
     }
   }
 
+  /* A check mark or badge that grows in when an answer is right (`animate-pop`). */
+  --animate-pop: pop 0.3s var(--ease-glide) both;
+  @keyframes pop {
+    from {
+      opacity: 0;
+      scale: 0.4;
+    }
+  }
+
   /* AppSplash: fades in after 0.25s (only slow loads see it), with a sliding loading bar. */
   --animate-splash: splash-in 0.4s ease-out 0.25s both;
   @keyframes splash-in {
