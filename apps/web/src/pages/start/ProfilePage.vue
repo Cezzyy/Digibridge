@@ -5,6 +5,7 @@ import {
   FULL_NAME_MAX_LENGTH,
   INTERNET_ACCESS,
   INTERNET_ACCESS_LABELS,
+  normalizeFullName,
   onlineRespondentSchema,
   SEX_LABELS,
   SEXES,
@@ -107,7 +108,7 @@ for (const field of ['sex', 'devices', 'internetAccess', 'showIdentity'] as cons
 
 // Leaving the name box tidies it the way the API saves it: no extra spaces.
 function leaveName() {
-  form.fullName = form.fullName.trim().replace(/\s+/g, ' ')
+  form.fullName = normalizeFullName(form.fullName)
   touch('fullName')
 }
 
