@@ -37,20 +37,20 @@ export const isRealDate = (date: string): boolean => {
   return !!p && p.month >= 1 && p.month <= 12 && p.day >= 1 && p.day <= daysInMonth(p.year, p.month)
 }
 
+// Built once: the form re-checks the date on every keystroke.
+const philippineDate = new Intl.DateTimeFormat('en-US', {
+  timeZone: PROFILE_TIME_ZONE,
+  year: 'numeric',
+  month: 'numeric',
+  day: 'numeric',
+})
+
 /** Today's date in the Philippines. */
 export const todayInPhilippines = (now = new Date()): IsoDate => {
-  const get = (type: string) =>
-    Number(
-      new Intl.DateTimeFormat('en-US', {
-        timeZone: PROFILE_TIME_ZONE,
-        year: 'numeric',
-        month: 'numeric',
-        day: 'numeric',
-      })
-        .formatToParts(now)
-        .find((part) => part.type === type)?.value,
-    )
-  return toIsoDate(get('year'), get('month'), get('day'))
+  const found = Object.fromEntries(
+    philippineDate.formatToParts(now).map((part) => [part.type, Number(part.value)]),
+  )
+  return toIsoDate(found.year ?? Number.NaN, found.month ?? Number.NaN, found.day ?? Number.NaN)
 }
 
 /**
