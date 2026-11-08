@@ -16,6 +16,12 @@ export type SaveState = 'saving' | 'saved' | 'failed'
 const SOMETHING_WENT_WRONG = 'Something went wrong. Please try again.'
 /** Waits before each retry of a failed save: 3 retries after the first try (TRD). */
 const RETRY_DELAYS_MS = [1000, 2000, 4000]
+/**
+ * When time is up, how long submit waits for saves still on their way before sending anyway.
+ * Waiting through every retry could take the submit past the grace period (it would close as
+ * expired), so the saves get a few seconds and the server scores what it has.
+ */
+const TIME_UP_SAVE_WAIT_MS = 5000
 
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms))
 const messageOf = (err: unknown) =>
@@ -195,7 +201,8 @@ export const useAttemptStore = defineStore('attempt', () => {
   /**
    * Sends the saves still on their way and tries failed ones again, then submits (ASM-08).
    * If an answer still won't save, it stops with `submitError` set, so no answer on screen is
-   * lost, unless `evenIfUnsaved` (time is up: send what the server has). Resolves to the closed
+   * lost, unless `evenIfUnsaved` (time is up: wait a few seconds at most, then send what the
+   * server has). Resolves to the closed
    * attempt, or null with `submitError` set. Safe to call twice: the server returns the closed
    * attempt.
    */
@@ -211,7 +218,7 @@ export const useAttemptStore = defineStore('attempt', () => {
           if (state === 'failed' && choiceId) queue(questionId, choiceId)
         }
       }
-      await flush()
+      await (evenIfUnsaved ? Promise.race([flush(), sleep(TIME_UP_SAVE_WAIT_MS)]) : flush())
       const failed = failedCount()
       if (failed > 0 && !closed.value && !evenIfUnsaved) {
         submitError.value = `${failed === 1 ? '1 answer' : `${failed} answers`} didn’t save. Check your connection, then try again.`
