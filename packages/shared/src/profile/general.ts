@@ -33,13 +33,16 @@ export const FULL_NAME_MESSAGES = {
 /** Starts with a letter; then letters (any language, ñ and accents too), spaces, - ' ’ and . */
 export const FULL_NAME_REGEX = /^\p{L}[\p{L}\p{M} '’.-]*$/u
 
+/** Trimmed, with runs of spaces made one: the name as it's saved. */
+export const normalizeFullName = (name: string): string => name.trim().replace(/\s+/g, ' ')
+
 /**
  * Trimmed, with runs of spaces made one, then checked one rule at a time: filled in, not too
  * long, only name characters, and at least two words (first and last name).
  */
 export const fullNameSchema = z
   .string({ error: FULL_NAME_MESSAGES.missing })
-  .overwrite((name) => name.trim().replace(/\s+/g, ' '))
+  .overwrite(normalizeFullName)
   .min(1, { message: FULL_NAME_MESSAGES.missing, abort: true })
   .max(FULL_NAME_MAX_LENGTH, { message: FULL_NAME_MESSAGES.tooLong, abort: true })
   .regex(FULL_NAME_REGEX, { message: FULL_NAME_MESSAGES.characters, abort: true })
