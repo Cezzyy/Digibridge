@@ -4,7 +4,8 @@ import { onBeforeUnmount, ref, useId, useTemplateRef, watch } from 'vue'
 import CalendarPanel from './CalendarPanel.vue'
 
 // A date typed as MM/DD/YYYY or picked on a calendar (CalendarPanel). Typing adds the slashes;
-// "6/" becomes "06/", and a browser's YYYY-MM-DD autofill is turned around.
+// "6/" typed at the end becomes "06", and a browser's YYYY-MM-DD autofill is turned around.
+// A fix in the middle of the date keeps the caret where it was and never adds a 0.
 //
 // The model is `YYYY-MM-DD` once all eight digits are in, even for a date that doesn't exist
 // (02/30), so the schema can say what's wrong; null when empty; and the typed text while it's
@@ -39,23 +40,47 @@ const toText = (date: string) => {
   return match ? `${match[2]}/${match[3]}/${match[1]}` : date
 }
 
-function format(raw: string) {
+// `padShort` adds the 0 to a one-digit month or day before a slash ("6/" to "06"). Only for
+// typing or pasting at the end: in the middle, deleting the 5 of 06/15 would make it 06/01.
+function format(raw: string, padShort: boolean) {
   const autofill = ISO.exec(raw.trim())
   if (autofill) return toText(raw.trim())
   const parts = raw.replace(/[^\d/]/g, '').split('/')
   const digits = parts
-    .map((part, i) => (i < 2 && i < parts.length - 1 && part.length === 1 ? `0${part}` : part))
+    .map((part, i) =>
+      padShort && i < 2 && i < parts.length - 1 && part.length === 1 ? `0${part}` : part,
+    )
     .join('')
     .slice(0, 8)
   return [digits.slice(0, 2), digits.slice(2, 4), digits.slice(4)].filter(Boolean).join('/')
+}
+
+/** The position just after the `count`th digit of `text`. */
+function afterDigit(text: string, count: number) {
+  if (count === 0) return 0
+  let seen = 0
+  for (let i = 0; i < text.length; i++) {
+    if (/\d/.test(text.charAt(i)) && ++seen === count) return i + 1
+  }
+  return text.length
 }
 
 const text = ref(model.value ? toText(model.value) : '')
 
 function onInput(event: Event) {
   const input = event.target as HTMLInputElement
-  const formatted = format(input.value)
-  if (input.value !== formatted) input.value = formatted
+  const caret = input.selectionStart ?? input.value.length
+  const atEnd = caret === input.value.length
+  const formatted = format(input.value, atEnd)
+  if (input.value !== formatted) {
+    const digitsBefore = input.value.slice(0, caret).replace(/\D/g, '').length
+    // Writing the value moves the caret to the end; put it back after the same digit.
+    input.value = formatted
+    if (!atEnd) {
+      const position = afterDigit(formatted, digitsBefore)
+      input.setSelectionRange(position, position)
+    }
+  }
   text.value = formatted
   const digits = formatted.replace(/\D/g, '')
   model.value =
