@@ -50,6 +50,8 @@ export const useAttemptStore = defineStore('attempt', () => {
   const closed = ref(false)
   const submitting = ref(false)
   const submitError = ref<string | null>(null)
+  /** The team voided the attempt: there's nothing left to submit. */
+  const voided = ref(false)
 
   // The newest choice per question that the server hasn't confirmed, and the save loop running
   // for it. Kept outside Vue's reactivity: only the page's view of them (saveStates) is shown.
@@ -77,6 +79,7 @@ export const useAttemptStore = defineStore('attempt', () => {
     current.value = 0
     closed.value = false
     submitError.value = null
+    voided.value = false
     wanted.clear()
   }
 
@@ -158,9 +161,7 @@ export const useAttemptStore = defineStore('attempt', () => {
     }
   }
 
-  /** Shows the choice and saves it (ASM-04). Ignored once the attempt is closing. */
-  function pick(questionId: string, choiceId: string) {
-    if (closed.value || submitting.value) return
+  function queue(questionId: string, choiceId: string) {
     answers.value = { ...answers.value, [questionId]: choiceId }
     saveStates.value = { ...saveStates.value, [questionId]: 'saving' }
     wanted.set(questionId, choiceId)
@@ -169,6 +170,12 @@ export const useAttemptStore = defineStore('attempt', () => {
       questionId,
       saveLoop(questionId).finally(() => running.delete(questionId)),
     )
+  }
+
+  /** Shows the choice and saves it (ASM-04). Ignored once the attempt is closing. */
+  function pick(questionId: string, choiceId: string) {
+    if (closed.value || submitting.value) return
+    queue(questionId, choiceId)
   }
 
   /** Tries a failed save again. */
@@ -182,21 +189,40 @@ export const useAttemptStore = defineStore('attempt', () => {
     while (running.size > 0) await Promise.all(running.values())
   }
 
+  const failedCount = () =>
+    Object.values(saveStates.value).filter((state) => state === 'failed').length
+
   /**
-   * Sends the saves still on their way, then submits (ASM-08). Resolves to the closed attempt,
-   * or null with `submitError` set. Safe to call twice: the server returns the closed attempt.
+   * Sends the saves still on their way and tries failed ones again, then submits (ASM-08).
+   * If an answer still won't save, it stops with `submitError` set, so no answer on screen is
+   * lost, unless `evenIfUnsaved` (time is up: send what the server has). Resolves to the closed
+   * attempt, or null with `submitError` set. Safe to call twice: the server returns the closed
+   * attempt.
    */
-  async function submit(): Promise<SubmittedAttempt | null> {
+  async function submit({ evenIfUnsaved = false } = {}): Promise<SubmittedAttempt | null> {
     const id = attempt.value?.id
     if (!id) return null
     submitting.value = true
     submitError.value = null
     try {
+      if (!closed.value) {
+        for (const [questionId, state] of Object.entries(saveStates.value)) {
+          const choiceId = answers.value[questionId]
+          if (state === 'failed' && choiceId) queue(questionId, choiceId)
+        }
+      }
       await flush()
+      const failed = failedCount()
+      if (failed > 0 && !closed.value && !evenIfUnsaved) {
+        submitError.value = `${failed === 1 ? '1 answer' : `${failed} answers`} didn’t save. Check your connection, then try again.`
+        return null
+      }
       const result = await call(api.attempts[':id'].submit.$post({ param: { id } }))
       session.setAttempt({ id: result.id, status: result.status })
       return result
     } catch (err) {
+      // The only 409 on submit: the team voided the attempt.
+      if (err instanceof ApiRequestError && err.code === 'conflict') voided.value = true
       submitError.value = messageOf(err)
       return null
     } finally {
@@ -214,6 +240,7 @@ export const useAttemptStore = defineStore('attempt', () => {
     closed,
     submitting,
     submitError,
+    voided,
     answeredCount,
     unsavedCount,
     deadline,
