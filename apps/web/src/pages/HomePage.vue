@@ -26,7 +26,7 @@ const session = useSessionStore()
       </h1>
       <p class="mt-3 text-lg text-quiet">
         You’re signed in as {{ ROLE_LABELS[session.role].toLowerCase() }}. You can go through the
-        student steps to see what they see.
+        student steps to see what they see. It’s only a preview, so nothing you enter is saved.
       </p>
       <RouterLink :to="{ name: 'consent' }" :class="[PRIMARY_BUTTON, 'mt-6']">
         Try the student steps
