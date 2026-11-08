@@ -11,13 +11,15 @@ import {
   ROLE_LABELS,
 } from '@digibridge/shared'
 import { computed } from 'vue'
+import { useRouter } from 'vue-router'
 import InfoRow from '../components/home/InfoRow.vue'
 import { ROW_ICONS, RULE_ICONS } from '../components/home/home-icons'
 import { AREA_DETAILS } from '../components/landing/areas'
 import { STEPS } from '../components/landing/steps'
 import StartLayout from '../components/start/StartLayout.vue'
 import StartSteps from '../components/start/StartSteps.vue'
-import { OFF_BUTTON, PRIMARY_BUTTON } from '../lib/buttons'
+import { useStartAttempt } from '../composables/useStartAttempt'
+import { PRIMARY_BUTTON } from '../lib/buttons'
 import { LEVEL_BANDS, LEVEL_TONE, levelRange } from '../lib/levels'
 import { useSessionStore } from '../stores/session'
 
@@ -26,9 +28,16 @@ import { useSessionStore } from '../stores/session'
 // then, once started or finished, the way back to it or to their results. Staff (later /admin)
 // get a preview of the student steps, which saves nothing.
 //
-// Start and Continue stay switched off until the assessment page exists (Build plan, Stage 1);
-// `useStartAttempt` is ready for Start.
+// Start begins the attempt (the 25-minute timer starts on the server) and opens the assessment;
+// Continue goes back to the one in progress.
 const session = useSessionStore()
+const router = useRouter()
+const { start, starting, error: startError } = useStartAttempt()
+
+async function begin() {
+  // A 409 (no profile, already taken, not ready) reloads /me, so the page follows it.
+  if (await start()) await router.push({ name: 'assessment' })
+}
 
 type View = 'start' | 'in-progress' | 'finished' | 'staff'
 const view = computed<View>(() => {
@@ -431,16 +440,21 @@ const studentSteps = STEPS.slice(1)
           Try the student steps
         </RouterLink>
         <div v-else class="flex shrink-0 flex-col gap-2 sm:flex-row sm:items-center">
-          <p id="opens-soon" class="text-sm font-semibold text-marigold-text sm:order-first">
-            The assessment opens soon
+          <p
+            v-if="startError"
+            role="alert"
+            class="text-sm font-semibold text-error sm:order-first sm:max-w-xs"
+          >
+            {{ startError }}
           </p>
           <button
+            v-if="view === 'start'"
             type="button"
-            aria-disabled="true"
-            aria-describedby="opens-soon"
-            :class="OFF_BUTTON"
+            :class="PRIMARY_BUTTON"
+            :disabled="starting"
+            @click="begin"
           >
-            {{ view === 'start' ? 'Start' : 'Continue' }}
+            {{ starting ? 'Starting…' : 'Start' }}
             <svg
               viewBox="0 0 16 16"
               aria-hidden="true"
@@ -449,6 +463,16 @@ const studentSteps = STEPS.slice(1)
               <path d="M6 3.5 10.5 8 6 12.5" stroke-linecap="round" stroke-linejoin="round" />
             </svg>
           </button>
+          <RouterLink v-else :to="{ name: 'assessment' }" :class="PRIMARY_BUTTON">
+            Continue
+            <svg
+              viewBox="0 0 16 16"
+              aria-hidden="true"
+              class="size-4 fill-none stroke-current stroke-[2.5]"
+            >
+              <path d="M6 3.5 10.5 8 6 12.5" stroke-linecap="round" stroke-linejoin="round" />
+            </svg>
+          </RouterLink>
         </div>
       </div>
     </template>
