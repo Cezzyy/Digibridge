@@ -15,7 +15,7 @@
 --
 -- Text uses typographic quotes (’ “ ”), so no SQL escaping is needed. In a stem, a blank line
 -- starts a new paragraph, and a paragraph wrapped in “ and ” (a text, a post, an email) is shown
--- as a message card on the assessment page.
+-- as a quote on the assessment page.
 
 begin;
 
