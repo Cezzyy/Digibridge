@@ -14,9 +14,8 @@ import BrandMark from './BrandMark.vue'
         DigiBridge
       </p>
       <p class="max-w-2xl leading-relaxed sm:text-right">
-        A research prototype for the study
-        <i>DigiBridge: Digital Literacy Assessment Framework and Digital Inclusion</i>, 2026. Built
-        on DigComp 2.2.
+        Check your digital skills and find lessons that fit your level. Built on DigComp 2.2. © 2026
+        DigiBridge.
       </p>
     </div>
   </footer>

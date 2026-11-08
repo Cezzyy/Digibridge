@@ -3,6 +3,7 @@ import {
   AREA_CODES,
   AREA_MAX_POINTS,
   ATTEMPT_DURATION_MINUTES,
+  DATA_KEPT_UNTIL,
   ITEMS_PER_AREA,
   ITEMS_PER_ATTEMPT,
   LEVELS,
@@ -51,7 +52,7 @@ onMounted(() => {
 onBeforeUnmount(() => stopCounting?.())
 
 const PRIVACY = [
-  { icon: 'lock', text: 'Only the DigiBridge research team can see your answers.' },
+  { icon: 'lock', text: 'Only the DigiBridge team can see your answers.' },
   {
     icon: 'hide',
     text: 'You choose whether the team can see who you are. If you say no, you show up as Hidden.',
@@ -62,7 +63,7 @@ const PRIVACY = [
   },
   {
     icon: 'calendar',
-    text: 'Your data is deleted when the study ends, and you can ask for it to be deleted sooner.',
+    text: `We keep your data until ${DATA_KEPT_UNTIL}, then delete it. You can ask for it to be deleted sooner.`,
   },
 ] as const
 
