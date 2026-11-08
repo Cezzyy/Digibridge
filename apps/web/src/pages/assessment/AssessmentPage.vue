@@ -30,22 +30,29 @@ const ready = computed(() => store.attempt !== null && store.attempt.id === atte
 
 const goHome = () => router.replace({ name: 'home' })
 
+/** Goes home after fetching /me again, when the attempt here is no longer the student's one. */
+async function leave() {
+  await session.loadMe()
+  await goHome()
+}
+
 async function load() {
   loadError.value = null
   const id = attemptId.value
   if (!id) return goHome()
   try {
     const data = await store.load(id)
+    // Voided: /me leaves it out, so ask /me again rather than storing it (home would read it
+    // as finished). The student can start again.
+    if (data.status === 'voided') return leave()
     if (data.status !== 'in_progress') {
       session.setAttempt({ id: data.id, status: data.status })
       await goHome()
     }
   } catch (err) {
     if (err instanceof ApiRequestError && (err.code === 'not_found' || err.code === 'forbidden')) {
-      // The attempt was voided or the account changed: let /me and home sort it out.
-      await session.loadMe()
-      await goHome()
-      return
+      // The account changed: let /me and home sort it out.
+      return leave()
     }
     loadError.value =
       err instanceof ApiRequestError ? err.message : 'Something went wrong. Please try again.'
@@ -84,11 +91,13 @@ function showGrid() {
 const dialogOpen = ref(false)
 const timeUp = computed(() => ready.value && (remainingMs.value === 0 || store.closed))
 
-async function submit() {
-  const result = await store.submit()
+async function submit({ evenIfUnsaved = false } = {}) {
+  const result = await store.submit({ evenIfUnsaved })
   if (result) {
     dialogOpen.value = false
     await goHome()
+  } else if (store.voided) {
+    await leave()
   }
 }
 
@@ -99,7 +108,7 @@ watch(
   (up) => {
     if (!up) return
     dialogOpen.value = false
-    void submit()
+    void submit({ evenIfUnsaved: true })
   },
   { immediate: true },
 )
@@ -299,7 +308,7 @@ function openDialog() {
       :unsaved="store.unsavedCount"
       :submitting="store.submitting"
       :error="store.submitError"
-      @confirm="submit"
+      @confirm="submit()"
       @close="dialogOpen = false"
     />
 
@@ -339,7 +348,7 @@ function openDialog() {
           :class="[PRIMARY_BUTTON, 'mt-6 w-full sm:w-auto']"
           :disabled="store.submitting"
           autofocus
-          @click="submit"
+          @click="submit({ evenIfUnsaved: true })"
         >
           {{ store.submitting ? 'Sending…' : 'Try again' }}
         </button>
