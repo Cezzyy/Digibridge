@@ -10,7 +10,7 @@ import {
   LEVEL_LABELS,
   ROLE_LABELS,
 } from '@digibridge/shared'
-import { computed } from 'vue'
+import { computed, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import InfoRow from '../components/home/InfoRow.vue'
 import { ROW_ICONS, RULE_ICONS } from '../components/home/home-icons'
@@ -24,9 +24,9 @@ import { LEVEL_BANDS, LEVEL_TONE, levelRange } from '../lib/levels'
 import { useSessionStore } from '../stores/session'
 
 // Where signed-in users land. Respondents without a profile never see it: the `step` guard sends
-// them to the privacy notice. Respondents see their next step: the assessment's rules and Start,
-// then, once started or finished, the way back to it or to their results. Staff (later /admin)
-// get a preview of the student steps, which saves nothing.
+// them to the privacy notice, and those who have finished go to their results. Respondents see
+// their next step: the assessment's rules and Start, then, once started, the way back to it.
+// Staff (later /admin) get a preview of the student steps, which saves nothing.
 //
 // Start begins the attempt (the 25-minute timer starts on the server) and opens the assessment;
 // Continue goes back to the one in progress.
@@ -39,19 +39,20 @@ async function begin() {
   if (await start()) await router.push({ name: 'assessment' })
 }
 
-type View = 'start' | 'in-progress' | 'finished' | 'staff'
+// The step guard sends finished respondents to /results; this follows /me when it changes while
+// home is open, e.g. when Start finds the assessment already taken.
+const finished = computed(() => {
+  const status = session.me?.attempt?.status
+  return status === 'submitted' || status === 'expired'
+})
+watch(finished, (done) => done && void router.replace({ name: 'results' }))
+
+type View = 'start' | 'in-progress' | 'staff'
 const view = computed<View>(() => {
   const me = session.me
   if (!me?.respondent) return 'staff'
   // /me leaves out a voided attempt, so a respondent whose attempt was voided can start again.
-  switch (me.attempt?.status) {
-    case undefined:
-      return 'start'
-    case 'in_progress':
-      return 'in-progress'
-    default:
-      return 'finished'
-  }
+  return me.attempt?.status === 'in_progress' ? 'in-progress' : 'start'
 })
 
 const name = computed(
@@ -67,10 +68,6 @@ const HEADINGS: Record<View, { title: string; lead: string }> = {
   'in-progress': {
     title: 'Welcome back',
     lead: 'You’ve started the assessment. Your answers are saved, and the timer is still running.',
-  },
-  finished: {
-    title: 'Well done',
-    lead: 'You’ve finished the assessment. Your level and lessons will show up here.',
   },
   staff: {
     title: 'Hi',
@@ -139,7 +136,7 @@ const studentSteps = STEPS.slice(1)
       <!-- Phones show the step bar above the heading; desktops list the steps under it. -->
       <StartSteps
         v-if="view !== 'staff'"
-        :current="view === 'finished' ? 'results' : 'questions'"
+        current="questions"
         class="mb-6 lg:order-1 lg:mt-10 lg:mb-0"
       />
       <p
@@ -206,54 +203,33 @@ const studentSteps = STEPS.slice(1)
       </div>
     </template>
 
-    <!-- Started or finished: one message in the middle of the page. -->
+    <!-- Started: one message in the middle of the page. -->
     <section
-      v-if="view === 'in-progress' || view === 'finished'"
+      v-if="view === 'in-progress'"
       class="mx-auto flex max-w-2xl flex-col justify-center py-6 motion-safe:animate-rise lg:min-h-[calc(100svh-var(--spacing-header)-6rem)]"
       aria-labelledby="status-title"
     >
-      <span
-        class="grid size-14 place-items-center rounded-full"
-        :class="view === 'finished' ? 'bg-evergreen-soft' : 'bg-marigold-soft'"
-      >
+      <span class="grid size-14 place-items-center rounded-full bg-marigold-soft">
         <svg
           viewBox="0 0 24 24"
           aria-hidden="true"
-          class="size-7 fill-none stroke-2"
-          :class="view === 'finished' ? 'stroke-evergreen' : 'stroke-marigold-text'"
+          class="size-7 fill-none stroke-marigold-text stroke-2"
           stroke-linecap="round"
           stroke-linejoin="round"
         >
-          <path
-            v-for="d in view === 'finished' ? ROW_ICONS.levels : RULE_ICONS.timer"
-            :key="d"
-            :d="d"
-          />
+          <path v-for="d in RULE_ICONS.timer" :key="d" :d="d" />
         </svg>
       </span>
-      <template v-if="view === 'in-progress'">
-        <h2
-          id="status-title"
-          class="mt-6 text-3xl leading-tight font-bold tracking-[-0.02em] text-balance sm:text-4xl"
-        >
-          Pick up where you left off
-        </h2>
-        <p class="mt-4 text-lg leading-relaxed text-quiet">
-          Your answers so far are saved. The timer kept running while you were away, so go back to
-          the questions soon.
-        </p>
-      </template>
-      <template v-else>
-        <h2
-          id="status-title"
-          class="mt-6 text-3xl leading-tight font-bold tracking-[-0.02em] text-balance sm:text-4xl"
-        >
-          Your results are on the way
-        </h2>
-        <p class="mt-4 text-lg leading-relaxed text-quiet">
-          You’ll see your level in each skill area here, with lessons that fit it. Check back soon.
-        </p>
-      </template>
+      <h2
+        id="status-title"
+        class="mt-6 text-3xl leading-tight font-bold tracking-[-0.02em] text-balance sm:text-4xl"
+      >
+        Pick up where you left off
+      </h2>
+      <p class="mt-4 text-lg leading-relaxed text-quiet">
+        Your answers so far are saved. The timer kept running while you were away, so go back to the
+        questions soon.
+      </p>
     </section>
 
     <article
@@ -413,7 +389,7 @@ const studentSteps = STEPS.slice(1)
       </ol>
     </article>
 
-    <template v-if="view !== 'finished'" #actions>
+    <template #actions>
       <div class="flex flex-col gap-4 md:flex-row md:items-center md:justify-between md:gap-8">
         <p class="flex items-center gap-3 leading-snug">
           <span
