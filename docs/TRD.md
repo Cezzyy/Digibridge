@@ -197,7 +197,7 @@ All routes live under `/api/v1` (only the OpenAPI spec and docs page sit at `/ap
 | GET | `/api/v1/attempts/:id` | Self | Items in shuffled order (no correct answers), saved answers, `expires_at`, server time |
 | PUT | `/api/v1/attempts/:id/answers/:questionId` | Self | Save or change one answer. Rejected after `expires_at` + 30 s. |
 | POST | `/api/v1/attempts/:id/submit` | Self | Score and close the attempt, create `results_token`. Safe to call twice. |
-| GET | `/api/v1/attempts/:id/result` | Self | Overall and per-area scores, levels, recommended lessons, `results_token` and whether SUS is answered |
+| GET | `/api/v1/attempts/:id/result` | Self | Overall and per-area scores, levels, recommended lessons (each tier for the area's level, with its published lesson or `null`), `results_token` and whether SUS is answered. No per-item marks. 409 while in progress or voided. |
 | POST | `/api/v1/attempts/:id/sus` | Self | Save the 10 SUS answers and return the score. 409 if already answered. |
 | GET | `/api/v1/results/:token` | Public | Results and lessons by private token, opened from the QR code (RES-04) |
 | GET | `/api/v1/lessons` | Public | Published lessons, filterable by area and tier |
@@ -337,8 +337,8 @@ The profile page is one component with a `mode` prop: online shows the general f
 - `CountdownTimer`: mm:ss, turns amber at 5 minutes and red at 1 minute, fires `expired`
 - `QuestionGrid`: 30 numbered cells, answered or unanswered, tap to jump
 - `SubmitDialog`: unanswered count and confirm
-- `RadarChart`: 3 axes, 0 to 100
-- `LevelBadge`, `LessonCard`
+- `RadarChart`: 3 axes, 0 to 100, over rings colored by level (Chart.js; the results page is lazy-loaded so the first load stays small)
+- `LevelBadge`, `ScoreBar`, `LessonCard`
 - `StatCard`, `FilterBar`, `BarChart`, `DataTable` for the dashboard
 - `MarkdownEditor`: textarea with live preview for lessons
 
