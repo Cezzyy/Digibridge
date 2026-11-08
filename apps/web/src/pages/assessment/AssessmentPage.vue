@@ -122,20 +122,25 @@ function openDialog() {
   />
 
   <div v-else class="flex min-h-dvh flex-col">
-    <!-- Its own top bar: the timer stays in view, and Sign out is still there (AUTH-03). -->
-    <header class="sticky top-0 z-30 border-b border-line bg-surface">
-      <div class="flex h-header items-center justify-between gap-3 px-4 sm:px-8 lg:px-10">
+    <!-- Its own top bar: the timer stays in view, and Sign out is still there (AUTH-03). The
+         progress bar is its bottom edge, so the header is exactly h-header tall. -->
+    <header class="sticky top-0 z-30 bg-surface">
+      <div
+        class="grid h-header grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-3 px-4 sm:px-8 lg:px-10"
+      >
         <RouterLink
           :to="{ name: 'home' }"
-          class="flex min-h-11 items-center gap-2.5 font-display text-xl font-bold text-evergreen"
+          class="flex min-h-11 items-center gap-2.5 justify-self-start font-display text-xl font-bold text-evergreen"
         >
           <BrandMark class="size-8" />
           <span class="sr-only sm:not-sr-only">DigiBridge</span>
         </RouterLink>
         <CountdownTimer v-if="remainingMs !== null" :remaining-ms="remainingMs" />
-        <AccountControls />
+        <div class="col-start-3 flex min-w-0 justify-end">
+          <AccountControls />
+        </div>
       </div>
-      <div class="h-1 bg-track" aria-hidden="true">
+      <div class="absolute inset-x-0 bottom-0 h-1 bg-track" aria-hidden="true">
         <div
           class="h-full bg-evergreen transition-[width] duration-500 ease-glide"
           :style="{ width: `${progress}%` }"
@@ -143,31 +148,39 @@ function openDialog() {
       </div>
     </header>
 
+    <!-- Across the whole screen. Phones and tablets: the question, then the answers panel, with
+         Back and Next stuck to the bottom. Desktops: the question on the left with Back and Next
+         under it, and the answers panel on the right, full height, staying put as the page
+         scrolls (the start pages' side panel, on the other side). -->
     <main
       v-if="ready && item"
-      class="mx-auto w-full max-w-6xl flex-1 px-4 py-6 sm:px-8 sm:py-8 lg:grid lg:grid-cols-[minmax(0,1fr)_19rem] lg:items-start lg:gap-10 lg:px-10 lg:py-10"
+      class="flex-1 lg:grid lg:grid-cols-[minmax(0,1fr)_20rem] lg:grid-rows-[1fr_auto] xl:grid-cols-[minmax(0,1fr)_22rem] 2xl:grid-cols-[minmax(0,1fr)_24rem] 3xl:grid-cols-[minmax(0,1fr)_26rem]"
     >
       <h1 class="sr-only">Assessment</h1>
 
-      <QuestionCard
-        :key="item.id"
-        ref="card"
-        class="motion-safe:animate-enter"
-        :item="item"
-        :number="store.current + 1"
-        :total="total"
-        :picked="store.answers[item.id] ?? null"
-        :save-state="store.saveStates[item.id] ?? null"
-        :locked="timeUp || store.submitting"
-        @pick="store.pick(item.id, $event)"
-        @retry="store.retry(item.id)"
-      />
+      <div
+        class="px-4 pt-6 sm:px-8 sm:pt-8 lg:col-start-1 lg:row-start-1 lg:px-10 lg:py-10 xl:px-14 2xl:px-12 3xl:px-16"
+      >
+        <QuestionCard
+          :key="item.id"
+          ref="card"
+          class="motion-safe:animate-enter"
+          :item="item"
+          :number="store.current + 1"
+          :total="total"
+          :picked="store.answers[item.id] ?? null"
+          :save-state="store.saveStates[item.id] ?? null"
+          :locked="timeUp || store.submitting"
+          @pick="store.pick(item.id, $event)"
+          @retry="store.retry(item.id)"
+        />
+      </div>
 
       <aside
         ref="gridSection"
         aria-labelledby="grid-title"
         tabindex="-1"
-        class="mt-6 scroll-mt-[calc(var(--spacing-header)+1rem)] rounded-card border border-line bg-surface p-4 focus:outline-none sm:p-5 lg:sticky lg:top-[calc(var(--spacing-header)+2.5rem)] lg:mt-0"
+        class="mx-4 my-6 scroll-mt-[calc(var(--spacing-header)+1rem)] rounded-card border border-line bg-surface p-4 focus:outline-none sm:mx-8 sm:my-8 sm:p-5 lg:sticky lg:top-header lg:col-start-2 lg:row-span-2 lg:row-start-1 lg:m-0 lg:flex lg:h-[calc(100svh-var(--spacing-header))] lg:flex-col lg:self-start lg:overflow-y-auto lg:rounded-none lg:border-y-0 lg:border-r-0 lg:p-6 xl:p-8"
       >
         <h2 id="grid-title" class="text-lg font-bold">Your answers</h2>
         <p class="mt-0.5 text-quiet">
@@ -181,15 +194,92 @@ function openDialog() {
           :current="store.current"
           @jump="show"
         />
-        <button
-          type="button"
-          :class="[SECONDARY_BUTTON, 'mt-5 w-full']"
-          :disabled="store.submitting"
-          @click="openDialog"
-        >
-          Submit answers
-        </button>
+        <div class="mt-5 lg:mt-auto lg:pt-6">
+          <p class="mb-3 hidden text-sm text-quiet lg:block">
+            You can change any answer until you submit.
+          </p>
+          <button
+            type="button"
+            :class="[SECONDARY_BUTTON, 'w-full']"
+            :disabled="store.submitting"
+            @click="openDialog"
+          >
+            Submit answers
+          </button>
+        </div>
       </aside>
+
+      <div
+        class="sticky bottom-0 z-20 border-t border-line bg-surface/95 backdrop-blur lg:col-start-1 lg:row-start-2"
+      >
+        <div
+          class="flex items-center justify-between gap-3 px-4 py-3 sm:px-8 lg:px-10 xl:px-14 2xl:px-12 3xl:px-16"
+        >
+          <!-- Hidden, not disabled, on the first question, so Next stays in the same place. -->
+          <button
+            type="button"
+            :class="[SECONDARY_BUTTON, 'px-4 sm:px-6', store.current === 0 && 'invisible']"
+            @click="show(store.current - 1)"
+          >
+            <svg
+              viewBox="0 0 16 16"
+              aria-hidden="true"
+              class="size-4 fill-none stroke-current stroke-[2.5]"
+            >
+              <path d="M10 3.5 5.5 8l4.5 4.5" stroke-linecap="round" stroke-linejoin="round" />
+            </svg>
+            Back
+          </button>
+
+          <!-- Phones and tablets have the grid under the question: this takes them there. -->
+          <button
+            type="button"
+            class="flex min-h-11 items-center gap-1.5 rounded-control px-3 text-sm font-semibold text-quiet tabular-nums hover:bg-mist-soft lg:hidden"
+            @click="showGrid"
+          >
+            {{ store.current + 1 }} / {{ total }}
+            <span class="sr-only">, see all questions</span>
+            <svg
+              viewBox="0 0 16 16"
+              aria-hidden="true"
+              class="size-4 fill-none stroke-current stroke-2"
+            >
+              <path d="M4 6.5 8 10.5l4-4" stroke-linecap="round" stroke-linejoin="round" />
+            </svg>
+          </button>
+          <p
+            class="hidden text-sm font-semibold text-quiet tabular-nums lg:block"
+            aria-hidden="true"
+          >
+            {{ store.current + 1 }} / {{ total }}
+          </p>
+
+          <button
+            v-if="!isLast"
+            type="button"
+            :class="[PRIMARY_BUTTON, 'px-4 sm:px-6']"
+            @click="show(store.current + 1)"
+          >
+            Next
+            <svg
+              viewBox="0 0 16 16"
+              aria-hidden="true"
+              class="size-4 fill-none stroke-current stroke-[2.5]"
+            >
+              <path d="M6 3.5 10.5 8 6 12.5" stroke-linecap="round" stroke-linejoin="round" />
+            </svg>
+          </button>
+          <button
+            v-else
+            type="button"
+            :class="[PRIMARY_BUTTON, 'px-4 sm:px-6']"
+            :disabled="store.submitting"
+            @click="openDialog"
+          >
+            Finish
+          </button>
+        </div>
+      </div>
     </main>
 
     <main v-else class="grid flex-1 place-items-center px-4" aria-busy="true">
@@ -201,76 +291,6 @@ function openDialog() {
         Loading your {{ ITEMS_PER_ATTEMPT }} questions…
       </p>
     </main>
-
-    <div
-      v-if="ready && item"
-      class="sticky bottom-0 z-20 border-t border-line bg-surface/95 backdrop-blur"
-    >
-      <div
-        class="mx-auto flex max-w-6xl items-center justify-between gap-3 px-4 py-3 sm:px-8 lg:px-10"
-      >
-        <!-- Hidden, not disabled, on the first question, so Next stays in the same place. -->
-        <button
-          type="button"
-          :class="[SECONDARY_BUTTON, 'px-4 sm:px-6', store.current === 0 && 'invisible']"
-          @click="show(store.current - 1)"
-        >
-          <svg
-            viewBox="0 0 16 16"
-            aria-hidden="true"
-            class="size-4 fill-none stroke-current stroke-[2.5]"
-          >
-            <path d="M10 3.5 5.5 8l4.5 4.5" stroke-linecap="round" stroke-linejoin="round" />
-          </svg>
-          Back
-        </button>
-
-        <!-- Phones and tablets have the grid under the question: this takes them there. -->
-        <button
-          type="button"
-          class="flex min-h-11 items-center gap-1.5 rounded-control px-3 text-sm font-semibold text-quiet tabular-nums hover:bg-mist-soft lg:hidden"
-          @click="showGrid"
-        >
-          {{ store.current + 1 }} / {{ total }}
-          <span class="sr-only">, see all questions</span>
-          <svg
-            viewBox="0 0 16 16"
-            aria-hidden="true"
-            class="size-4 fill-none stroke-current stroke-2"
-          >
-            <path d="M4 6.5 8 10.5l4-4" stroke-linecap="round" stroke-linejoin="round" />
-          </svg>
-        </button>
-        <p class="hidden text-sm font-semibold text-quiet tabular-nums lg:block" aria-hidden="true">
-          {{ store.current + 1 }} / {{ total }}
-        </p>
-
-        <button
-          v-if="!isLast"
-          type="button"
-          :class="[PRIMARY_BUTTON, 'px-4 sm:px-6']"
-          @click="show(store.current + 1)"
-        >
-          Next
-          <svg
-            viewBox="0 0 16 16"
-            aria-hidden="true"
-            class="size-4 fill-none stroke-current stroke-[2.5]"
-          >
-            <path d="M6 3.5 10.5 8 6 12.5" stroke-linecap="round" stroke-linejoin="round" />
-          </svg>
-        </button>
-        <button
-          v-else
-          type="button"
-          :class="[PRIMARY_BUTTON, 'px-4 sm:px-6']"
-          :disabled="store.submitting"
-          @click="openDialog"
-        >
-          Finish
-        </button>
-      </div>
-    </div>
 
     <SubmitDialog
       :open="dialogOpen && !timeUp"
@@ -286,14 +306,14 @@ function openDialog() {
     <!-- Time is up: the answers go by themselves. Covers the page so nothing else can change. -->
     <div
       v-if="timeUp"
-      class="fixed inset-0 z-40 grid place-items-center bg-ink/55 p-4"
+      class="fixed inset-0 z-40 grid place-items-center bg-ink/50 p-4"
       role="alertdialog"
       aria-modal="true"
       aria-labelledby="time-up-title"
       aria-describedby="time-up-body"
     >
       <div
-        class="w-full max-w-md rounded-card bg-surface p-6 text-center shadow-[0_30px_60px_-20px_rgb(18_36_28/0.45)] motion-safe:animate-rise sm:p-7"
+        class="w-full max-w-md rounded-card bg-surface p-6 text-center shadow-lg motion-safe:animate-rise sm:p-7"
       >
         <span class="mx-auto grid size-14 place-items-center rounded-full bg-marigold-soft">
           <svg

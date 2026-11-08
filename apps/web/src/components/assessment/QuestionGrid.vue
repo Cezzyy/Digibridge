@@ -14,7 +14,7 @@ defineEmits<{ jump: [index: number] }>()
 
 <template>
   <nav aria-label="Questions">
-    <ol class="grid grid-cols-6 gap-1.5 sm:grid-cols-10 lg:grid-cols-6">
+    <ol class="grid grid-cols-6 gap-1.5 sm:grid-cols-10 lg:grid-cols-5 2xl:grid-cols-6">
       <li v-for="(id, i) in itemIds" :key="id">
         <button
           type="button"
