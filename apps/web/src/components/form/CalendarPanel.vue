@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { daysInMonth, isRealDate, toIsoDate } from '@digibridge/shared'
+import { addDays, daysInMonth, isRealDate, parseIsoDate, toIsoDate } from '@digibridge/shared'
 import { computed, nextTick, onMounted, ref, useTemplateRef } from 'vue'
 
 // The calendar that opens from DateField. With nothing picked it starts on the years, then
@@ -39,9 +39,11 @@ const WEEKDAYS = [
   ['Sa', 'Saturday'],
 ] as const
 
+// Only given `min`, `max` and a picked date that passed isRealDate, so it always parses.
 const parse = (date: string): Ymd => {
-  const [year = 0, month = 1, day = 1] = date.split('-').map(Number)
-  return { year, month, day }
+  const d = parseIsoDate(date)
+  if (!d) throw new Error(`Not a YYYY-MM-DD date: ${date}`)
+  return d
 }
 const iso = (d: Ymd) => toIsoDate(d.year, d.month, d.day)
 const longDate = (d: Ymd) => `${MONTHS[d.month - 1]?.long} ${d.day}, ${d.year}`
@@ -84,10 +86,8 @@ function moveTo(d: Ymd, focus = true) {
   cursor.value = clamp(d)
   if (focus) void focusCursor()
 }
-function addDays(n: number) {
-  const { year, month, day } = cursor.value
-  const t = new Date(Date.UTC(year, month - 1, day + n))
-  moveTo({ year: t.getUTCFullYear(), month: t.getUTCMonth() + 1, day: t.getUTCDate() })
+function moveDays(n: number) {
+  moveTo(parse(addDays(iso(cursor.value), n)))
 }
 function addMonths(n: number, focus = true) {
   const total = cursor.value.year * 12 + cursor.value.month - 1 + n
@@ -161,12 +161,12 @@ function onKeydown(event: KeyboardEvent) {
       ArrowDown: () => month < 10 && addMonths(3),
     },
     days: {
-      ArrowLeft: () => addDays(-1),
-      ArrowRight: () => addDays(1),
-      ArrowUp: () => addDays(-7),
-      ArrowDown: () => addDays(7),
-      Home: () => addDays(-new Date(Date.UTC(year, month - 1, cursor.value.day)).getUTCDay()),
-      End: () => addDays(6 - new Date(Date.UTC(year, month - 1, cursor.value.day)).getUTCDay()),
+      ArrowLeft: () => moveDays(-1),
+      ArrowRight: () => moveDays(1),
+      ArrowUp: () => moveDays(-7),
+      ArrowDown: () => moveDays(7),
+      Home: () => moveDays(-new Date(Date.UTC(year, month - 1, cursor.value.day)).getUTCDay()),
+      End: () => moveDays(6 - new Date(Date.UTC(year, month - 1, cursor.value.day)).getUTCDay()),
       PageUp: () => addMonths(event.shiftKey ? -12 : -1),
       PageDown: () => addMonths(event.shiftKey ? 12 : 1),
     },

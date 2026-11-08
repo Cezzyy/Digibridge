@@ -24,16 +24,23 @@ export const toIsoDate = (year: number, month: number, day: number): IsoDate =>
 export const daysInMonth = (year: number, month: number): number =>
   new Date(Date.UTC(year, month, 0)).getUTCDate()
 
-const parts = (date: string) => {
+/** A `YYYY-MM-DD` date's year, month (1 to 12) and day, or null if it isn't in that shape. */
+export const parseIsoDate = (date: string): { year: number; month: number; day: number } | null => {
   const match = ISO_DATE.exec(date)
   if (!match) return null
   const [year, month, day] = match.slice(1).map(Number) as [number, number, number]
   return { year, month, day }
 }
 
+const mustParse = (date: string) => {
+  const p = parseIsoDate(date)
+  if (!p) throw new Error(`Not a YYYY-MM-DD date: ${date}`)
+  return p
+}
+
 /** True for a `YYYY-MM-DD` date that exists (no February 30). */
 export const isRealDate = (date: string): boolean => {
-  const p = parts(date)
+  const p = parseIsoDate(date)
   return !!p && p.month >= 1 && p.month <= 12 && p.day >= 1 && p.day <= daysInMonth(p.year, p.month)
 }
 
@@ -58,8 +65,8 @@ export const todayInPhilippines = (now = new Date()): IsoDate => {
  * March 1 in other years, which matches Postgres's `date - interval 'n years'`.
  */
 export const ageOn = (birthDate: string, onDate: string): number => {
-  const born = parts(birthDate)
-  const on = parts(onDate)
+  const born = parseIsoDate(birthDate)
+  const on = parseIsoDate(onDate)
   if (!born || !on) return Number.NaN
   const hadBirthday = on.month > born.month || (on.month === born.month && on.day >= born.day)
   return on.year - born.year - (hadBirthday ? 0 : 1)
@@ -67,17 +74,15 @@ export const ageOn = (birthDate: string, onDate: string): number => {
 
 /** The same day `years` years earlier. February 29 becomes February 28 in other years. */
 export const yearsBefore = (date: string, years: number): IsoDate => {
-  const p = parts(date)
-  if (!p) throw new Error(`Not a YYYY-MM-DD date: ${date}`)
+  const p = mustParse(date)
   const year = p.year - years
   return toIsoDate(year, p.month, Math.min(p.day, daysInMonth(year, p.month)))
 }
 
-/** The day after `date`. */
-export const nextDay = (date: string): IsoDate => {
-  const p = parts(date)
-  if (!p) throw new Error(`Not a YYYY-MM-DD date: ${date}`)
-  const next = new Date(Date.UTC(p.year, p.month - 1, p.day + 1))
+/** The date `days` days after `date` (before it, when `days` is negative). */
+export const addDays = (date: string, days: number): IsoDate => {
+  const p = mustParse(date)
+  const next = new Date(Date.UTC(p.year, p.month - 1, p.day + days))
   return toIsoDate(next.getUTCFullYear(), next.getUTCMonth() + 1, next.getUTCDate())
 }
 
@@ -87,7 +92,7 @@ export const nextDay = (date: string): IsoDate => {
  * `respondents_birth_date_range` check.
  */
 export const birthDateRange = (today: string = todayInPhilippines()) => ({
-  earliest: nextDay(yearsBefore(today, AGE_MAX + 1)),
+  earliest: addDays(yearsBefore(today, AGE_MAX + 1), 1),
   latest: yearsBefore(today, AGE_MIN),
 })
 

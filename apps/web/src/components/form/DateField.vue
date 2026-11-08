@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { toIsoDate } from '@digibridge/shared'
+import { parseIsoDate, toIsoDate } from '@digibridge/shared'
 import { onBeforeUnmount, ref, useId, useTemplateRef, watch } from 'vue'
 import CalendarPanel from './CalendarPanel.vue'
 
@@ -34,17 +34,17 @@ const ids = {
   panel: `${id}-calendar`,
 }
 
-const ISO = /^(\d{4})-(\d{2})-(\d{2})$/
+/** `YYYY-MM-DD` as `MM/DD/YYYY`; anything else as it is. */
 const toText = (date: string) => {
-  const match = ISO.exec(date)
-  return match ? `${match[2]}/${match[3]}/${match[1]}` : date
+  if (!parseIsoDate(date)) return date
+  const [year, month, day] = date.split('-')
+  return `${month}/${day}/${year}`
 }
 
 // `padShort` adds the 0 to a one-digit month or day before a slash ("6/" to "06"). Only for
 // typing or pasting at the end: in the middle, deleting the 5 of 06/15 would make it 06/01.
 function format(raw: string, padShort: boolean) {
-  const autofill = ISO.exec(raw.trim())
-  if (autofill) return toText(raw.trim())
+  if (parseIsoDate(raw.trim())) return toText(raw.trim())
   const parts = raw.replace(/[^\d/]/g, '').split('/')
   const digits = parts
     .map((part, i) =>
@@ -94,7 +94,7 @@ function onInput(event: Event) {
 // A date set from outside (or picked) shows in the box.
 watch(model, (value) => {
   if (value === null) text.value = ''
-  else if (ISO.test(value) && toText(value) !== text.value) text.value = toText(value)
+  else if (parseIsoDate(value) && toText(value) !== text.value) text.value = toText(value)
 })
 
 const open = ref(false)
