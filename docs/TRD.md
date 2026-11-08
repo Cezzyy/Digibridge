@@ -315,7 +315,7 @@ One Vue app serves respondents, kiosk devices and admins, split by route guards.
 | `public` | `/lessons/*` | Anyone |
 | `guest` | `/`, `/sign-in` | Signed out only, else to `/home` |
 | `signedIn` | `/home`, `/start/*`, `/assessment`, `/results` | Supabase session required, else to `/sign-in` |
-| `step` | `/start/profile`, `/start/ready`, `/assessment`, `/results` | Sends the user to the right step from `/api/v1/me` (no profile → consent; attempt submitted → results) |
+| `step` | `/home`, `/start/*`, `/assessment`, `/results` | Sends the user to the right step from `/api/v1/me` (no profile → consent; attempt submitted → results) |
 
 The profile page is one component with a `mode` prop: online shows the general fields only; under `/kiosk/*` it adds student number, course and year level.
 | `kioskLock` | Every route | If a kiosk session is open on this device, anything outside `/kiosk/*` redirects to `/kiosk` |
