@@ -42,11 +42,10 @@ async function begin() {
 // The step guard sends finished respondents to /results; this follows /me when it changes while
 // home is open, e.g. when Start finds the assessment already taken. Until /results opens (its
 // code may still be downloading), Start stays disabled, so it can't be tapped again.
-const finished = computed(() => {
-  const status = session.me?.attempt?.status
-  return status === 'submitted' || status === 'expired'
-})
-watch(finished, (done) => done && void router.replace({ name: 'results' }))
+watch(
+  () => session.attemptFinished,
+  (done) => done && void router.replace({ name: 'results' }),
+)
 
 type View = 'start' | 'in-progress' | 'staff'
 const view = computed<View>(() => {
@@ -428,10 +427,12 @@ const studentSteps = STEPS.slice(1)
             v-if="view === 'start'"
             type="button"
             :class="PRIMARY_BUTTON"
-            :disabled="starting || finished"
+            :disabled="starting || session.attemptFinished"
             @click="begin"
           >
-            {{ starting ? 'Starting…' : finished ? 'Opening your results…' : 'Start' }}
+            {{
+              starting ? 'Starting…' : session.attemptFinished ? 'Opening your results…' : 'Start'
+            }}
             <svg
               viewBox="0 0 16 16"
               aria-hidden="true"

@@ -32,6 +32,11 @@ export const useSessionStore = defineStore('session', () => {
   const role = computed<Role | null>(() => me.value?.profile.role ?? null)
   const isStaff = computed(() => STAFF_ROLES.some((r) => r === role.value))
   const isAdmin = computed(() => role.value === 'admin')
+  /** The attempt is submitted or expired: results is the respondent's page from now on. */
+  const attemptFinished = computed(() => {
+    const status = me.value?.attempt?.status
+    return status === 'submitted' || status === 'expired'
+  })
 
   async function loadMe() {
     // A load that ends signed out or signed in replaces any earlier failure (e.g. after a sign-in
@@ -139,6 +144,7 @@ export const useSessionStore = defineStore('session', () => {
     role,
     isStaff,
     isAdmin,
+    attemptFinished,
     init,
     loadMe,
     setRespondent,

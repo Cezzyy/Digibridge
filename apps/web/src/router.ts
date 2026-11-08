@@ -143,7 +143,7 @@ function checkStep(step: Step) {
   const me = session.me
   if (!me) return { name: 'sign-in' }
   const hasProfile = me.respondent !== null
-  const finished = me.attempt?.status === 'submitted' || me.attempt?.status === 'expired'
+  const finished = session.attemptFinished
   switch (step) {
     case 'home':
       if (finished) return { name: 'results' }
