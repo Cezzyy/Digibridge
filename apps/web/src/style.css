@@ -79,6 +79,14 @@
       opacity: 0;
     }
   }
+  /* Loading placeholders breathing while the data comes in (`animate-skeleton`). */
+  --animate-skeleton: skeleton 1.6s ease-in-out infinite;
+  @keyframes skeleton {
+    50% {
+      opacity: 0.45;
+    }
+  }
+
   --animate-deck: deck 1.4s ease-in-out infinite;
   @keyframes deck {
     from {

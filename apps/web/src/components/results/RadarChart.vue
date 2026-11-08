@@ -13,8 +13,9 @@ import {
 } from 'chart.js'
 import { computed } from 'vue'
 import { Radar } from 'vue-chartjs'
-import { LEVEL_BANDS, levelRange, wholePct } from '../../lib/levels'
+import { LEVEL_BANDS, wholePct } from '../../lib/levels'
 import { prefersReducedMotion } from '../../lib/motion'
+import LevelKey from './LevelKey.vue'
 
 // The 3 areas' scores on axes from 0 to 100 (RES-01), drawn by Chart.js over rings colored by
 // level, so the shape shows which level each area reached. The page lists the same scores as
@@ -34,14 +35,13 @@ const faded = (hex: string, alpha: number) =>
     .padStart(2, '0')
 const FONT = getComputedStyle(document.body).fontFamily
 
-// Each level's ring in its full color, lightest in the middle. `swatch` is the same color for the
-// key under the chart.
+// Each level's ring in its full color, lightest in the middle. LevelKey shows the same colors.
 const RING = {
-  beginner: { color: 'level-1', swatch: 'bg-level-1' },
-  basic: { color: 'level-2', swatch: 'bg-level-2' },
-  intermediate: { color: 'level-3', swatch: 'bg-level-3' },
-  advanced: { color: 'level-4', swatch: 'bg-level-4' },
-} as const satisfies Record<Level, { color: string; swatch: string }>
+  beginner: 'level-1',
+  basic: 'level-2',
+  intermediate: 'level-3',
+  advanced: 'level-4',
+} as const satisfies Record<Level, string>
 
 const levelRings: Plugin<'radar'> = {
   id: 'levelRings',
@@ -68,7 +68,7 @@ const levelRings: Plugin<'radar'> = {
         2 * Math.PI,
         true,
       )
-      ctx.fillStyle = token(RING[band.level].color)
+      ctx.fillStyle = token(RING[band.level])
       ctx.fill()
     }
     ctx.restore()
@@ -192,18 +192,6 @@ const label = computed(
       <Radar :data="data" :options="options" :plugins="[levelRings]" :aria-label="label" />
     </div>
     <!-- The key to the rings. -->
-    <figcaption class="mt-4 flex flex-wrap justify-center gap-x-4 gap-y-2 text-sm">
-      <span v-for="band in LEVEL_BANDS" :key="band.level" class="flex items-center gap-2">
-        <span
-          aria-hidden="true"
-          class="size-3.5 rounded-full ring-1 ring-line-strong/40 ring-inset"
-          :class="RING[band.level].swatch"
-        />
-        <span class="flex gap-1.5">
-          <span class="font-semibold">{{ LEVEL_LABELS[band.level] }}</span>
-          <span class="text-quiet">{{ levelRange(band) }}</span>
-        </span>
-      </span>
-    </figcaption>
+    <figcaption class="mt-4"><LevelKey /></figcaption>
   </figure>
 </template>
