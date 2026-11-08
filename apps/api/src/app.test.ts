@@ -485,10 +485,16 @@ describe('POST /api/v1/respondents', () => {
     })
   })
 
-  it('lets staff take it online too', async () => {
-    const user = await signedIn('admin')
-    expect((await post({ ...profile, showIdentity: true }, user.headers)).status).toBe(201)
-  })
+  it.each(['facilitator', 'admin'] as const)(
+    'refuses %s accounts and saves nothing, so staff tries stay out of the data',
+    async (role) => {
+      const user = await signedIn(role)
+      const res = await post(profile, user.headers)
+      expect(res.status).toBe(403)
+      expect(await res.json()).toMatchObject({ error: { code: 'forbidden' } })
+      expect(await respondentsOf(user.id)).toHaveLength(0)
+    },
+  )
 
   it('sends unauthorized without a token', async () => {
     expect((await post(profile)).status).toBe(401)

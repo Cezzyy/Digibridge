@@ -26,14 +26,17 @@ import OptionGroup, { type Option } from '../../components/start/OptionGroup.vue
 import StartLayout from '../../components/start/StartLayout.vue'
 import StartSteps from '../../components/start/StartSteps.vue'
 import { useCreateRespondent } from '../../composables/useCreateRespondent'
+import { useToday } from '../../composables/useToday'
 import { PRIMARY_BUTTON, SECONDARY_BUTTON } from '../../lib/buttons'
 import { useConsentStore } from '../../stores/consent'
 import { useSessionStore } from '../../stores/session'
 
 // The online profile (PRO-01) and the show-identity choice (PRO-05). No school details: online
 // never asks for them (PRO-06). Saving sends the consent from the previous page with it, which
-// the `step` guard makes sure exists.
+// the `step` guard makes sure exists. Staff get a preview: the answers are checked but not
+// saved (the API refuses them), so their tries stay out of the research data.
 const session = useSessionStore()
+const preview = computed(() => session.isStaff)
 const consent = useConsentStore()
 const router = useRouter()
 const { save, saving, error: saveError } = useCreateRespondent()
@@ -74,8 +77,11 @@ const identityOptions: Option<boolean>[] = [
   },
 ]
 
-const result = computed(() =>
-  onlineRespondentSchema.safeParse({
+// The birth date checks read the clock, so reading `today` runs them again on a new day.
+const today = useToday()
+const result = computed(() => {
+  void today.value
+  return onlineRespondentSchema.safeParse({
     fullName: form.fullName,
     birthDate: form.birthDate ?? undefined,
     sex: form.sex ?? undefined,
@@ -83,8 +89,8 @@ const result = computed(() =>
     internetAccess: form.internetAccess,
     showIdentity: form.showIdentity ?? undefined,
     consentVersion: session.me ? consent.versionFor(session.me.profile.id) : null,
-  }),
-)
+  })
+})
 
 // Each answer's error shows once the student has left or answered that question, or tried to
 // save, and then follows the answer as it changes.
@@ -154,6 +160,11 @@ async function submit() {
       '[data-invalid] input, input[aria-invalid="true"]',
     )
     first?.focus()
+    return
+  }
+  if (preview.value) {
+    consent.clear()
+    await router.replace({ name: 'home' })
     return
   }
   if (await save(result.value.data)) await router.replace({ name: 'home' })
@@ -251,6 +262,11 @@ async function submit() {
         </p>
       </div>
     </header>
+
+    <p v-if="preview" role="note" class="mt-6 rounded-control bg-evergreen-soft px-4 py-3">
+      <span class="font-semibold text-evergreen">This is a preview.</span>
+      You’re signed in as staff, so nothing you enter here is saved.
+    </p>
 
     <!-- One panel, one row per part, read top to bottom (like the privacy notice). -->
     <form
@@ -401,7 +417,7 @@ async function submit() {
             >
               <path d="M12 3a9 9 0 1 0 9 9" stroke-linecap="round" />
             </svg>
-            {{ saving ? 'Saving…' : 'Save and continue' }}
+            {{ preview ? 'Finish preview' : saving ? 'Saving…' : 'Save and continue' }}
           </button>
         </div>
       </div>

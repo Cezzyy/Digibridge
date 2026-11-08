@@ -192,7 +192,7 @@ All routes live under `/api/v1` (only the OpenAPI spec and docs page sit at `/ap
 | Method | Path | Auth | Purpose |
 | --- | --- | --- | --- |
 | GET | `/api/v1/me` | Signed in | Profile, role, own respondent record and attempt status |
-| POST | `/api/v1/respondents` | Self | Save consent, profile and identity choice. Online: general profile only, 400 if school fields are sent, 409 if the account already has a respondent. Kiosk (`X-Kiosk-Session`): school fields required, 409 if the student number is already used. |
+| POST | `/api/v1/respondents` | Respondent (online), facilitator (kiosk) | Save consent, profile and identity choice. Online: respondent role only (staff try the flow as a preview that saves nothing, 403 here), general profile only, 400 if school fields are sent, 409 if the account already has a respondent. Kiosk (`X-Kiosk-Session`): school fields required, 409 if the student number is already used. |
 | POST | `/api/v1/attempts` | Self | Start the attempt: pick items, shuffle, set `expires_at`. Returns the existing attempt if one is in progress. |
 | GET | `/api/v1/attempts/:id` | Self | Items in shuffled order (no correct answers), saved answers, `expires_at`, server time |
 | PUT | `/api/v1/attempts/:id/answers/:questionId` | Self | Save or change one answer. Rejected after `expires_at` + 30 s. |
