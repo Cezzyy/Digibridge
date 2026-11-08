@@ -12,7 +12,7 @@ DigiBridge is a web app that measures the digital literacy of ACLC College of Ma
 
 - Runs a 30-item, scenario-based assessment across Information and data literacy, Communication and collaboration, and Online safety.
 - Works two ways:
-  - **Online (public):** anyone opens the site and signs in with Google. They answer general questions only (name, age, sex, devices, internet access). No school details are asked.
+  - **Online (public):** anyone opens the site and signs in with Google. They answer general questions only (name, date of birth, sex, devices, internet access). No school details are asked.
   - **Kiosk mode (school):** a facilitator hands a tablet or laptop to a student in person. This is the only mode that asks for school details: student number, course and year level. The study's ACLC data comes from kiosk mode.
 - Scores each area into one of 4 levels and recommends lessons that live inside the app.
 - Gives admins and facilitators a dashboard broken down by age, sex and device or internet access for everyone, and by course and year level for kiosk respondents. This is the digital inclusion view the paper needs.
@@ -116,7 +116,7 @@ Every requirement has an ID that Morales's test cases point to. Must = needed fo
 | --- | --- | --- |
 | CON-01 | Before anything else, respondents see a consent notice under the Data Privacy Act of 2012: purpose, data collected, who sees it, that data is kept until the end of the semester (December 2026) and then deleted, and the DigiBridge team as contact (the kiosk notice may name the group leader, Cez). They must agree to continue. | Must |
 | CON-02 | The app stores the consent with its timestamp and notice version. Declining ends the flow without saving anything. | Must |
-| PRO-01 | General profile, asked in both modes: full name, age, sex, devices they own, and how they usually get internet. | Must |
+| PRO-01 | General profile, asked in both modes: full name, date of birth (age from 10 to 99, worked out from it in Philippine time), sex, devices they own, and how they usually get internet. | Must |
 | PRO-05 | Before starting, respondents choose whether the team may see who they are: their name, and in kiosk mode also their student number. If they say no, these show as Hidden on the dashboard and in the CSV, and only the other profile answers are shown. | Must |
 | PRO-06 | Online respondents are never asked for a student number, course or year level, and the API refuses them if sent. | Must |
 | PRO-07 | Online, one respondent and one attempt per Google account. An account that already has an attempt goes to its results instead of a new profile. | Must |
@@ -250,7 +250,7 @@ Example: a student gets all 4 basic, 2 intermediate and 1 advanced item right in
 | Sign in | /sign-in | Signed out | Continue with Google; the first sign-in makes the account |
 | Home | /home | Signed in | Where signed-in users land (placeholder: name, email, role) |
 | Consent | /start/consent | Respondent | Data Privacy Act notice, Agree and Decline buttons |
-| Profile | /start/profile | Respondent | Name, age, sex, devices, internet access, show-my-identity choice (no school details) |
+| Profile | /start/profile | Respondent | Name, date of birth, sex, devices, internet access, show-my-identity choice (no school details) |
 | Instructions | /start/ready | Respondent | 30 items, 25 minutes, can go back, Start button |
 | Assessment | /assessment | Respondent | One item, 4 choices, timer, Back and Next, question grid, Submit |
 | Results | /results | Respondent | Overall level, radar chart, score and level per area, recommended lessons, QR code, Rate DigiBridge card |
