@@ -7,6 +7,7 @@ import {
   type RouteLocationNormalized,
 } from 'vue-router'
 import { findCallbackParams, isCallbackParam, returningFromGoogle } from './lib/supabase'
+import AssessmentPage from './pages/assessment/AssessmentPage.vue'
 import HomePage from './pages/HomePage.vue'
 import LandingPage from './pages/LandingPage.vue'
 import NotFoundPage from './pages/NotFoundPage.vue'
@@ -22,7 +23,7 @@ import { useSessionStore } from './stores/session'
 export type Requirement = 'guest' | 'signedIn' | 'staff' | 'admin'
 
 /** A page of the respondent flow, which the `step` guard keeps in order. */
-export type Step = 'home' | 'consent' | 'profile'
+export type Step = 'home' | 'consent' | 'profile' | 'assessment'
 
 declare module 'vue-router' {
   interface RouteMeta {
@@ -80,6 +81,13 @@ export const router = createRouter({
       component: ProfilePage,
       meta: { requires: 'signedIn', step: 'profile' },
     },
+    // Draws its own top bar, with the timer in it.
+    {
+      path: '/assessment',
+      name: 'assessment',
+      component: AssessmentPage,
+      meta: { requires: 'signedIn', step: 'assessment', hideHeader: true },
+    },
     {
       path: '/:pathMatch(.*)*',
       name: 'not-found',
@@ -117,9 +125,11 @@ function checkRequirement(requires: Requirement) {
   }
 }
 
-// The respondent flow in order: consent, profile, then home. A new respondent's first sign-in
-// lands on /home and goes on to the notice; once the profile is saved, both start pages send
-// them home. Staff stay on /home and can open the notice from there to try the flow.
+// The respondent flow in order: consent, profile, home, then the assessment. A new respondent's
+// first sign-in lands on /home and goes on to the notice; once the profile is saved, both start
+// pages send them home, and Start on home opens the assessment. Only an attempt in progress can
+// be opened; once it's submitted or expired, /assessment sends them home. Staff stay on /home
+// and can open the notice from there to try the flow; they never get an attempt.
 function checkStep(step: Step) {
   const session = useSessionStore()
   const me = session.me
@@ -134,6 +144,8 @@ function checkStep(step: Step) {
       if (hasProfile) return { name: 'home' }
       // The notice comes first, and its answer lives in memory only (stores/consent.ts).
       return useConsentStore().versionFor(me.profile.id) !== null || { name: 'consent' }
+    case 'assessment':
+      return me.attempt?.status === 'in_progress' || { name: 'home' }
   }
 }
 

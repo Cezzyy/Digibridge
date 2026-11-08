@@ -1,2 +1,0 @@
-// Assessment page (/assessment).
-export {}
