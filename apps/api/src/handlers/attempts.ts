@@ -133,10 +133,31 @@ export const startAttempt: RouteHandler<typeof startAttemptRoute, AuthEnv> = asy
 
 const NOT_FOUND = 'We couldn’t find this assessment.'
 
+/** The attempt with this ID, only if it belongs to the signed-in user's respondent. */
+function isOwnAttempt(db: Db | Tx, profileId: string, attemptId: string) {
+  return and(
+    eq(attempts.id, attemptId),
+    inArray(
+      attempts.respondentId,
+      db
+        .select({ id: respondents.id })
+        .from(respondents)
+        .where(eq(respondents.profileId, profileId)),
+    ),
+  )
+}
+
 /**
- * The attempt with this ID, if it belongs to the signed-in user's respondent. `lock` takes a row
- * lock inside a transaction: `share` while saving an answer, `update` while submitting, so an
- * answer can't land after the attempt is scored.
+ * When a closed attempt ended. The schema doesn't make submitted_at required, so a row closed some
+ * other way (the cron, a fix by hand) may lack it: it closed at expires_at then.
+ */
+const closedAt = (attempt: { submittedAt: Date | null; expiresAt: Date }) =>
+  attempt.submittedAt ?? attempt.expiresAt
+
+/**
+ * The signed-in user's attempt with this ID (`isOwnAttempt`). `lock` takes a row lock inside a
+ * transaction: `share` while saving an answer, `update` while submitting, so an answer can't land
+ * after the attempt is scored.
  */
 async function ownAttempt(
   db: Db | Tx,
@@ -155,9 +176,8 @@ async function ownAttempt(
       choiceOrder: attempts.choiceOrder,
     })
     .from(attempts)
-    .innerJoin(respondents, eq(respondents.id, attempts.respondentId))
-    .where(and(eq(attempts.id, attemptId), eq(respondents.profileId, profileId)))
-  const [row] = await (lock ? query.for(lock, { of: attempts }) : query)
+    .where(isOwnAttempt(db, profileId, attemptId))
+  const [row] = await (lock ? query.for(lock) : query)
   if (!row) throw new ApiError('not_found', NOT_FOUND)
   return row
 }
@@ -277,13 +297,12 @@ export const submitAttempt: RouteHandler<typeof submitAttemptRoute, AuthEnv> = a
     return scoreAndClose(tx, attempt, new Date())
   })
 
-  // The status is submitted or expired here. The schema doesn't make submitted_at required, so a
-  // row closed some other way (the cron, a fix by hand) may lack it: it closed at expires_at then.
+  // The status is submitted or expired here.
   return c.json(
     {
       id: closed.id,
       status: closed.status as 'submitted' | 'expired',
-      submittedAt: (closed.submittedAt ?? closed.expiresAt).toISOString(),
+      submittedAt: closedAt(closed).toISOString(),
     },
     200,
   )
@@ -306,11 +325,8 @@ export const getResult: RouteHandler<typeof getResultRoute, AuthEnv> = async (c)
       susAttemptId: susResponses.attemptId,
     })
     .from(attempts)
-    .innerJoin(respondents, eq(respondents.id, attempts.respondentId))
     .leftJoin(susResponses, eq(susResponses.attemptId, attempts.id))
-    .where(
-      and(eq(attempts.id, c.req.valid('param').id), eq(respondents.profileId, c.var.profile.id)),
-    )
+    .where(isOwnAttempt(db, c.var.profile.id, c.req.valid('param').id))
   if (!attempt) throw new ApiError('not_found', NOT_FOUND)
   if (attempt.status === 'in_progress') {
     throw new ApiError('conflict', 'Submit the assessment to see your results.')
@@ -384,7 +400,7 @@ export const getResult: RouteHandler<typeof getResultRoute, AuthEnv> = async (c)
     {
       id: attempt.id,
       status: attempt.status,
-      submittedAt: (attempt.submittedAt ?? attempt.expiresAt).toISOString(),
+      submittedAt: closedAt(attempt).toISOString(),
       overall: {
         points: totalPoints,
         maxPoints: rows.reduce((sum, row) => sum + row.maxPoints, 0),

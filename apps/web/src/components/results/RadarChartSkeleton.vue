@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import type { Level } from '@digibridge/shared'
+import { LEVEL_BANDS } from '../../lib/levels'
 import LevelKey from './LevelKey.vue'
 
 // RadarChart's loading placeholder: its rings, axes and the 3 label spots, drawn where the chart
@@ -8,13 +10,15 @@ import LevelKey from './LevelKey.vue'
 // left of the middle, since the right label is the widest) and each label's place beside its
 // point. Update them if the chart's labels, font or aspect ratio change.
 
-// The rings at 100, 80, 60 and 40, darkest outside like the chart's level colors.
-const RINGS = [
-  { size: 1, tone: 'bg-line' },
-  { size: 0.8, tone: 'bg-mist' },
-  { size: 0.6, tone: 'bg-track' },
-  { size: 0.4, tone: 'bg-mist-soft' },
-] as const
+// A disc out to the top of each level's band, largest first so the smaller ones sit on top,
+// darkest outside like the chart's level colors.
+const TONE = {
+  advanced: 'bg-line',
+  intermediate: 'bg-mist',
+  basic: 'bg-track',
+  beginner: 'bg-mist-soft',
+} as const satisfies Record<Level, string>
+const RINGS = LEVEL_BANDS.map((band) => ({ size: band.to / 100, tone: TONE[band.level] })).reverse()
 
 // Axes from the center: up, then clockwise to the lower right and lower left, as Chart.js draws
 // 3 points. Each line points down before it's turned.
