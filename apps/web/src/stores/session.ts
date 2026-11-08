@@ -3,7 +3,7 @@ import type { Session } from '@supabase/supabase-js'
 import type { InferResponseType } from 'hono/client'
 import { defineStore } from 'pinia'
 import { computed, ref, shallowRef } from 'vue'
-import { api, ApiRequestError, call } from '../lib/api'
+import { api, ApiRequestError, call, messageOf, SOMETHING_WENT_WRONG } from '../lib/api'
 import { markSignInStarted, returningFromGoogle, supabase } from '../lib/supabase'
 
 export type Me = InferResponseType<typeof api.me.$get, 200>
@@ -15,8 +15,6 @@ export type RespondentSummary = NonNullable<Me['respondent']>
  * `unavailable`: signed in with Google, but /me failed (API down, no internet).
  */
 export type SessionFailure = { kind: 'sign-in' } | { kind: 'unavailable'; message: string }
-
-const SOMETHING_WENT_WRONG = 'Something went wrong. Please try again.'
 
 // The Supabase session and the signed-in user from GET /api/v1/me.
 export const useSessionStore = defineStore('session', () => {
@@ -51,8 +49,7 @@ export const useSessionStore = defineStore('session', () => {
         session.value = null
         return
       }
-      const message = err instanceof ApiRequestError ? err.message : SOMETHING_WENT_WRONG
-      failure.value = { kind: 'unavailable', message }
+      failure.value = { kind: 'unavailable', message: messageOf(err) }
     }
   }
 
