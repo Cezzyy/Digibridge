@@ -31,7 +31,7 @@ describe('onlineRespondentSchema', () => {
     const { showIdentity: _, ...withoutChoice } = online
     for (const bad of [withoutChoice, { ...online, showIdentity: 'yes' }]) {
       expect(onlineRespondentSchema.safeParse(bad).error?.issues[0]?.message).toBe(
-        'Choose whether the research team may see your name.',
+        'Choose whether the DigiBridge team may see your name.',
       )
     }
   })

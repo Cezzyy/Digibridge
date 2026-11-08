@@ -516,7 +516,7 @@ describe('POST /api/v1/respondents', () => {
     const res = await post(withoutChoice, user.headers)
     expect(res.status).toBe(400)
     expect(await res.json()).toMatchObject({
-      error: { message: 'Choose whether the research team may see your name.' },
+      error: { message: 'Choose whether the DigiBridge team may see your name.' },
     })
   })
 

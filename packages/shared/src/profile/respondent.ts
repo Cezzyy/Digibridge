@@ -7,7 +7,7 @@ import { generalProfileSchema } from './general'
 
 /** True lets the team see the respondent's name (and, in kiosk mode, student number). */
 export const showIdentitySchema = z.boolean({
-  error: 'Choose whether the research team may see your name.',
+  error: 'Choose whether the DigiBridge team may see your name.',
 })
 
 /**
