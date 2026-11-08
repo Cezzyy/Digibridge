@@ -146,12 +146,17 @@ const PICKED = 1
       <p class="font-display text-base font-bold">Your profile</p>
       <p class="mt-1 text-[0.6875rem] text-quiet">This helps us see who needs more help.</p>
       <div class="mt-4 grid grid-cols-2 gap-2">
-        <div v-for="(f, k) in ['Age', 'Sex']" :key="f" class="field" :style="{ '--k': k }">
+        <div
+          v-for="(f, k) in ['Date of birth', 'Sex']"
+          :key="f"
+          class="field"
+          :style="{ '--k': k }"
+        >
           <p class="text-[0.625rem] font-semibold text-quiet">{{ f }}</p>
           <p
             class="mt-1 flex h-9 items-center rounded-control border border-line-strong px-2.5 text-xs font-semibold"
           >
-            <span class="typed">{{ k === 0 ? '19' : SEX_LABELS.female }}</span>
+            <span class="typed">{{ k === 0 ? 'Jun 15, 2007' : SEX_LABELS.female }}</span>
           </p>
         </div>
       </div>

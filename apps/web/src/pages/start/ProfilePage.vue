@@ -12,8 +12,16 @@ import {
   type InternetAccess,
   type Sex,
 } from '@digibridge/shared'
-import { computed, nextTick, reactive, ref } from 'vue'
+import { computed, nextTick, reactive, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
+import BirthDateField from '../../components/start/BirthDateField.vue'
+import {
+  DEVICE_ICONS,
+  IDENTITY_ICONS,
+  INTERNET_ACCESS_ICONS,
+} from '../../components/start/choice-icons'
+import TextField from '../../components/form/TextField.vue'
+import FormSection from '../../components/start/FormSection.vue'
 import OptionGroup, { type Option } from '../../components/start/OptionGroup.vue'
 import StartSteps from '../../components/start/StartSteps.vue'
 import { useCreateRespondent } from '../../composables/useCreateRespondent'
@@ -32,8 +40,7 @@ const { save, saving, error: saveError } = useCreateRespondent()
 const googleName = session.me?.profile.fullName ?? ''
 const form = reactive({
   fullName: googleName,
-  // Text, not a number input: phones then show the number pad without the spinner's quirks.
-  age: '',
+  birthDate: null as string | null,
   sex: null as Sex | null,
   devices: [] as Device[],
   internetAccess: [] as InternetAccess[],
@@ -44,35 +51,32 @@ const sexOptions: Option<Sex>[] = SEXES.map((value) => ({ value, label: SEX_LABE
 const deviceOptions: Option<Device>[] = DEVICES.map((value) => ({
   value,
   label: DEVICE_LABELS[value],
+  icon: DEVICE_ICONS[value],
 }))
 const internetOptions: Option<InternetAccess>[] = INTERNET_ACCESS.map((value) => ({
   value,
   label: INTERNET_ACCESS_LABELS[value],
+  icon: INTERNET_ACCESS_ICONS[value],
 }))
 const identityOptions: Option<boolean>[] = [
   {
     value: true,
     label: 'Yes, show my name',
     hint: 'The DigiBridge team sees your name with your answers.',
+    icon: IDENTITY_ICONS.show,
   },
   {
     value: false,
     label: 'No, hide my name',
     hint: 'The team still sees your answers, but your name shows as Hidden.',
+    icon: IDENTITY_ICONS.hide,
   },
 ]
-
-// Whole numbers only; anything else fails the shared schema with its own message.
-function parseAge(text: string) {
-  const trimmed = text.trim()
-  if (trimmed === '') return undefined
-  return /^\d+$/.test(trimmed) ? Number(trimmed) : Number.NaN
-}
 
 const result = computed(() =>
   onlineRespondentSchema.safeParse({
     fullName: form.fullName,
-    age: parseAge(form.age),
+    birthDate: form.birthDate ?? undefined,
     sex: form.sex ?? undefined,
     devices: form.devices,
     internetAccess: form.internetAccess,
@@ -81,12 +85,29 @@ const result = computed(() =>
   }),
 )
 
-// Shown after the first try to save, then kept up to date as the answers change.
+// Each answer's error shows once the student has left or answered that question, or tried to
+// save, and then follows the answer as it changes.
 const tried = ref(false)
 type Field = keyof typeof form
-const errors = computed(() => {
+const touched = reactive(new Set<Field>())
+const touch = (field: Field) => touched.add(field)
+for (const field of ['sex', 'devices', 'internetAccess', 'showIdentity'] as const) {
+  watch(
+    () => form[field],
+    () => touch(field),
+  )
+}
+
+// Leaving the name box tidies it the way the API saves it: no extra spaces.
+function leaveName() {
+  form.fullName = form.fullName.trim().replace(/\s+/g, ' ')
+  touch('fullName')
+}
+
+/** The first message for each field (or the form), whether shown yet or not. */
+const issues = computed(() => {
   const byField: Partial<Record<Field | 'form', string>> = {}
-  if (!tried.value || result.value.success) return byField
+  if (result.value.success) return byField
   for (const issue of result.value.error.issues) {
     const field = issue.path[0]
     const key = typeof field === 'string' && field in form ? (field as Field) : 'form'
@@ -94,6 +115,14 @@ const errors = computed(() => {
   }
   return byField
 })
+const errors = computed(() => {
+  const shown: Partial<Record<Field | 'form', string>> = {}
+  for (const [key, message] of Object.entries(issues.value) as [Field | 'form', string][]) {
+    if (tried.value || (key !== 'form' && touched.has(key))) shown[key] = message
+  }
+  return shown
+})
+const fieldErrorCount = computed(() => Object.keys(errors.value).filter((k) => k !== 'form').length)
 
 async function submit() {
   tried.value = true
@@ -108,13 +137,6 @@ async function submit() {
   }
   if (await save(result.value.data)) await router.replace({ name: 'home' })
 }
-
-const INPUT =
-  'mt-2 block min-h-12 w-full rounded-control border bg-surface px-4 text-lg focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-evergreen'
-const inputClass = (field: Field) => [
-  INPUT,
-  errors.value[field] ? 'border-error' : 'border-line-strong',
-]
 </script>
 
 <template>
@@ -135,91 +157,86 @@ const inputClass = (field: Field) => [
 
     <form
       novalidate
-      class="mt-8 space-y-8 rounded-card border border-line bg-surface p-5 sm:p-7 motion-safe:animate-rise motion-safe:[animation-delay:160ms]"
+      class="mt-8 space-y-5 motion-safe:animate-rise motion-safe:[animation-delay:160ms]"
       @submit.prevent="submit"
     >
-      <div>
-        <label for="full-name" class="text-lg font-semibold">Full name</label>
-        <p v-if="googleName" id="full-name-hint" class="mt-0.5 text-quiet">
-          We filled this in from Google. Change it if it isn’t your real name.
-        </p>
-        <input
-          id="full-name"
+      <FormSection :number="1" title="About you">
+        <TextField
           v-model="form.fullName"
-          type="text"
+          label="Full name"
+          :hint="
+            googleName
+              ? 'We filled this in from Google. Change it if it isn’t your real name.'
+              : 'Your first and last name.'
+          "
           autocomplete="name"
           :maxlength="FULL_NAME_MAX_LENGTH"
-          :aria-invalid="errors.fullName ? 'true' : undefined"
-          :aria-describedby="
-            [googleName && 'full-name-hint', errors.fullName && 'full-name-error']
-              .filter(Boolean)
-              .join(' ') || undefined
-          "
-          :class="inputClass('fullName')"
+          :error="errors.fullName"
+          :valid="touched.has('fullName') && !issues.fullName"
+          @touch="leaveName"
+        >
+          <template #icon>
+            <path d="M12 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8Z" />
+            <path d="M4 20a8 8 0 0 1 16 0" />
+          </template>
+        </TextField>
+
+        <BirthDateField
+          v-model="form.birthDate"
+          :error="errors.birthDate"
+          @touch="touch('birthDate')"
         />
-        <p v-if="errors.fullName" id="full-name-error" class="mt-2 font-semibold text-error">
-          {{ errors.fullName }}
-        </p>
-      </div>
 
-      <div>
-        <label for="age" class="text-lg font-semibold">Age</label>
-        <input
-          id="age"
-          v-model="form.age"
-          type="text"
-          inputmode="numeric"
-          autocomplete="off"
-          maxlength="2"
-          :aria-invalid="errors.age ? 'true' : undefined"
-          :aria-describedby="errors.age ? 'age-error' : undefined"
-          :class="[inputClass('age'), 'max-w-32']"
+        <OptionGroup
+          v-model="form.sex"
+          legend="Sex"
+          :options="sexOptions"
+          :columns="3"
+          :error="errors.sex"
         />
-        <p v-if="errors.age" id="age-error" class="mt-2 font-semibold text-error">
-          {{ errors.age }}
-        </p>
-      </div>
+      </FormSection>
 
-      <OptionGroup
-        v-model="form.sex"
-        legend="Sex"
-        :options="sexOptions"
-        :columns="3"
-        :error="errors.sex"
-      />
+      <FormSection
+        :number="2"
+        title="Your devices and internet"
+        description="So we can see how people get online."
+      >
+        <OptionGroup
+          v-model="form.devices"
+          legend="Which devices do you own?"
+          hint="Pick all that apply."
+          :options="deviceOptions"
+          multiple
+          exclusive="none"
+          :columns="2"
+          :error="errors.devices"
+        />
 
-      <OptionGroup
-        v-model="form.devices"
-        legend="Which devices do you own?"
-        hint="Pick all that apply."
-        :options="deviceOptions"
-        multiple
-        exclusive="none"
-        :columns="2"
-        :error="errors.devices"
-      />
+        <OptionGroup
+          v-model="form.internetAccess"
+          legend="How do you usually get internet?"
+          hint="Pick all that apply."
+          :options="internetOptions"
+          multiple
+          exclusive="none"
+          :columns="2"
+          :error="errors.internetAccess"
+        />
+      </FormSection>
 
-      <OptionGroup
-        v-model="form.internetAccess"
-        legend="How do you usually get internet?"
-        hint="Pick all that apply."
-        :options="internetOptions"
-        multiple
-        exclusive="none"
-        :columns="2"
-        :error="errors.internetAccess"
-      />
-
-      <div class="border-t border-line pt-8">
+      <FormSection
+        :number="3"
+        title="Your privacy"
+        description="Either way, your answers count the same."
+      >
         <OptionGroup
           v-model="form.showIdentity"
           legend="May the DigiBridge team see your name?"
-          hint="Either way, your answers count the same."
           :options="identityOptions"
           :columns="2"
           :error="errors.showIdentity"
         />
-      </div>
+      </FormSection>
 
       <p
         v-if="saveError || errors.form"
@@ -229,14 +246,18 @@ const inputClass = (field: Field) => [
         {{ saveError ?? errors.form }}
       </p>
       <p
-        v-else-if="tried && !result.success"
+        v-else-if="tried && fieldErrorCount > 0"
         role="alert"
         class="rounded-control bg-error-soft px-4 py-3 text-error"
       >
-        Please check the answers marked in red.
+        {{
+          fieldErrorCount === 1
+            ? 'One answer needs fixing. It’s marked in red.'
+            : `${fieldErrorCount} answers need fixing. They’re marked in red.`
+        }}
       </p>
 
-      <div class="flex flex-col-reverse gap-3 sm:flex-row sm:justify-between">
+      <div class="flex flex-col-reverse gap-3 pt-3 sm:flex-row sm:justify-between">
         <RouterLink :to="{ name: 'consent' }" :class="SECONDARY_BUTTON">
           Back to the notice
         </RouterLink>
