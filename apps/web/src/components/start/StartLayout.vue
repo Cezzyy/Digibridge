@@ -5,8 +5,9 @@
 // content as a header band. `#actions` is a bar under the content that sticks to the bottom of
 // the screen from tablets up, so the page's buttons are always in reach. `stickOnPhones` makes it
 // stick on phones too, for pages whose bar is short (home); the notice's and the profile's bars
-// stack two buttons on phones and would cover too much of the screen.
-defineProps<{ stickOnPhones?: boolean }>()
+// stack two buttons on phones and would cover too much of the screen. `fitScreen` narrows the
+// panel and tightens the padding from `2xl`, so a short page (home) fits on one screen.
+defineProps<{ stickOnPhones?: boolean; fitScreen?: boolean }>()
 
 // The bridge drawn faintly at the foot of the panel (it stays with the panel as the page scrolls): two towers, the cable and its hangers.
 const W = 480
@@ -28,11 +29,17 @@ const hangers = Array.from({ length: W / 20 - 1 }, (_, i) => (i + 1) * 20)
 
 <template>
   <main
-    class="min-h-[calc(100svh-var(--spacing-header))] lg:grid lg:grid-cols-[24rem_minmax(0,1fr)] xl:grid-cols-[28rem_minmax(0,1fr)] 2xl:grid-cols-[26rem_minmax(0,1fr)] 3xl:grid-cols-[30rem_minmax(0,1fr)]"
+    :class="
+      fitScreen
+        ? '2xl:grid-cols-[26rem_minmax(0,1fr)] 3xl:grid-cols-[30rem_minmax(0,1fr)]'
+        : '2xl:grid-cols-[32rem_minmax(0,1fr)] 3xl:grid-cols-[36rem_minmax(0,1fr)]'
+    "
+    class="min-h-[calc(100svh-var(--spacing-header))] lg:grid lg:grid-cols-[24rem_minmax(0,1fr)] xl:grid-cols-[28rem_minmax(0,1fr)]"
   >
     <header class="bg-linear-to-b from-evergreen to-evergreen-hover text-white">
       <div
-        class="relative isolate flex flex-col px-4 py-7 sm:px-8 sm:py-9 lg:sticky lg:top-header lg:h-[calc(100svh-var(--spacing-header))] lg:overflow-y-auto lg:px-10 lg:py-12 xl:px-12 2xl:py-8 lg:short:py-8 2xl:snug:py-6"
+        :class="fitScreen ? '2xl:py-8 2xl:snug:py-6' : '2xl:px-14'"
+        class="relative isolate flex flex-col px-4 py-7 sm:px-8 sm:py-9 lg:sticky lg:top-header lg:h-[calc(100svh-var(--spacing-header))] lg:overflow-y-auto lg:px-10 lg:py-12 xl:px-12 lg:short:py-8"
       >
         <slot name="rail" />
 
@@ -69,14 +76,18 @@ const hangers = Array.from({ length: W / 20 - 1 }, (_, i) => (i + 1) * 20)
 
     <div class="flex min-w-0 flex-col">
       <div
-        class="flex-1 px-4 py-7 sm:px-8 sm:py-9 lg:px-10 lg:py-12 xl:px-14 2xl:px-12 2xl:py-8 2xl:snug:py-6 3xl:px-16"
+        :class="fitScreen ? '2xl:px-12 2xl:py-8 2xl:snug:py-6 3xl:px-16' : '2xl:px-16'"
+        class="flex-1 px-4 py-7 sm:px-8 sm:py-9 lg:px-10 lg:py-12 xl:px-14"
       >
         <slot />
       </div>
       <div
         v-if="$slots.actions"
-        :class="stickOnPhones && 'sticky bottom-0 z-10'"
-        class="border-t border-line bg-surface/95 px-4 py-4 backdrop-blur sm:sticky sm:bottom-0 sm:z-10 sm:px-8 lg:px-10 xl:px-14 2xl:px-12 2xl:snug:py-3 3xl:px-16"
+        :class="[
+          stickOnPhones && 'sticky bottom-0 z-10',
+          fitScreen ? '2xl:px-12 2xl:snug:py-3 3xl:px-16' : '2xl:px-16',
+        ]"
+        class="border-t border-line bg-surface/95 px-4 py-4 backdrop-blur sm:sticky sm:bottom-0 sm:z-10 sm:px-8 lg:px-10 xl:px-14"
       >
         <slot name="actions" />
       </div>

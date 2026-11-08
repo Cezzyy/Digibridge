@@ -134,7 +134,7 @@ const studentSteps = STEPS.slice(1)
 </script>
 
 <template>
-  <StartLayout v-if="session.me && session.role" stick-on-phones>
+  <StartLayout v-if="session.me && session.role" stick-on-phones fit-screen>
     <template #rail>
       <!-- Phones show the step bar above the heading; desktops list the steps under it. -->
       <StartSteps
