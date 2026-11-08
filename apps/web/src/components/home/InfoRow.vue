@@ -9,7 +9,7 @@ defineProps<{ title: string; icon: ChoiceIcon }>()
 
 <template>
   <li
-    class="gap-8 px-5 py-6 sm:px-7 md:grid md:grid-cols-[14rem_minmax(0,1fr)] lg:grid-cols-1 xl:grid-cols-[16rem_minmax(0,1fr)] xl:py-7 2xl:grid-cols-[18rem_minmax(0,1fr)]"
+    class="gap-8 px-5 py-6 sm:px-7 md:grid md:grid-cols-[14rem_minmax(0,1fr)] lg:grid-cols-1 xl:grid-cols-[16rem_minmax(0,1fr)] xl:py-7 2xl:grid-cols-[12rem_minmax(0,1fr)] 2xl:gap-6 2xl:px-6 2xl:py-5 2xl:snug:py-4 3xl:grid-cols-[14rem_minmax(0,1fr)]"
   >
     <div class="flex items-center gap-3 md:items-start lg:items-center xl:items-start">
       <span

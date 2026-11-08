@@ -125,7 +125,7 @@ const studentSteps = STEPS.slice(1)
 </script>
 
 <template>
-  <StartLayout v-if="session.me && session.role">
+  <StartLayout v-if="session.me && session.role" stick-on-phones>
     <template #rail>
       <!-- Phones show the step bar above the heading; desktops list the steps under it. -->
       <StartSteps
@@ -252,7 +252,8 @@ const studentSteps = STEPS.slice(1)
       aria-labelledby="home-title"
       class="motion-safe:animate-rise motion-safe:[animation-delay:120ms]"
     >
-      <header class="flex items-center gap-4">
+      <!-- Big screens without room for it (`snug:`) keep it for screen readers only, so the page fits. -->
+      <header class="flex items-center gap-4 2xl:snug:sr-only">
         <span class="grid size-12 shrink-0 place-items-center rounded-card bg-evergreen-soft">
           <svg
             viewBox="0 0 24 24"
@@ -283,10 +284,10 @@ const studentSteps = STEPS.slice(1)
       </header>
 
       <ol
-        class="mt-6 divide-y divide-line overflow-hidden rounded-card border border-line bg-surface"
+        class="mt-6 divide-y 2xl:snug:mt-0 divide-line overflow-hidden rounded-card border border-line bg-surface"
       >
         <InfoRow v-if="view === 'staff'" title="The student steps" :icon="ROW_ICONS.steps">
-          <ol class="space-y-4">
+          <ol class="space-y-4 2xl:grid 2xl:grid-cols-2 2xl:gap-x-8 2xl:gap-y-5 2xl:space-y-0">
             <li v-for="(step, i) in studentSteps" :key="step.screen" class="flex gap-3">
               <span
                 aria-hidden="true"
@@ -309,7 +310,7 @@ const studentSteps = STEPS.slice(1)
             <li
               v-for="rule in RULES"
               :key="rule.title"
-              class="flex gap-3 rounded-control bg-mist-soft px-4 py-3.5"
+              class="flex gap-3 rounded-control bg-mist-soft px-4 py-3.5 2xl:py-3"
             >
               <svg
                 viewBox="0 0 24 24"
@@ -333,17 +334,23 @@ const studentSteps = STEPS.slice(1)
             <li
               v-for="area in areas"
               :key="area.code"
-              class="flex gap-3 rounded-control bg-mist-soft px-4 py-3.5 2xl:flex-col 2xl:gap-2"
+              class="flex gap-3 rounded-control bg-mist-soft px-4 py-3.5 2xl:flex-col 2xl:gap-2 2xl:py-3"
             >
-              <span
-                class="w-7 shrink-0 font-display text-lg leading-6 font-bold text-marigold-text tabular-nums"
-              >
-                {{ area.number }}
-              </span>
+              <!-- Wide screens put the question count beside the number, so the cards stay short. -->
+              <p class="flex shrink-0 items-baseline justify-between gap-3">
+                <span
+                  class="w-7 font-display text-lg leading-6 font-bold text-marigold-text tabular-nums"
+                >
+                  {{ area.number }}
+                </span>
+                <span class="hidden text-sm text-quiet 2xl:inline">
+                  {{ ITEMS_PER_AREA }} questions
+                </span>
+              </p>
               <div class="min-w-0">
                 <p class="font-semibold text-evergreen">{{ area.label }}</p>
                 <p class="mt-1 leading-relaxed">{{ area.summary }}</p>
-                <p class="mt-2 text-sm text-quiet">{{ ITEMS_PER_AREA }} questions</p>
+                <p class="mt-2 text-sm text-quiet 2xl:hidden">{{ ITEMS_PER_AREA }} questions</p>
               </div>
             </li>
           </ul>
@@ -363,7 +370,7 @@ const studentSteps = STEPS.slice(1)
                 :style="{ flexGrow: level.to - level.from }"
               />
             </div>
-            <div class="relative mt-1.5 h-4 text-xs text-quiet">
+            <div class="relative mt-1.5 h-4 text-xs text-quiet 2xl:hidden">
               <span
                 v-for="tick in TICKS"
                 :key="tick"
@@ -374,12 +381,22 @@ const studentSteps = STEPS.slice(1)
               </span>
             </div>
           </div>
-          <ul class="mt-4 grid gap-2 sm:grid-cols-2">
-            <li v-for="level in levels" :key="level.level" class="flex items-center gap-3">
-              <span aria-hidden="true" class="size-4 shrink-0 rounded-sm" :class="level.tone" />
-              <span>
+          <!-- Wide screens name each level under its part of the bar instead of in a key. -->
+          <ul class="mt-4 grid gap-2 sm:grid-cols-2 2xl:mt-2 2xl:flex 2xl:gap-0.5">
+            <li
+              v-for="level in levels"
+              :key="level.level"
+              class="flex items-center gap-3 2xl:min-w-0 2xl:basis-0 2xl:flex-col 2xl:items-start 2xl:gap-0"
+              :style="{ flexGrow: level.to - level.from }"
+            >
+              <span
+                aria-hidden="true"
+                class="size-4 shrink-0 rounded-sm 2xl:hidden"
+                :class="level.tone"
+              />
+              <span class="2xl:contents">
                 <span class="font-semibold">{{ level.label }}</span>
-                <span class="text-quiet"> · {{ level.range }}</span>
+                <span class="text-quiet"><span class="2xl:hidden"> · </span>{{ level.range }}</span>
               </span>
             </li>
           </ul>
