@@ -23,7 +23,7 @@ import { useSessionStore } from './stores/session'
 export type Requirement = 'guest' | 'signedIn' | 'staff' | 'admin'
 
 /** A page of the respondent flow, which the `step` guard keeps in order. */
-export type Step = 'home' | 'consent' | 'profile' | 'assessment'
+export type Step = 'home' | 'consent' | 'profile' | 'assessment' | 'results'
 
 declare module 'vue-router' {
   interface RouteMeta {
@@ -88,6 +88,13 @@ export const router = createRouter({
       component: AssessmentPage,
       meta: { requires: 'signedIn', step: 'assessment', hideHeader: true },
     },
+    // Lazy, so Chart.js (the radar chart) loads only here, not with the first page.
+    {
+      path: '/results',
+      name: 'results',
+      component: () => import('./pages/results/ResultsPage.vue'),
+      meta: { requires: 'signedIn', step: 'results' },
+    },
     {
       path: '/:pathMatch(.*)*',
       name: 'not-found',
@@ -125,18 +132,21 @@ function checkRequirement(requires: Requirement) {
   }
 }
 
-// The respondent flow in order: consent, profile, home, then the assessment. A new respondent's
-// first sign-in lands on /home and goes on to the notice; once the profile is saved, both start
-// pages send them home, and Start on home opens the assessment. Only an attempt in progress can
-// be opened; once it's submitted or expired, /assessment sends them home. Staff stay on /home
-// and can open the notice from there to try the flow; they never get an attempt.
+// The respondent flow in order: consent, profile, home, the assessment, then results. A new
+// respondent's first sign-in lands on /home and goes on to the notice; once the profile is saved,
+// both start pages send them home, and Start on home opens the assessment. Only an attempt in
+// progress can be opened; once it's submitted or expired, home and /assessment send them to
+// their results, and so does every later sign-in (PRO-07, RES-03). Staff stay on /home and can
+// open the notice from there to try the flow; they never get an attempt, so never results.
 function checkStep(step: Step) {
   const session = useSessionStore()
   const me = session.me
   if (!me) return { name: 'sign-in' }
   const hasProfile = me.respondent !== null
+  const finished = me.attempt?.status === 'submitted' || me.attempt?.status === 'expired'
   switch (step) {
     case 'home':
+      if (finished) return { name: 'results' }
       return hasProfile || session.isStaff || { name: 'consent' }
     case 'consent':
       return !hasProfile || { name: 'home' }
@@ -146,6 +156,8 @@ function checkStep(step: Step) {
       return useConsentStore().versionFor(me.profile.id) !== null || { name: 'consent' }
     case 'assessment':
       return me.attempt?.status === 'in_progress' || { name: 'home' }
+    case 'results':
+      return finished || { name: 'home' }
   }
 }
 
