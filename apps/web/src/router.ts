@@ -177,6 +177,11 @@ router.beforeEach(async (to, from) => {
   return checkStep(to.meta.step)
 })
 
+// A navigation that throws, most often a lazy page (/results) whose code didn't download: the
+// page never opens, and on the first one App.vue would show the splash for good. Show the error
+// screen instead; its Try again reloads, which also picks up a new deploy's file names.
+router.onError(() => useSessionStore().failPage())
+
 // Going to any page after the first one (a button, the logo, the back button) closes the error
 // screen. This runs in afterEach because a link to the page already open (the logo on `/`, where
 // Google sends users back) skips beforeEach but still reaches afterEach, as a duplicate.
