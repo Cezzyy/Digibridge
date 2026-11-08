@@ -332,7 +332,12 @@ async function scoreAndClose(
       overallLevel: score.overall.level,
     })
     .where(eq(attempts.id, attempt.id))
-    .returning({ id: attempts.id, status: attempts.status, submittedAt: attempts.submittedAt })
+    .returning({
+      id: attempts.id,
+      status: attempts.status,
+      expiresAt: attempts.expiresAt,
+      submittedAt: attempts.submittedAt,
+    })
   return closed!
 }
 
@@ -349,12 +354,13 @@ export const submitAttempt: RouteHandler<typeof submitAttemptRoute, AuthEnv> = a
     return scoreAndClose(tx, attempt, new Date())
   })
 
-  // Closed attempts always have submitted_at; the status is submitted or expired here.
+  // The status is submitted or expired here. The schema doesn't make submitted_at required, so a
+  // row closed some other way (the cron, a fix by hand) may lack it: it closed at expires_at then.
   return c.json(
     {
       id: closed.id,
       status: closed.status as 'submitted' | 'expired',
-      submittedAt: closed.submittedAt!.toISOString(),
+      submittedAt: (closed.submittedAt ?? closed.expiresAt).toISOString(),
     },
     200,
   )
