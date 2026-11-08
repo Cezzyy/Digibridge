@@ -26,7 +26,7 @@ Done when you can sign in with Google on the deployed site and `/api/v1/me` answ
 - [x] **Supabase project:** Google provider on, redirect URLs for `localhost` and the Pages URL.
 - [x] **Cloudflare resources:** Pages project `digibridge-web`, R2 bucket `digibridge-media`, Hyperdrive config `digibridge-db`, all bound in `wrangler.toml`.
 - [x] **Full schema** in `packages/db`: all 11 tables and 7 enums from the TRD, the partial unique indexes (one attempt per respondent, one correct choice per question) and the 3 dashboard indexes. `db:generate`, `db:push`.
-- [ ] **Seeds:** `db:seed` for the 3 areas, `db:seed:dummy` for 5 dummy items per area.
+- [ ] **Seeds:** `packages/db/seed/dev-questions.sql` for the 3 areas and 13 practice items per area (5 basic, 5 intermediate, 3 advanced; 5 per area can't fill the 4/4/2 mix), run in the Supabase SQL editor.
 - [x] **Shared package:** enums, course and year-level lists, student number regex, scoring weights and level cut-offs.
 - [x] **API skeleton:** OpenAPIHono app, error handler that returns `{ error: { code, message } }`, CORS for the Pages origin, `config/db` connection, docs in `openapi/`.
 - [x] **Auth middleware and `GET /api/v1/me`:** verify the Supabase token with `jose`, create the profile on first call, `ADMIN_EMAILS` makes you admin, `requireRole` (AUTH-01, AUTH-02, AUTH-04).
@@ -101,7 +101,7 @@ Done when the database holds only real content and no test data.
 
 - [ ] Real questions imported from the team's sheet by CSV (Nov 8).
 - [ ] 9 lessons and the SUS wording from Gonzaga loaded (Nov 8).
-- [ ] Dummy items deactivated; readiness check passes in all 3 areas.
+- [ ] Practice items deactivated (IDs start with `de000000-`); readiness check passes in all 3 areas.
 - [ ] Morales's QA pass; every Must bug closed (Nov 10).
 - [ ] Device run: low-end Android on mobile data, an iPhone, a laptop.
 - [ ] Feature freeze (Nov 11): test respondents and attempts deleted, bugs only from here.
