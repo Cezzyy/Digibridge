@@ -1,17 +1,21 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
+import { useCountdown } from '../../composables/useCountdown'
 
 // The time left, always in view at the top of the assessment (ASM-03). Calm until 5 minutes,
-// marigold from 5 minutes, red in the last minute (docs/design.md). The page works out the time
-// from the server's clock and submits at 0; this only shows it.
-const props = defineProps<{ remainingMs: number }>()
+// marigold from 5 minutes, red in the last minute (docs/design.md). The page works out the
+// deadline from the server's clock and submits at 0; this only shows it. It ticks on its own so
+// only the timer re-renders each tick, not the whole page.
+const props = defineProps<{ deadline: number }>()
+const { remainingMs: left } = useCountdown(() => props.deadline)
+const remainingMs = computed(() => left.value ?? 0)
 
 const WARN_MS = 5 * 60_000
 const DANGER_MS = 60_000
 
 type Tone = 'calm' | 'warn' | 'danger'
 const tone = computed<Tone>(() =>
-  props.remainingMs <= DANGER_MS ? 'danger' : props.remainingMs <= WARN_MS ? 'warn' : 'calm',
+  remainingMs.value <= DANGER_MS ? 'danger' : remainingMs.value <= WARN_MS ? 'warn' : 'calm',
 )
 
 const TONE_CLASS: Record<Tone, string> = {
@@ -25,7 +29,7 @@ const ICON_CLASS: Record<Tone, string> = {
   danger: 'stroke-error',
 }
 
-const seconds = computed(() => Math.ceil(props.remainingMs / 1000))
+const seconds = computed(() => Math.ceil(remainingMs.value / 1000))
 const clock = computed(() => {
   const s = seconds.value
   return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`

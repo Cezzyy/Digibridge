@@ -60,11 +60,16 @@ async function load() {
 }
 onMounted(load)
 
-const { remainingMs } = useCountdown(() => (ready.value ? store.deadline : null))
+// Only read through computed values below, never in the template: the countdown ticks every
+// 250 ms, and reading it there would re-render the whole page each tick. CountdownTimer ticks on
+// its own for the clock.
+const deadline = computed(() => (ready.value ? store.deadline : null))
+const { remainingMs } = useCountdown(deadline)
 
 const total = computed(() => store.items.length)
 const item = computed(() => store.items[store.current] ?? null)
 const isLast = computed(() => store.current >= total.value - 1)
+const itemIds = computed(() => store.items.map((i) => i.id))
 const progress = computed(() => (total.value ? (store.answeredCount / total.value) * 100 : 0))
 
 const card = ref<InstanceType<typeof QuestionCard> | null>(null)
@@ -144,7 +149,7 @@ function openDialog() {
           <BrandMark class="size-8" />
           <span class="sr-only sm:not-sr-only">DigiBridge</span>
         </RouterLink>
-        <CountdownTimer v-if="remainingMs !== null" :remaining-ms="remainingMs" />
+        <CountdownTimer v-if="deadline !== null" :deadline="deadline" />
         <div class="col-start-3 flex min-w-0 justify-end">
           <AccountControls />
         </div>
@@ -197,7 +202,7 @@ function openDialog() {
         </p>
         <QuestionGrid
           class="mt-4"
-          :item-ids="store.items.map((i) => i.id)"
+          :item-ids="itemIds"
           :answers="store.answers"
           :save-states="store.saveStates"
           :current="store.current"
