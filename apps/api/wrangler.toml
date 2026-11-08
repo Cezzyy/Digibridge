@@ -22,3 +22,7 @@ id = "cb86ab5ed71c4778886200d6c14a318c"
 [[r2_buckets]]
 binding = "MEDIA"
 bucket_name = "digibridge-media"
+
+# Closes attempts left past expires_at plus the grace period (index.ts, `scheduled`).
+[triggers]
+crons = ["*/5 * * * *"]

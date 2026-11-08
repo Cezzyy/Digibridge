@@ -1,10 +1,10 @@
 import { answers, areaResults, attempts, choices, competencyAreas, questions } from '@digibridge/db'
 import { ANSWER_GRACE_SECONDS, type AreaCode } from '@digibridge/shared'
-import { and, eq, inArray, sql } from 'drizzle-orm'
+import { and, eq, inArray, lt, sql } from 'drizzle-orm'
 import type { Db } from '../config/db'
 import { roundPct, scoreAttempt, type ScoredItem } from './scoring'
 
-// Closing an attempt: submit (handlers/attempts.ts) ends here, and the cron will too.
+// Closing an attempt: submit (handlers/attempts.ts) and the cron (index.ts) both end here.
 
 export type Tx = Parameters<Parameters<Db['transaction']>[0]>[0]
 
@@ -88,4 +88,44 @@ export async function scoreAndClose(
       submittedAt: attempts.submittedAt,
     })
   return closed!
+}
+
+/**
+ * The cron's job: scores and closes, as `expired`, every attempt still in progress more than the
+ * grace period past `expires_at` (the tab was closed or the phone died before it submitted).
+ * Each attempt gets its own transaction, so one failure doesn't hold up the rest; one that a
+ * submit has locked is skipped, since that submit closes it. Returns how many it closed.
+ */
+export async function closeExpiredAttempts(db: Db, now = new Date()) {
+  const cutoff = new Date(now.getTime() - ANSWER_GRACE_SECONDS * 1000)
+  const due = await db
+    .select({ id: attempts.id })
+    .from(attempts)
+    .where(and(eq(attempts.status, 'in_progress'), lt(attempts.expiresAt, cutoff)))
+
+  let closed = 0
+  for (const { id } of due) {
+    try {
+      const done = await db.transaction(async (tx) => {
+        const [attempt] = await tx
+          .select({
+            id: attempts.id,
+            status: attempts.status,
+            expiresAt: attempts.expiresAt,
+            questionOrder: attempts.questionOrder,
+          })
+          .from(attempts)
+          .where(eq(attempts.id, id))
+          .for('update', { skipLocked: true })
+        // Locked by a submit, or closed since the first query.
+        if (attempt?.status !== 'in_progress') return false
+        await scoreAndClose(tx, attempt, now)
+        return true
+      })
+      if (done) closed++
+    } catch (error) {
+      console.error(`Couldn't close expired attempt ${id}`, error)
+    }
+  }
+  return closed
 }
