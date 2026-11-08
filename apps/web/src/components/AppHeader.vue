@@ -4,13 +4,13 @@ import AccountControls from './AccountControls.vue'
 import BrandMark from './BrandMark.vue'
 
 // Top bar on every page, so users can sign in or out from anywhere (AUTH-03). It stays at the
-// top while the page scrolls.
+// top while the page scrolls, and spans the whole width like the start pages under it.
 const session = useSessionStore()
 </script>
 
 <template>
-  <header class="sticky top-0 z-30 border-b border-line bg-surface">
-    <div class="mx-auto flex max-w-5xl items-center justify-between gap-4 px-4 py-2">
+  <header class="sticky top-0 z-30 h-header border-b border-line bg-surface">
+    <div class="flex h-full w-full items-center justify-between gap-4 px-4 sm:px-8 lg:px-10">
       <RouterLink
         :to="{ name: session.isSignedIn ? 'home' : 'landing' }"
         class="flex min-h-11 items-center gap-2.5 font-display text-xl font-bold text-evergreen"
