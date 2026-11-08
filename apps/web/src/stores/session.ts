@@ -114,6 +114,11 @@ export const useSessionStore = defineStore('session', () => {
     if (me.value) me.value = { ...me.value, respondent }
   }
 
+  /** After starting the assessment: the attempt /me would now return, without another call. */
+  function setAttempt(attempt: NonNullable<Me['attempt']>) {
+    if (me.value) me.value = { ...me.value, attempt }
+  }
+
   /** Hides the error screen; the router calls it when the user goes to another page. */
   function clearFailure() {
     failure.value = null
@@ -132,6 +137,7 @@ export const useSessionStore = defineStore('session', () => {
     init,
     loadMe,
     setRespondent,
+    setAttempt,
     signIn,
     signOut,
     clearFailure,
