@@ -1,7 +1,10 @@
-import { attempts, profiles, respondents } from '@digibridge/db'
+import { attempts, choices, profiles, questions, respondents } from '@digibridge/db'
 import {
   AGE_MAX,
   AGE_MIN,
+  ATTEMPT_DURATION_MINUTES,
+  CHOICES_PER_QUESTION,
+  ITEMS_PER_ATTEMPT,
   toIsoDate,
   COURSES,
   ONLINE_CONSENT_NOTICE,
@@ -9,11 +12,11 @@ import {
   YEAR_LEVELS,
 } from '@digibridge/shared'
 import { OpenAPIHono, createRoute, z } from '@hono/zod-openapi'
-import { eq } from 'drizzle-orm'
+import { eq, inArray } from 'drizzle-orm'
 import { bodyLimit } from 'hono/body-limit'
 import { HTTPException } from 'hono/http-exception'
 import { generateKeyPair } from 'jose'
-import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest'
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import { app } from './app'
 import type { AppEnv } from './env'
 import {
@@ -29,8 +32,10 @@ import {
   ADMIN_EMAIL,
   WEB_ORIGIN,
   addAuthUser,
+  addQuestionBank,
   bearer,
   clearAccounts,
+  clearQuestionBank,
   env,
   serveTestJwks,
   setUpDatabase,
@@ -581,13 +586,186 @@ describe('POST /api/v1/respondents', () => {
   })
 })
 
+describe('POST /api/v1/attempts', () => {
+  // Before each test: clearAccounts empties questions too (questions.created_by points at
+  // profiles, so its cascade reaches them), but leaves the areas.
+  let bank: Awaited<ReturnType<typeof addQuestionBank>>
+  beforeEach(async () => {
+    await clearQuestionBank()
+    bank = await addQuestionBank()
+  })
+  afterAll(clearQuestionBank)
+
+  const start = (headers: Record<string, string> = {}) =>
+    app.request('/api/v1/attempts', { method: 'POST', headers }, env)
+
+  /** A respondent who has agreed to the notice and saved their profile. */
+  const respondent = async () => {
+    const user = await signedIn()
+    const [row] = await testDb
+      .insert(respondents)
+      .values({
+        profileId: user.id,
+        fullName: 'Juan Dela Cruz',
+        birthDate: '2007-06-15',
+        sex: 'male',
+        mode: 'online',
+        consentVersion: '1',
+        consentedAt: new Date(),
+      })
+      .returning({ id: respondents.id })
+    return { ...user, respondentId: row!.id }
+  }
+  const attemptsOf = (respondentId: string) =>
+    testDb.select().from(attempts).where(eq(attempts.respondentId, respondentId))
+
+  it('starts an attempt with the 30 active items and their choices shuffled (ASM-01, ASM-02)', async () => {
+    const user = await respondent()
+    const before = Date.now()
+    const res = await start(user.headers)
+    expect(res.status).toBe(201)
+    const body = (await res.json()) as Record<string, string>
+    expect(body).toEqual({
+      id: expect.any(String),
+      status: 'in_progress',
+      startedAt: expect.any(String),
+      expiresAt: expect.any(String),
+      serverTime: expect.any(String),
+    })
+    const duration = Date.parse(body.expiresAt!) - Date.parse(body.startedAt!)
+    expect(duration).toBe(ATTEMPT_DURATION_MINUTES * 60_000)
+    expect(Date.parse(body.serverTime!)).toBeGreaterThanOrEqual(before - 1000)
+
+    const [row] = await attemptsOf(user.respondentId)
+    expect(row!.id).toBe(body.id)
+    // The bank holds exactly the 4/4/2 mix per area, so every active item is used, and no inactive one.
+    expect(row!.questionOrder).toHaveLength(ITEMS_PER_ATTEMPT)
+    expect(row!.questionOrder.toSorted()).toEqual(bank.active.toSorted())
+
+    // Each item's own 4 choices, once each.
+    const rows = await testDb
+      .select({ id: choices.id, questionId: choices.questionId })
+      .from(choices)
+      .where(inArray(choices.questionId, row!.questionOrder))
+    for (const questionId of row!.questionOrder) {
+      const shown = row!.choiceOrder[questionId] ?? []
+      expect(shown).toHaveLength(CHOICES_PER_QUESTION)
+      const own = rows.filter((c) => c.questionId === questionId).map((c) => c.id)
+      expect(shown.toSorted()).toEqual(own.toSorted())
+    }
+
+    // /me now knows the attempt.
+    expect(await (await get('/api/v1/me', user.headers)).json()).toMatchObject({
+      attempt: { id: body.id, status: 'in_progress' },
+    })
+  })
+
+  it('returns the attempt in progress instead of starting another (ASM-07)', async () => {
+    const user = await respondent()
+    const first = (await (await start(user.headers)).json()) as Record<string, string>
+    const res = await start(user.headers)
+    expect(res.status).toBe(200)
+    expect(await res.json()).toMatchObject({
+      id: first.id,
+      startedAt: first.startedAt,
+      expiresAt: first.expiresAt,
+    })
+    expect(await attemptsOf(user.respondentId)).toHaveLength(1)
+  })
+
+  it('starts one attempt when two arrive together', async () => {
+    const user = await respondent()
+    const results = await Promise.all([start(user.headers), start(user.headers)])
+    expect(results.map((r) => r.status).sort()).toEqual([200, 201])
+    const ids = await Promise.all(results.map(async (r) => ((await r.json()) as { id: string }).id))
+    expect(ids[0]).toBe(ids[1])
+    expect(await attemptsOf(user.respondentId)).toHaveLength(1)
+  })
+
+  it.each(['submitted', 'expired'] as const)(
+    'refuses a second attempt after a %s one (PRO-07)',
+    async (status) => {
+      const user = await respondent()
+      await start(user.headers)
+      await testDb
+        .update(attempts)
+        .set({ status })
+        .where(eq(attempts.respondentId, user.respondentId))
+      const res = await start(user.headers)
+      expect(res.status).toBe(409)
+      expect(await res.json()).toEqual({
+        error: { code: 'conflict', message: 'You already took the assessment.' },
+      })
+      expect(await attemptsOf(user.respondentId)).toHaveLength(1)
+    },
+  )
+
+  it('starts again after the attempt was voided', async () => {
+    const user = await respondent()
+    await start(user.headers)
+    await testDb
+      .update(attempts)
+      .set({ status: 'voided', voidReason: 'Lost connection' })
+      .where(eq(attempts.respondentId, user.respondentId))
+    expect((await start(user.headers)).status).toBe(201)
+    expect(await attemptsOf(user.respondentId)).toHaveLength(2)
+  })
+
+  it('sends conflict before the profile is saved', async () => {
+    const user = await signedIn()
+    const res = await start(user.headers)
+    expect(res.status).toBe(409)
+    expect(await res.json()).toEqual({
+      error: { code: 'conflict', message: 'Fill in your profile before you start.' },
+    })
+  })
+
+  it.each(['facilitator', 'admin'] as const)('refuses %s accounts', async (role) => {
+    const user = await signedIn(role)
+    const res = await start(user.headers)
+    expect(res.status).toBe(403)
+    expect(await res.json()).toMatchObject({ error: { code: 'forbidden' } })
+  })
+
+  it('sends unauthorized without a token', async () => {
+    expect((await start()).status).toBe(401)
+  })
+
+  it('sends conflict and starts nothing when an area has too few active items', async () => {
+    const user = await respondent()
+    const [first] = bank.active
+    await testDb.update(questions).set({ isActive: false }).where(eq(questions.id, first!))
+    const error = vi.spyOn(console, 'error').mockImplementation(() => {})
+    try {
+      const res = await start(user.headers)
+      expect(res.status).toBe(409)
+      expect(await res.json()).toEqual({
+        error: {
+          code: 'conflict',
+          message: 'The assessment isn’t ready yet. Please try again later.',
+        },
+      })
+      expect(error).toHaveBeenCalled()
+      expect(await attemptsOf(user.respondentId)).toHaveLength(0)
+    } finally {
+      error.mockRestore()
+      await testDb.update(questions).set({ isActive: true }).where(eq(questions.id, first!))
+    }
+  })
+})
+
 describe('API docs', () => {
   it('builds the OpenAPI spec with every route', async () => {
     const res = await get('/api/openapi.json')
     expect(res.status).toBe(200)
     const spec = (await res.json()) as { paths: Record<string, unknown> }
     expect(Object.keys(spec.paths)).toEqual(
-      expect.arrayContaining(['/api/v1/health', '/api/v1/me', '/api/v1/respondents']),
+      expect.arrayContaining([
+        '/api/v1/health',
+        '/api/v1/me',
+        '/api/v1/respondents',
+        '/api/v1/attempts',
+      ]),
     )
   })
 })
