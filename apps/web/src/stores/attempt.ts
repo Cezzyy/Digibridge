@@ -1,7 +1,7 @@
 import type { InferResponseType } from 'hono/client'
 import { defineStore } from 'pinia'
 import { computed, ref, shallowRef } from 'vue'
-import { api, ApiRequestError, call } from '../lib/api'
+import { api, ApiRequestError, call, messageOf } from '../lib/api'
 import { useSessionStore } from './session'
 
 export type Attempt = InferResponseType<(typeof api.attempts)[':id']['$get'], 200>
@@ -13,7 +13,6 @@ export type SubmittedAttempt = InferResponseType<
 /** Where one answer's save is: on its way, saved, or failed after every retry. */
 export type SaveState = 'saving' | 'saved' | 'failed'
 
-const SOMETHING_WENT_WRONG = 'Something went wrong. Please try again.'
 /** Waits before each retry of a failed save: 3 retries after the first try (TRD). */
 const RETRY_DELAYS_MS = [1000, 2000, 4000]
 /**
@@ -24,8 +23,6 @@ const RETRY_DELAYS_MS = [1000, 2000, 4000]
 const TIME_UP_SAVE_WAIT_MS = 5000
 
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms))
-const messageOf = (err: unknown) =>
-  err instanceof ApiRequestError ? err.message : SOMETHING_WENT_WRONG
 
 // A save worth trying again: no connection, or a hiccup on our side.
 const canRetry = (err: unknown) =>

@@ -11,7 +11,7 @@ import SubmitDialog from '../../components/assessment/SubmitDialog.vue'
 import ErrorScreen from '../../components/ErrorScreen.vue'
 import { RULE_ICONS } from '../../components/home/home-icons'
 import { useCountdown } from '../../composables/useCountdown'
-import { ApiRequestError } from '../../lib/api'
+import { ApiRequestError, messageOf } from '../../lib/api'
 import { PRIMARY_BUTTON, SECONDARY_BUTTON } from '../../lib/buttons'
 import { useAttemptStore } from '../../stores/attempt'
 import { useSessionStore } from '../../stores/session'
@@ -55,8 +55,7 @@ async function load() {
       // The account changed: let /me and home sort it out.
       return leave()
     }
-    loadError.value =
-      err instanceof ApiRequestError ? err.message : 'Something went wrong. Please try again.'
+    loadError.value = messageOf(err)
   }
 }
 onMounted(load)

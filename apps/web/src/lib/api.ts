@@ -41,6 +41,13 @@ const NETWORK_MESSAGE =
   "We couldn't reach DigiBridge. Check your internet connection and try again."
 const FALLBACK_MESSAGE = 'Something went wrong on our side. Please try again.'
 
+/** For an error that isn't from the API (a bug, or something the browser threw). */
+export const SOMETHING_WENT_WRONG = 'Something went wrong. Please try again.'
+
+/** What to tell the student about a failed call: the API's message, or SOMETHING_WENT_WRONG. */
+export const messageOf = (err: unknown) =>
+  err instanceof ApiRequestError ? err.message : SOMETHING_WENT_WRONG
+
 // The JSON body of a call's successful responses.
 type SuccessBody<R> =
   R extends ClientResponse<infer T, infer S, 'json'>

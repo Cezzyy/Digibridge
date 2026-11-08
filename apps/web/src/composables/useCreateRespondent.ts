@@ -1,6 +1,6 @@
 import type { OnlineRespondentInput } from '@digibridge/shared'
 import { ref } from 'vue'
-import { api, ApiRequestError, call } from '../lib/api'
+import { api, ApiRequestError, call, messageOf, SOMETHING_WENT_WRONG } from '../lib/api'
 import { useConsentStore } from '../stores/consent'
 import { useSessionStore } from '../stores/session'
 
@@ -29,12 +29,11 @@ export function useCreateRespondent() {
         if (session.me?.respondent) return true
         // The follow-up /me failed. A 401 there signs the user out without leaving the page.
         error.value = session.session
-          ? 'Something went wrong. Please try again.'
+          ? SOMETHING_WENT_WRONG
           : 'You were signed out. Please sign in again.'
         return false
       }
-      error.value =
-        err instanceof ApiRequestError ? err.message : 'Something went wrong. Please try again.'
+      error.value = messageOf(err)
       return false
     } finally {
       saving.value = false
