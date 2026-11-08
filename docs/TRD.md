@@ -357,7 +357,7 @@ The browser never talks to the database directly, and only the fields the study 
 - **Kiosk PIN** is hashed with SHA-256 plus a per-session salt and rate limited (5 tries, then 1 minute).
 - **Uploads** accept only PNG, JPEG and WebP up to 2 MB.
 - **Data Privacy Act of 2012:**
-  - Consent notice versioned (`consent_version`) and stored with a timestamp. Online and kiosk can show different notice text, since only kiosk collects school details.
+  - Consent notice versioned (`consent_version`) and stored with a timestamp. Online and kiosk show different notice text: the online notice is general (what DigiBridge does with your answers, no mention of the study or a school), and the kiosk notice explains the research and the school details.
   - Online collects no school details at all; the API refuses them.
   - Name and student number are shown to the team only if the respondent allowed it (show\_identity). Otherwise they read Hidden everywhere, including the CSV.
   - CSV export is admin only.
