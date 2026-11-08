@@ -7,6 +7,7 @@ import { api, ApiRequestError, call } from '../lib/api'
 import { markSignInStarted, returningFromGoogle, supabase } from '../lib/supabase'
 
 export type Me = InferResponseType<typeof api.me.$get, 200>
+export type RespondentSummary = NonNullable<Me['respondent']>
 
 /**
  * Why the app can't go on, shown by App.vue as an ErrorScreen.
@@ -108,6 +109,11 @@ export const useSessionStore = defineStore('session', () => {
     failure.value = null
   }
 
+  /** After saving the profile: the user is now a respondent, without another /me call. */
+  function setRespondent(respondent: RespondentSummary) {
+    if (me.value) me.value = { ...me.value, respondent }
+  }
+
   /** Hides the error screen; the router calls it when the user goes to another page. */
   function clearFailure() {
     failure.value = null
@@ -124,6 +130,8 @@ export const useSessionStore = defineStore('session', () => {
     isStaff,
     isAdmin,
     init,
+    loadMe,
+    setRespondent,
     signIn,
     signOut,
     clearFailure,
