@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
 import { useCountdown } from '../../composables/useCountdown'
+import { RULE_ICONS } from '../home/home-icons'
 
 // The time left, always in view at the top of the assessment (ASM-03). Calm until 5 minutes,
 // marigold from 5 minutes, red in the last minute (docs/design.md). The page works out the
@@ -65,9 +66,7 @@ watch(tone, (next, before) => {
         stroke-linecap="round"
         stroke-linejoin="round"
       >
-        <path d="M12 5a8 8 0 1 0 0 16 8 8 0 0 0 0-16Z" />
-        <path d="M12 9v4l2.5 1.5" />
-        <path d="M10 2h4" />
+        <path v-for="d in RULE_ICONS.timer" :key="d" :d="d" />
       </svg>
       <span aria-hidden="true">{{ clock }}</span>
     </span>
