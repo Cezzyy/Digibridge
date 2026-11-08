@@ -20,7 +20,7 @@ import { useSessionStore } from '../../stores/session'
 // jump around, the timer from the server's clock, and Submit (ASM-01 to ASM-09). The `step`
 // guard lets in only a respondent with an attempt in progress. Each answer saves as it's picked;
 // a reload gets the same items, answers and time back. At 0 the answers are sent by themselves,
-// and once the attempt is closed the page goes back to home.
+// and once the attempt is closed the page goes on to the results.
 const session = useSessionStore()
 const store = useAttemptStore()
 const router = useRouter()
@@ -30,6 +30,7 @@ const attemptId = computed(() => session.me?.attempt?.id ?? null)
 const ready = computed(() => store.attempt !== null && store.attempt.id === attemptId.value)
 
 const goHome = () => router.replace({ name: 'home' })
+const showResults = () => router.replace({ name: 'results' })
 
 /** Goes home after fetching /me again, when the attempt here is no longer the student's one. */
 async function leave() {
@@ -48,7 +49,7 @@ async function load() {
     if (data.status === 'voided') return leave()
     if (data.status !== 'in_progress') {
       session.setAttempt({ id: data.id, status: data.status })
-      await goHome()
+      await showResults()
     }
   } catch (err) {
     if (err instanceof ApiRequestError && (err.code === 'not_found' || err.code === 'forbidden')) {
@@ -100,7 +101,7 @@ async function submit({ evenIfUnsaved = false } = {}) {
   const result = await store.submit({ evenIfUnsaved })
   if (result) {
     dialogOpen.value = false
-    await goHome()
+    await showResults()
   } else if (store.voided) {
     await leave()
   }
