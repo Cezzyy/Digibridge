@@ -114,7 +114,7 @@ Every requirement has an ID that Morales's test cases point to. Must = needed fo
 
 | ID | Requirement | Priority |
 | --- | --- | --- |
-| CON-01 | Before anything else, respondents see a consent notice under the Data Privacy Act of 2012: purpose, data collected, who sees it, that data is kept until the end of the semester (December 2026) and then deleted, and the group leader, Cez, as contact person. They must agree to continue. | Must |
+| CON-01 | Before anything else, respondents see a consent notice under the Data Privacy Act of 2012: purpose, data collected, who sees it, that data is kept until the end of the semester (December 2026) and then deleted, and the DigiBridge team as contact (the kiosk notice may name the group leader, Cez). They must agree to continue. | Must |
 | CON-02 | The app stores the consent with its timestamp and notice version. Declining ends the flow without saving anything. | Must |
 | PRO-01 | General profile, asked in both modes: full name, age, sex, devices they own, and how they usually get internet. | Must |
 | PRO-05 | Before starting, respondents choose whether the team may see who they are: their name, and in kiosk mode also their student number. If they say no, these show as Hidden on the dashboard and in the CSV, and only the other profile answers are shown. | Must |
@@ -309,7 +309,7 @@ The open questions are settled; each answer is built into the requirements above
 - **School details only in kiosk mode** (Nov 7): student number, course and year level are asked only in kiosk mode. Online mode is public and general, with one attempt per Google account (PRO-06, PRO-07, KIO-03). The study's ACLC sample comes from kiosk sessions.
 - **Student number format:** like C23-01-7557-MAN121, kiosk mode only (PRO-02).
 - **Courses and year levels:** BSIT, BSCS, BSBA, BSA and BSHM for 1st to 4th year; TESDA scholars in HRT and WADT for 1st to 3rd year, kiosk mode only (PRO-04).
-- **Consent contact and retention:** Cez is the contact person. Data is kept until the end of the semester (December 2026), since it's needed for the defense and finals, then deleted (CON-01).
+- **Consent contact and retention:** the online notice names the DigiBridge team as contact, not a person. Data is kept until the end of the semester (December 2026), since it's needed for the defense and finals, then deleted (CON-01).
 - **SUS survey:** inside the app after results. Optional online, prompted in kiosk mode (SUS-01 to SUS-05). This replaces the separate Google Form.
 - **QR code to results:** included (RES-04).
 - **Showing identity:** each respondent chooses before the assessment whether the team sees their name and, in kiosk mode, their student number (PRO-05).
