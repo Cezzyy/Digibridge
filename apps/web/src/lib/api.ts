@@ -3,9 +3,20 @@ import type { AppType } from 'api/src/app'
 import { hc, type ClientResponse } from 'hono/client'
 import { supabase } from './supabase'
 
+/** A request with no reply by then is given up on, and fails as `network`. */
+const REQUEST_TIMEOUT_MS = 10_000
+
+// Browsers never time out a fetch by themselves: on a bad connection it can hang for minutes.
+function fetchWithTimeout(input: RequestInfo | URL, init?: RequestInit) {
+  const timeout = AbortSignal.timeout(REQUEST_TIMEOUT_MS)
+  const signal = init?.signal ? AbortSignal.any([init.signal, timeout]) : timeout
+  return fetch(input, { ...init, signal })
+}
+
 // Typed client for /api/v1, built from the API's route types. Each call sends the
 // signed-in user's token; getSession refreshes it first if it has expired.
 export const api = hc<AppType>(import.meta.env.VITE_API_URL, {
+  fetch: fetchWithTimeout,
   headers: async (): Promise<Record<string, string>> => {
     const { data } = await supabase.auth.getSession()
     const token = data.session?.access_token
