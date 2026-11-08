@@ -1,6 +1,6 @@
 import { OpenAPIHono } from '@hono/zod-openapi'
 import type { AppEnv } from './env'
-import { startAttempt } from './handlers/attempts'
+import { getAttempt, saveAnswer, startAttempt, submitAttempt } from './handlers/attempts'
 import { getHealth } from './handlers/health'
 import { getMe } from './handlers/me'
 import { createRespondent } from './handlers/respondents'
@@ -12,7 +12,12 @@ import {
   validationHook,
 } from './middleware'
 import { addApiDocs } from './openapi'
-import { startAttemptRoute } from './routes/attempts'
+import {
+  getAttemptRoute,
+  saveAnswerRoute,
+  startAttemptRoute,
+  submitAttemptRoute,
+} from './routes/attempts'
 import { healthRoute } from './routes/health'
 import { meRoute } from './routes/me'
 import { createRespondentRoute } from './routes/respondents'
@@ -26,6 +31,9 @@ const v1Routes = v1
   .openapi(meRoute, getMe)
   .openapi(createRespondentRoute, createRespondent)
   .openapi(startAttemptRoute, startAttempt)
+  .openapi(getAttemptRoute, getAttempt)
+  .openapi(saveAnswerRoute, saveAnswer)
+  .openapi(submitAttemptRoute, submitAttempt)
 
 // Builds the Hono app: routes under /api/v1, docs under /api.
 // CORS is added before the routes so it runs on every response, errors included.
