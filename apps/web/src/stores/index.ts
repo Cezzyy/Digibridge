@@ -1,2 +1,3 @@
-// Pinia stores: session, kiosk, attempt.
+// Pinia stores: session, consent, kiosk, attempt.
+export * from './consent'
 export * from './session'
