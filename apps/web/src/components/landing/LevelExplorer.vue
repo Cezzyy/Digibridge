@@ -12,7 +12,7 @@ import {
   type Difficulty,
 } from '@digibridge/shared'
 import { computed, onBeforeUnmount, onMounted, ref, useId, useTemplateRef, watch } from 'vue'
-import { LEVEL_BANDS, LEVEL_TONE } from '../../lib/levels'
+import { LEVEL_BANDS, LEVEL_TONE, levelRange } from '../../lib/levels'
 import { onFirstView, prefersReducedMotion, tween } from '../../lib/motion'
 
 // "Try a score" on the landing page: drag across one area's points and see the level and
@@ -63,13 +63,7 @@ const rollIn = computed(() => (rising.value ? 'translate-y-full' : '-translate-y
 const rollOut = computed(() => (rising.value ? '-translate-y-full' : 'translate-y-full'))
 
 const band = computed(() => LEVEL_BANDS.find((b) => b.level === level.value))
-const bandRange = computed(() => {
-  const b = band.value
-  if (!b) return ''
-  if (b.from === 0) return `Below ${b.to}%`
-  if (b.to === 100) return `${b.from}% and up`
-  return `${b.from}% to ${b.to - 1}%`
-})
+const bandRange = computed(() => (band.value ? levelRange(band.value) : ''))
 
 /** One way to earn `total` points: as many basic items as possible, then harder ones. */
 function itemsRight(total: number): Record<Difficulty, number> {
