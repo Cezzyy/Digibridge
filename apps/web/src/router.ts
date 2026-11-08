@@ -11,16 +11,24 @@ import HomePage from './pages/HomePage.vue'
 import LandingPage from './pages/LandingPage.vue'
 import NotFoundPage from './pages/NotFoundPage.vue'
 import SignInPage from './pages/SignInPage.vue'
+import ConsentPage from './pages/start/ConsentPage.vue'
+import ProfilePage from './pages/start/ProfilePage.vue'
+import { useConsentStore } from './stores/consent'
 import { useSessionStore } from './stores/session'
 
 // Who may open a page. No `requires` means anyone; `guest` means only signed-out users.
 // These guards only decide what to show; the API checks the role again on every call (AUTH-04).
-// The `step` and `kioskLock` guards from the TRD come with the consent and kiosk pages.
+// The `kioskLock` guard from the TRD comes with the kiosk pages.
 export type Requirement = 'guest' | 'signedIn' | 'staff' | 'admin'
+
+/** A page of the respondent flow, which the `step` guard keeps in order. */
+export type Step = 'home' | 'consent' | 'profile'
 
 declare module 'vue-router' {
   interface RouteMeta {
     requires?: Requirement
+    /** Checked after `requires`: sends users to the step they're on (see `checkStep`). */
+    step?: Step
     /** The page draws its own top bar instead of AppHeader. */
     hideHeader?: boolean
   }
@@ -54,7 +62,24 @@ export const router = createRouter({
       component: SignInPage,
       meta: { requires: 'guest', hideHeader: true },
     },
-    { path: '/home', name: 'home', component: HomePage, meta: { requires: 'signedIn' } },
+    {
+      path: '/home',
+      name: 'home',
+      component: HomePage,
+      meta: { requires: 'signedIn', step: 'home' },
+    },
+    {
+      path: '/start/consent',
+      name: 'consent',
+      component: ConsentPage,
+      meta: { requires: 'signedIn', step: 'consent' },
+    },
+    {
+      path: '/start/profile',
+      name: 'profile',
+      component: ProfilePage,
+      meta: { requires: 'signedIn', step: 'profile' },
+    },
     {
       path: '/:pathMatch(.*)*',
       name: 'not-found',
@@ -77,6 +102,41 @@ function withoutCallbackParams(to: RouteLocationNormalized, from: RouteLocationN
   return { path: to.path, query, hash: inHash ? '' : to.hash, replace: true }
 }
 
+// Whether the signed-in user may open a page, or where to go instead.
+function checkRequirement(requires: Requirement) {
+  const session = useSessionStore()
+  switch (requires) {
+    case 'guest':
+      return !session.isSignedIn || { name: 'home' }
+    case 'signedIn':
+      return session.isSignedIn || { name: 'sign-in' }
+    case 'staff':
+      return session.isStaff || { name: session.isSignedIn ? 'home' : 'sign-in' }
+    case 'admin':
+      return session.isAdmin || { name: session.isSignedIn ? 'home' : 'sign-in' }
+  }
+}
+
+// The respondent flow in order: consent, profile, then home. A new respondent's first sign-in
+// lands on /home and goes on to the notice; once the profile is saved, both start pages send
+// them home. Staff stay on /home and can open the notice from there to try the flow.
+function checkStep(step: Step) {
+  const session = useSessionStore()
+  const me = session.me
+  if (!me) return { name: 'sign-in' }
+  const hasProfile = me.respondent !== null
+  switch (step) {
+    case 'home':
+      return hasProfile || session.isStaff || { name: 'consent' }
+    case 'consent':
+      return !hasProfile || { name: 'home' }
+    case 'profile':
+      if (hasProfile) return { name: 'home' }
+      // The notice comes first, and its answer lives in memory only (stores/consent.ts).
+      return useConsentStore().versionFor(me.profile.id) !== null || { name: 'consent' }
+  }
+}
+
 router.beforeEach(async (to, from) => {
   const clean = withoutCallbackParams(to, from)
   if (clean) return clean
@@ -88,16 +148,9 @@ router.beforeEach(async (to, from) => {
   await session.init()
   // App.vue shows the error screen over the first page, so stay there: "Try again" reloads it.
   if (session.failure && from === START_LOCATION) return true
-  switch (requires) {
-    case 'guest':
-      return !session.isSignedIn || { name: 'home' }
-    case 'signedIn':
-      return session.isSignedIn || { name: 'sign-in' }
-    case 'staff':
-      return session.isStaff || { name: session.isSignedIn ? 'home' : 'sign-in' }
-    case 'admin':
-      return session.isAdmin || { name: session.isSignedIn ? 'home' : 'sign-in' }
-  }
+  const allowed = checkRequirement(requires)
+  if (allowed !== true || !to.meta.step) return allowed
+  return checkStep(to.meta.step)
 })
 
 // Going to any page after the first one (a button, the logo, the back button) closes the error
