@@ -1,20 +1,26 @@
-import { AGE_MAX, AGE_MIN, YEAR_LEVELS, type Mode } from '@digibridge/shared'
+import { AGE_MAX, AGE_MIN, PROFILE_TIME_ZONE, YEAR_LEVELS, type Mode } from '@digibridge/shared'
 import { sql } from 'drizzle-orm'
 import {
   boolean,
   check,
+  date,
   index,
   pgTable,
   smallint,
   text,
   timestamp,
   uuid,
+  type AnyPgColumn,
 } from 'drizzle-orm/pg-core'
 import { authUsers } from 'drizzle-orm/supabase'
 import { modeEnum, roleEnum, sexEnum } from './enums'
 
 // Mode values for the school fields check, typed against MODES so renaming one breaks the build.
 const modeLiteral = (mode: Mode) => sql.raw(`'${mode}'`)
+
+// The calendar day of a timestamp in the Philippines, where respondents' ages are counted.
+const consentDay = (column: AnyPgColumn) =>
+  sql`(${column} at time zone ${sql.raw(`'${PROFILE_TIME_ZONE}'`)})::date`
 
 // One row per Google account, created on the first API call after sign-in.
 export const profiles = pgTable('profiles', {
@@ -45,7 +51,8 @@ export const respondents = pgTable(
     fullName: text('full_name').notNull(),
     course: text('course'),
     yearLevel: smallint('year_level'),
-    age: smallint('age').notNull(),
+    // Sent and read as 'YYYY-MM-DD'. Age is worked out from it (ageOn in packages/shared).
+    birthDate: date('birth_date', { mode: 'string' }).notNull(),
     sex: sexEnum('sex').notNull(),
     devices: text('devices')
       .array()
@@ -63,9 +70,12 @@ export const respondents = pgTable(
   },
   (t) => [
     check('respondents_student_number_upper', sql`${t.studentNumber} = upper(${t.studentNumber})`),
+    // Age on the day of consent, in the Philippines, from AGE_MIN to AGE_MAX: born on or before
+    // that day AGE_MIN years ago, and after that day AGE_MAX + 1 years ago.
     check(
-      'respondents_age_range',
-      sql`${t.age} between ${sql.raw(String(AGE_MIN))} and ${sql.raw(String(AGE_MAX))}`,
+      'respondents_birth_date_range',
+      sql`${t.birthDate} <= ${consentDay(t.consentedAt)} - interval '${sql.raw(String(AGE_MIN))} years'
+        and ${t.birthDate} > ${consentDay(t.consentedAt)} - interval '${sql.raw(String(AGE_MAX + 1))} years'`,
     ),
     check(
       'respondents_year_level_range',
