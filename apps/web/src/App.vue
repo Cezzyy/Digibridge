@@ -18,12 +18,20 @@ const router = useRouter()
 const starting = computed(() => route.matched.length === 0)
 const showHeader = computed(() => !route.meta.hideHeader)
 
-// When signing in fails or the API can't be reached, the error screen takes the whole page.
-// Going to another page closes it (router.ts).
+// When signing in fails, the API can't be reached or a page won't open, the error screen takes
+// the whole page. Going to another page closes it (router.ts).
 const failureScreen = computed(() => {
   const failure = session.failure
   if (!failure) return null
 
+  const retry: ErrorAction = { label: 'Try again', onClick: () => window.location.reload() }
+  if (failure.kind === 'page') {
+    return {
+      title: "We couldn't open this page",
+      message: 'Part of the page didn’t load. Check your internet connection, then try again.',
+      actions: [retry],
+    }
+  }
   const home: ErrorAction = { label: 'Back to the home page', to: { name: 'landing' } }
   if (failure.kind === 'sign-in') {
     return {
@@ -37,7 +45,7 @@ const failureScreen = computed(() => {
     title: "We couldn't load your account",
     message: failure.message,
     actions: [
-      { label: 'Try again', onClick: () => window.location.reload() },
+      retry,
       {
         label: 'Sign out',
         onClick: async () => {
@@ -51,8 +59,9 @@ const failureScreen = computed(() => {
 </script>
 
 <template>
-  <AppSplash v-if="starting" />
-  <ErrorScreen v-else-if="failureScreen" v-bind="failureScreen" />
+  <!-- The error screen comes first: a first page that fails to open never ends `starting`. -->
+  <ErrorScreen v-if="failureScreen" v-bind="failureScreen" />
+  <AppSplash v-else-if="starting" />
   <template v-else>
     <AppHeader v-if="showHeader" />
     <RouterView />

@@ -13,8 +13,11 @@ export type RespondentSummary = NonNullable<Me['respondent']>
  * Why the app can't go on, shown by App.vue as an ErrorScreen.
  * `sign-in`: the return from Google didn't end signed in (cancelled, expired code, token refused).
  * `unavailable`: signed in with Google, but /me failed (API down, no internet).
+ * `page`: a page couldn't open, e.g. its code didn't download (flaky connection, or a new
+ * deploy replaced the file). Set by the router.
  */
-export type SessionFailure = { kind: 'sign-in' } | { kind: 'unavailable'; message: string }
+export type SessionFailure =
+  { kind: 'sign-in' } | { kind: 'unavailable'; message: string } | { kind: 'page' }
 
 // The Supabase session and the signed-in user from GET /api/v1/me.
 export const useSessionStore = defineStore('session', () => {
@@ -116,6 +119,11 @@ export const useSessionStore = defineStore('session', () => {
     if (me.value) me.value = { ...me.value, attempt }
   }
 
+  /** Shows the error screen when a page couldn't open; the router calls it. */
+  function failPage() {
+    failure.value = { kind: 'page' }
+  }
+
   /** Hides the error screen; the router calls it when the user goes to another page. */
   function clearFailure() {
     failure.value = null
@@ -137,6 +145,7 @@ export const useSessionStore = defineStore('session', () => {
     setAttempt,
     signIn,
     signOut,
+    failPage,
     clearFailure,
   }
 })
