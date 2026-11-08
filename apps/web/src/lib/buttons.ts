@@ -5,3 +5,9 @@ const BUTTON =
 
 export const PRIMARY_BUTTON = `${BUTTON} bg-evergreen text-white hover:bg-evergreen-hover disabled:bg-evergreen-hover`
 export const SECONDARY_BUTTON = `${BUTTON} border border-line-strong text-evergreen hover:bg-evergreen-soft`
+
+/**
+ * Something that isn't open yet: looks switched off and does nothing. Put `aria-disabled="true"`
+ * on it instead of `disabled`, so it can still be focused and screen readers read it out.
+ */
+export const OFF_BUTTON = `${BUTTON} cursor-not-allowed bg-track text-quiet`
