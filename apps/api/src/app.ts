@@ -2,6 +2,7 @@ import { OpenAPIHono } from '@hono/zod-openapi'
 import type { AppEnv } from './env'
 import { getAttempt, getResult, saveAnswer, startAttempt, submitAttempt } from './handlers/attempts'
 import { getHealth } from './handlers/health'
+import { getLesson, listLessons } from './handlers/lessons'
 import { getMe } from './handlers/me'
 import { createRespondent } from './handlers/respondents'
 import {
@@ -20,6 +21,7 @@ import {
   submitAttemptRoute,
 } from './routes/attempts'
 import { healthRoute } from './routes/health'
+import { getLessonRoute, listLessonsRoute } from './routes/lessons'
 import { meRoute } from './routes/me'
 import { createRespondentRoute } from './routes/respondents'
 
@@ -36,6 +38,8 @@ const v1Routes = v1
   .openapi(saveAnswerRoute, saveAnswer)
   .openapi(submitAttemptRoute, submitAttempt)
   .openapi(getResultRoute, getResult)
+  .openapi(listLessonsRoute, listLessons)
+  .openapi(getLessonRoute, getLesson)
 
 // Builds the Hono app: routes under /api/v1, docs under /api.
 // CORS is added before the routes so it runs on every response, errors included.
