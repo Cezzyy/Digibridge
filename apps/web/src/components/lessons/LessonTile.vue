@@ -1,80 +1,78 @@
 <script setup lang="ts">
-import {
-  LESSON_TIER_LABELS,
-  LEVEL_LABELS,
-  levelsForLessonTier,
-  type LessonTier,
-} from '@digibridge/shared'
+import { LESSON_TIER_LABELS, type LessonTier } from '@digibridge/shared'
 import { computed } from 'vue'
+import { RouterLink } from 'vue-router'
 import type { LessonSummary } from '../../composables/useLessons'
+import LevelDots from './LevelDots.vue'
+import TierMeter from './TierMeter.vue'
 
-// One lesson tier of an area in the library: its tier, the levels it's meant for, and a link to
-// the lesson. `lesson` is null until the team publishes that tier's lesson. `current` marks the
-// lesson already open, on its own page, where it isn't a link.
+// One lesson tier of an area: its tier and how far up the area it sits, the lesson's title and
+// summary, and the levels it's meant for (LevelDots). `lesson` is null until the
+// team publishes that tier's lesson. `current` marks the lesson already open, on its own page,
+// where it isn't a link.
 const props = defineProps<{ tier: LessonTier; lesson: LessonSummary | null; current?: boolean }>()
 
 const tierLabel = computed(() => LESSON_TIER_LABELS[props.tier])
-const forLevels = computed(
-  () =>
-    `For ${levelsForLessonTier(props.tier)
-      .map((level) => LEVEL_LABELS[level])
-      .join(' and ')}`,
-)
 </script>
 
 <template>
-  <div
-    v-if="lesson && current"
-    aria-current="page"
-    class="flex h-full flex-col rounded-card border-2 border-evergreen bg-evergreen-soft p-4"
+  <component
+    :is="lesson && !current ? RouterLink : 'div'"
+    :to="lesson && !current ? { name: 'lesson', params: { slug: lesson.slug } } : undefined"
+    :aria-current="lesson && current ? 'page' : undefined"
+    class="group flex h-full flex-col rounded-card p-5 sm:p-6"
+    :class="
+      !lesson
+        ? 'border border-dashed border-line-strong/50 bg-mist-soft'
+        : current
+          ? 'border-2 border-evergreen bg-evergreen-soft'
+          : 'border border-line bg-surface transition-[border-color,box-shadow,translate] duration-300 ease-glide hover:-translate-y-0.5 hover:border-evergreen hover:shadow-[0_18px_36px_-24px_rgb(18_36_28/0.45)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-evergreen'
+    "
   >
-    <p class="flex flex-wrap items-center gap-2 text-sm">
-      <span class="rounded-full bg-evergreen px-2.5 py-0.5 font-semibold text-white">
-        {{ tierLabel }}
-      </span>
-      <span class="text-quiet">You’re reading this</span>
+    <p class="flex items-center justify-between gap-3 text-sm font-semibold">
+      <span :class="lesson ? 'text-evergreen' : 'text-quiet'">{{ tierLabel }}</span>
+      <TierMeter :tier="tier" :class="!lesson && 'opacity-50'" />
     </p>
-    <p class="mt-3 font-semibold text-evergreen">{{ lesson.title }}</p>
-  </div>
 
-  <RouterLink
-    v-else-if="lesson"
-    :to="{ name: 'lesson', params: { slug: lesson.slug } }"
-    class="group flex h-full flex-col rounded-card border border-line bg-surface p-4 transition-colors hover:border-evergreen hover:bg-evergreen-soft focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-evergreen sm:p-5"
-  >
-    <p class="flex flex-wrap items-center gap-2 text-sm">
-      <span
-        class="rounded-full bg-evergreen-soft px-2.5 py-0.5 font-semibold text-evergreen group-hover:bg-surface"
+    <template v-if="lesson">
+      <h3
+        class="mt-4 text-xl leading-tight font-bold text-balance"
+        :class="current ? 'text-evergreen' : 'transition-colors group-hover:text-evergreen'"
       >
-        {{ tierLabel }}
-      </span>
-      <span class="text-quiet">{{ forLevels }}</span>
-    </p>
-    <p class="mt-3 text-lg leading-snug font-semibold text-evergreen">{{ lesson.title }}</p>
-    <p class="mt-1 leading-relaxed text-quiet">{{ lesson.summary }}</p>
-    <p class="mt-auto flex items-center gap-1.5 pt-4 text-sm font-semibold text-evergreen">
-      Open lesson
-      <svg
-        viewBox="0 0 16 16"
-        aria-hidden="true"
-        class="size-4 fill-none stroke-current stroke-[2.5] transition-transform group-hover:translate-x-0.5"
-      >
-        <path d="M6 3.5 10.5 8 6 12.5" stroke-linecap="round" stroke-linejoin="round" />
-      </svg>
-    </p>
-  </RouterLink>
+        {{ lesson.title }}
+      </h3>
+      <p v-if="!current" class="mt-2 leading-relaxed text-quiet">{{ lesson.summary }}</p>
+    </template>
+    <template v-else>
+      <h3 class="mt-4 text-xl leading-tight font-bold">{{ tierLabel }} lesson</h3>
+      <p class="mt-2 leading-relaxed text-quiet">Coming soon. The team is still writing it.</p>
+    </template>
 
-  <div
-    v-else
-    class="flex h-full flex-col rounded-card border border-dashed border-line-strong/50 bg-mist-soft p-4 sm:p-5"
-  >
-    <p class="flex flex-wrap items-center gap-2 text-sm">
-      <span class="rounded-full bg-evergreen-soft px-2.5 py-0.5 font-semibold text-evergreen">
-        {{ tierLabel }}
-      </span>
-      <span class="text-quiet">{{ forLevels }}</span>
-    </p>
-    <p class="mt-3 text-lg font-semibold">{{ tierLabel }} lesson</p>
-    <p class="mt-1 leading-relaxed text-quiet">Coming soon. The team is still writing it.</p>
-  </div>
+    <div class="mt-auto pt-5">
+      <div
+        class="flex min-h-9 items-center justify-between gap-3"
+        :class="!current && 'border-t border-line pt-4'"
+      >
+        <p v-if="current" class="text-sm font-semibold text-evergreen">You’re reading this</p>
+        <LevelDots
+          v-else
+          :tier="tier"
+          :ring="lesson ? 'ring-surface' : 'ring-mist-soft'"
+          class="text-sm text-quiet"
+        />
+        <span
+          v-if="lesson && !current"
+          aria-hidden="true"
+          class="grid size-9 shrink-0 place-items-center rounded-full bg-evergreen-soft text-evergreen transition-colors group-hover:bg-evergreen group-hover:text-white"
+        >
+          <svg
+            viewBox="0 0 16 16"
+            class="size-4 fill-none stroke-current stroke-[2.25] transition-transform group-hover:translate-x-0.5"
+          >
+            <path d="M3 8h9.5M8.5 4l4 4-4 4" stroke-linecap="round" stroke-linejoin="round" />
+          </svg>
+        </span>
+      </div>
+    </div>
+  </component>
 </template>
