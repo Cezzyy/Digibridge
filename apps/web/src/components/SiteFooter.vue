@@ -13,10 +13,19 @@ import BrandMark from './BrandMark.vue'
         <BrandMark class="size-6" />
         DigiBridge
       </p>
-      <p class="max-w-2xl leading-relaxed sm:text-right">
-        Check your digital skills and find lessons that fit your level. Built on DigComp 2.2. © 2026
-        DigiBridge.
-      </p>
+      <div class="max-w-2xl sm:text-right">
+        <p class="leading-relaxed">
+          Check your digital skills and find lessons that fit your level. Built on DigComp 2.2. ©
+          2026 DigiBridge.
+        </p>
+        <!-- The library is open without signing in (LES-03). -->
+        <RouterLink
+          :to="{ name: 'lessons' }"
+          class="mt-2 inline-flex min-h-11 items-center font-semibold text-white underline decoration-white/40 underline-offset-2 hover:decoration-white"
+        >
+          Browse the lessons
+        </RouterLink>
+      </div>
     </div>
   </footer>
 </template>
