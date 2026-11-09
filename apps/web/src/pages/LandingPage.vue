@@ -100,6 +100,13 @@ onBeforeUnmount(() => observer?.disconnect())
       >
         {{ link.label }}
       </RouterLink>
+      <!-- From `sm`: on phones there's no room beside Sign in, so the footer links it instead. -->
+      <RouterLink
+        :to="{ name: 'lessons' }"
+        class="hidden min-h-11 items-center rounded-control px-3 font-semibold text-quiet transition-colors hover:text-ink sm:inline-flex"
+      >
+        Lessons
+      </RouterLink>
       <RouterLink
         :to="{ name: 'sign-in' }"
         class="ml-2 inline-flex min-h-11 items-center rounded-control border border-line-strong px-4 font-semibold text-evergreen transition-colors hover:bg-evergreen-soft"

@@ -4,7 +4,8 @@ import AccountControls from './AccountControls.vue'
 import BrandMark from './BrandMark.vue'
 
 // Top bar on every page, so users can sign in or out from anywhere (AUTH-03). It stays at the
-// top while the page scrolls, and spans the whole width like the start pages under it.
+// top while the page scrolls, and spans the whole width like the start pages under it. The
+// lessons link shows from `sm`: on phones there's no room beside Sign out.
 const session = useSessionStore()
 </script>
 
@@ -19,15 +20,24 @@ const session = useSessionStore()
         DigiBridge
       </RouterLink>
 
-      <AccountControls v-if="session.isSignedIn" />
+      <div class="flex min-w-0 items-center gap-2 sm:gap-4">
+        <RouterLink
+          :to="{ name: 'lessons' }"
+          class="hidden min-h-11 shrink-0 items-center rounded-control px-3 font-semibold text-quiet hover:text-ink sm:flex"
+        >
+          Lessons
+        </RouterLink>
 
-      <RouterLink
-        v-else-if="!session.loading"
-        :to="{ name: 'sign-in' }"
-        class="flex min-h-11 shrink-0 items-center rounded-control border border-line-strong px-4 font-semibold text-evergreen hover:bg-evergreen-soft"
-      >
-        Sign in
-      </RouterLink>
+        <AccountControls v-if="session.isSignedIn" />
+
+        <RouterLink
+          v-else-if="!session.loading"
+          :to="{ name: 'sign-in' }"
+          class="flex min-h-11 shrink-0 items-center rounded-control border border-line-strong px-4 font-semibold text-evergreen hover:bg-evergreen-soft"
+        >
+          Sign in
+        </RouterLink>
+      </div>
     </div>
   </header>
 </template>
