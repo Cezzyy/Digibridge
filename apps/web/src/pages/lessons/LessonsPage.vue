@@ -1,15 +1,19 @@
 <script setup lang="ts">
-import { AREA_CODES, AREA_LABELS, LESSON_TIERS } from '@digibridge/shared'
+import { AREA_CODES, AREA_LABELS, LESSON_TIER_LABELS, LESSON_TIERS } from '@digibridge/shared'
 import { computed } from 'vue'
+import { AREA_DETAILS } from '../../components/landing/areas'
 import LessonTile from '../../components/lessons/LessonTile.vue'
+import LevelDots from '../../components/lessons/LevelDots.vue'
+import TierMeter from '../../components/lessons/TierMeter.vue'
 import SkeletonText from '../../components/results/SkeletonText.vue'
 import { useLessons } from '../../composables/useLessons'
 import { PRIMARY_BUTTON, SECONDARY_BUTTON } from '../../lib/buttons'
 import { useSessionStore } from '../../stores/session'
 
 // The lessons library (LES-01): the 3 areas, each with its Foundations, Intermediate and
-// Advanced lesson. Open to everyone, signed in or not (LES-03). A tier with no published
-// lesson yet shows "Coming soon".
+// Advanced lesson. The header explains how the 3 tiers build up and which levels each is for.
+// Open to everyone, signed in or not (LES-03). A tier with no published lesson yet shows
+// "Coming soon". Each area's heading is `#area-<code>`, which a lesson's breadcrumb links to.
 const session = useSessionStore()
 const { lessons, error, load } = useLessons()
 void load()
@@ -19,53 +23,84 @@ const areas = computed(() =>
     code,
     number: String(i + 1).padStart(2, '0'),
     label: AREA_LABELS[code],
+    summary: AREA_DETAILS[code].summary,
     tiers: LESSON_TIERS.map((tier) => ({
       tier,
       lesson: lessons.value?.find((l) => l.area === code && l.tier === tier) ?? null,
     })),
   })),
 )
+
+const CTA =
+  'inline-flex min-h-12 items-center gap-2 rounded-control bg-surface px-6 font-semibold text-evergreen transition-colors hover:bg-evergreen-soft'
 </script>
 
 <template>
   <main>
     <header class="bg-linear-to-b from-evergreen to-evergreen-hover text-white">
-      <div class="mx-auto max-w-6xl px-4 py-10 sm:px-8 sm:py-14 lg:px-10">
-        <p class="font-semibold text-marigold motion-safe:animate-rise">Lessons library</p>
-        <h1
-          class="mt-2 text-[clamp(2rem,1.5rem+1.6vw,3.25rem)] leading-[1.02] font-extrabold tracking-[-0.02em] text-balance motion-safe:animate-rise motion-safe:[animation-delay:80ms]"
-        >
-          Lessons for every level
-        </h1>
-        <p
-          class="mt-4 max-w-2xl text-lg leading-relaxed text-white/85 motion-safe:animate-rise motion-safe:[animation-delay:160ms]"
-        >
-          Short lessons in 3 skill areas. Each area has a Foundations, an Intermediate and an
-          Advanced lesson. Read any of them, anytime.
-        </p>
+      <div
+        class="mx-auto grid max-w-7xl gap-12 px-4 py-12 sm:px-8 sm:py-16 lg:grid-cols-[minmax(0,1fr)_26rem] lg:items-end lg:gap-16 lg:px-10 lg:py-20"
+      >
+        <div>
+          <p class="flex items-center gap-3 font-semibold text-marigold motion-safe:animate-rise">
+            <span class="h-px w-8 bg-current" aria-hidden="true" />
+            Lessons library
+          </p>
+          <h1
+            class="mt-4 text-[clamp(2.5rem,1.6rem+3vw,4.5rem)] leading-[0.98] font-extrabold tracking-[-0.025em] text-balance motion-safe:animate-rise motion-safe:[animation-delay:80ms]"
+          >
+            Learn the next step for your level.
+          </h1>
+          <p
+            class="mt-5 max-w-xl text-lg leading-relaxed text-white/80 motion-safe:animate-rise motion-safe:[animation-delay:160ms]"
+          >
+            Short lessons in {{ AREA_CODES.length }} skill areas, with real examples from school,
+            group chats and your phone. Read any of them, anytime. No sign-in needed.
+          </p>
 
-        <div
-          class="mt-6 flex flex-wrap gap-3 motion-safe:animate-rise motion-safe:[animation-delay:240ms]"
-        >
-          <RouterLink
-            v-if="session.attemptFinished"
-            :to="{ name: 'results' }"
-            class="inline-flex min-h-12 items-center rounded-control bg-surface px-6 font-semibold text-evergreen hover:bg-evergreen-soft"
+          <div
+            class="mt-8 flex flex-wrap gap-3 motion-safe:animate-rise motion-safe:[animation-delay:240ms]"
           >
-            See the lessons for your level
-          </RouterLink>
-          <RouterLink
-            v-else-if="!session.isSignedIn && !session.loading"
-            :to="{ name: 'sign-in' }"
-            class="inline-flex min-h-12 items-center rounded-control bg-surface px-6 font-semibold text-evergreen hover:bg-evergreen-soft"
-          >
-            Check your level first
-          </RouterLink>
+            <RouterLink v-if="session.attemptFinished" :to="{ name: 'results' }" :class="CTA">
+              See the lessons for your level
+            </RouterLink>
+            <RouterLink
+              v-else-if="!session.isSignedIn && !session.loading"
+              :to="{ name: 'sign-in' }"
+              :class="CTA"
+            >
+              Check your level first
+            </RouterLink>
+          </div>
         </div>
+
+        <!-- How the tiers build up: the key for the bars and dots on every lesson. -->
+        <section
+          aria-labelledby="tiers-title"
+          class="rounded-card bg-white/[0.07] p-6 ring-1 ring-white/15 motion-safe:animate-rise motion-safe:[animation-delay:320ms] sm:p-7"
+        >
+          <h2 id="tiers-title" class="text-lg font-bold">
+            Every area has {{ LESSON_TIERS.length }} lessons
+          </h2>
+          <ol class="mt-5 space-y-4">
+            <li v-for="tier in LESSON_TIERS" :key="tier" class="flex items-center gap-4">
+              <span
+                class="grid size-10 shrink-0 place-items-center rounded-control bg-white/10"
+                aria-hidden="true"
+              >
+                <TierMeter :tier="tier" tone="on-green" />
+              </span>
+              <span class="min-w-0">
+                <span class="block font-semibold">{{ LESSON_TIER_LABELS[tier] }}</span>
+                <LevelDots :tier="tier" ring="ring-white/40" class="text-sm text-white/75" />
+              </span>
+            </li>
+          </ol>
+        </section>
       </div>
     </header>
 
-    <div class="mx-auto max-w-6xl px-4 py-10 sm:px-8 lg:px-10">
+    <div class="mx-auto max-w-7xl px-4 py-14 sm:px-8 sm:py-20 lg:px-10">
       <!-- Couldn't load: say so in place, with a way to try again. -->
       <div
         v-if="error"
@@ -87,45 +122,64 @@ const areas = computed(() =>
         </div>
       </div>
 
-      <div v-else class="space-y-12" :aria-busy="!lessons">
+      <div v-else :aria-busy="!lessons">
         <p class="sr-only" role="status">{{ lessons ? '' : 'Loading the lessons' }}</p>
 
         <section
           v-for="(area, i) in areas"
           :key="area.code"
           :aria-labelledby="`area-${area.code}`"
-          class="motion-safe:animate-rise"
+          class="border-t border-line py-14 first:border-t-0 first:pt-0 last:pb-0 sm:py-16 motion-safe:animate-rise"
           :style="{ animationDelay: `${120 + i * 80}ms` }"
         >
-          <h2
-            :id="`area-${area.code}`"
-            class="flex gap-3 text-2xl leading-tight font-bold sm:text-3xl"
+          <div
+            class="grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,30rem)] lg:items-end lg:gap-16"
           >
-            <span class="font-display text-marigold-text tabular-nums">{{ area.number }}</span>
-            <span>{{ area.label }}</span>
-          </h2>
+            <h2
+              :id="`area-${area.code}`"
+              class="flex items-start gap-4 text-3xl leading-[1.1] font-bold tracking-[-0.02em] text-balance sm:gap-5 sm:text-4xl"
+            >
+              <span
+                class="font-display text-[1.4em] leading-[0.8] font-extrabold text-marigold-text tabular-nums"
+              >
+                {{ area.number }}
+              </span>
+              <span>{{ area.label }}</span>
+            </h2>
+            <p class="text-lg leading-relaxed text-quiet">{{ area.summary }}</p>
+          </div>
 
-          <ul class="mt-5 grid gap-4 md:grid-cols-3">
+          <ol class="mt-8 grid gap-4 md:grid-cols-3 lg:gap-5">
             <li v-for="item in area.tiers" :key="item.tier">
               <LessonTile v-if="lessons" :tier="item.tier" :lesson="item.lesson" />
               <!-- Shaped like a lesson tile while the list loads. -->
               <div
                 v-else
                 aria-hidden="true"
-                class="flex h-full flex-col rounded-card border border-line bg-surface p-4 sm:p-5"
+                class="flex h-full flex-col rounded-card border border-line bg-surface p-5 sm:p-6"
               >
-                <p class="flex text-sm">
-                  <span class="h-6 w-24 rounded-full bg-mist motion-safe:animate-skeleton" />
+                <p class="flex items-center justify-between text-sm font-semibold">
+                  <span class="text-evergreen">{{ LESSON_TIER_LABELS[item.tier] }}</span>
+                  <TierMeter :tier="item.tier" class="opacity-40" />
                 </p>
-                <p class="mt-3 text-lg font-semibold"><SkeletonText class="w-[12em]" /></p>
-                <p class="mt-1 leading-relaxed">
+                <p class="mt-4 text-xl leading-tight font-bold">
+                  <SkeletonText class="w-full" />
+                  <br />
+                  <SkeletonText class="w-1/2" />
+                </p>
+                <p class="mt-2 leading-relaxed">
                   <SkeletonText class="w-full" />
                   <br />
                   <SkeletonText class="w-2/3" />
                 </p>
+                <p class="mt-auto pt-5">
+                  <span class="block border-t border-line pt-4 text-sm">
+                    <SkeletonText class="w-[9em]" />
+                  </span>
+                </p>
               </div>
             </li>
-          </ul>
+          </ol>
         </section>
       </div>
     </div>
