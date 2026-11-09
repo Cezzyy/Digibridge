@@ -10,6 +10,7 @@ import { findCallbackParams, isCallbackParam, returningFromGoogle } from './lib/
 import AssessmentPage from './pages/assessment/AssessmentPage.vue'
 import HomePage from './pages/HomePage.vue'
 import LandingPage from './pages/LandingPage.vue'
+import LessonsPage from './pages/lessons/LessonsPage.vue'
 import NotFoundPage from './pages/NotFoundPage.vue'
 import SignInPage from './pages/SignInPage.vue'
 import ConsentPage from './pages/start/ConsentPage.vue'
@@ -19,7 +20,8 @@ import { useSessionStore } from './stores/session'
 
 // Who may open a page. No `requires` means anyone; `guest` means only signed-out users.
 // These guards only decide what to show; the API checks the role again on every call (AUTH-04).
-// The `kioskLock` guard from the TRD comes with the kiosk pages.
+// The `kioskLock` guard from the TRD comes with the kiosk pages. The TRD's `public` (the lessons)
+// is the same as no `requires`.
 export type Requirement = 'guest' | 'signedIn' | 'staff' | 'admin'
 
 /** A page of the respondent flow, which the `step` guard keeps in order. */
@@ -94,6 +96,14 @@ export const router = createRouter({
       name: 'results',
       component: () => import('./pages/results/ResultsPage.vue'),
       meta: { requires: 'signedIn', step: 'results' },
+    },
+    // The lessons library and each lesson, open to everyone (LES-03), so no `requires`.
+    { path: '/lessons', name: 'lessons', component: LessonsPage },
+    // Lazy, so markdown-it and DOMPurify load only here.
+    {
+      path: '/lessons/:slug',
+      name: 'lesson',
+      component: () => import('./pages/lessons/LessonPage.vue'),
     },
     {
       path: '/:pathMatch(.*)*',
