@@ -1,4 +1,4 @@
-import { CHOICES_PER_QUESTION } from '@digibridge/shared'
+import { CHOICES_PER_QUESTION, type LessonResource } from '@digibridge/shared'
 import { sql } from 'drizzle-orm'
 import {
   boolean,
@@ -69,8 +69,6 @@ export const choices = pgTable(
     ),
   ],
 ).enableRLS()
-
-export type LessonResource = { label: string; url: string }
 
 export const lessons = pgTable(
   'lessons',
