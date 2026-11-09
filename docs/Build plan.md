@@ -45,7 +45,7 @@ Done when a test account goes from consent to results and lessons on a phone, us
 - [x] **Scoring:** `lib/scoring.ts` as a pure function with its unit tests first, then `POST /submit`, idempotent, all writes in one transaction (ASM-09).
 - [x] **Cron:** `scheduled` handler in `index.ts` closes attempts past `expires_at` + 30 s as expired.
 - [x] **Results page:** overall level, radar chart, score and level per area, recommended lessons, no per-item marks (RES-01 to RES-03, RES-05).
-- [ ] **Lessons:** public library and lesson page with Markdown rendered through DOMPurify (LES-01 to LES-03).
+- [x] **Lessons:** public library and lesson page with Markdown rendered through DOMPurify (LES-01 to LES-03).
 - [ ] **SUS:** `lib/sus.ts` with its tests, `POST /api/v1/attempts/:id/sus`, `SusForm` as an optional card under results (SUS-01, SUS-02, SUS-04).
 - [ ] **QR code:** `results_token` at submit, `GET /api/v1/results/:token`, `ResultsQr` on the results page (RES-04).
 
