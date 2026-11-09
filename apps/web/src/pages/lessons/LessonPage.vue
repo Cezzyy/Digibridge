@@ -3,7 +3,9 @@ import { AREA_CODES, AREA_LABELS, LESSON_TIER_LABELS, LESSON_TIERS } from '@digi
 import { computed, nextTick, onUnmounted, useTemplateRef, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import LessonBody from '../../components/lessons/LessonBody.vue'
+import LessonBodySkeleton from '../../components/lessons/LessonBodySkeleton.vue'
 import LessonTile from '../../components/lessons/LessonTile.vue'
+import LessonTileSkeleton from '../../components/lessons/LessonTileSkeleton.vue'
 import LessonToc from '../../components/lessons/LessonToc.vue'
 import LessonVideo from '../../components/lessons/LessonVideo.vue'
 import LevelDots from '../../components/lessons/LevelDots.vue'
@@ -24,7 +26,7 @@ import { useSessionStore } from '../../stores/session'
 const route = useRoute()
 const session = useSessionStore()
 const { lesson, notFound, error, load } = useLesson()
-const { lessons: areaLessons, load: loadAreaLessons } = useLessons()
+const { lessons: areaLessons, error: areaError, load: loadAreaLessons } = useLessons()
 
 const slug = computed(() => String(route.params.slug))
 
@@ -34,6 +36,12 @@ async function fetchLesson() {
   if (lesson.value) await loadAreaLessons({ area: lesson.value.area })
 }
 watch(slug, fetchLesson, { immediate: true })
+
+// While the lesson loads, the page is drawn with placeholders the shape of each part. Once it's
+// in, the area's list still has to come: What's next and the area's tiles wait for it. If that
+// list fails, those parts are just left out.
+const loading = computed(() => !lesson.value && !notFound.value && !error.value)
+const areaLoading = computed(() => !!lesson.value && !areaLessons.value && !areaError.value)
 
 const rendered = computed(() => (lesson.value ? renderLesson(lesson.value.bodyMd) : null))
 const goals = computed(() => rendered.value?.sections.find((s) => s.kind === 'goals') ?? null)
@@ -151,6 +159,10 @@ onUnmounted(() => {
                 {{ area.label }}
               </RouterLink>
             </li>
+            <li v-else-if="loading" aria-hidden="true" class="flex min-h-11 items-center gap-2">
+              <span class="text-line-strong">/</span>
+              <SkeletonText tone="page" class="w-[13em]" />
+            </li>
           </ol>
           <RouterLink
             v-if="session.attemptFinished"
@@ -261,24 +273,66 @@ onUnmounted(() => {
         </div>
 
         <!-- Shaped like the header while the lesson loads. -->
-        <p v-else class="sr-only" role="status">Loading the lesson</p>
-        <div v-if="!notFound && !error && !lesson" aria-hidden="true" class="mt-8 lg:mt-12">
-          <p class="font-semibold"><SkeletonText class="w-[16em]" /></p>
-          <p
-            class="mt-5 max-w-[22ch] text-[clamp(2.25rem,1.6rem+2.4vw,3.75rem)] leading-[1.02] font-extrabold"
+        <template v-else>
+          <p class="sr-only" role="status">Loading the lesson</p>
+          <div
+            aria-hidden="true"
+            class="mt-8 grid gap-10 lg:mt-12 xl:grid-cols-[minmax(0,1fr)_25rem] xl:items-end xl:gap-16"
           >
-            <SkeletonText class="w-full" />
-            <br />
-            <SkeletonText class="w-3/5" />
-          </p>
-          <p class="mt-5 max-w-[56ch] text-xl leading-relaxed">
-            <SkeletonText class="w-full" />
-            <br />
-            <SkeletonText class="w-1/2" />
-          </p>
-        </div>
+            <div>
+              <p class="flex flex-wrap items-center gap-x-5 gap-y-2">
+                <span class="font-semibold"><SkeletonText tone="page" class="w-[11em]" /></span>
+                <span class="text-sm"><SkeletonText tone="page" class="w-[14em]" /></span>
+              </p>
+              <p
+                class="mt-5 max-w-[22ch] text-[clamp(2.25rem,1.6rem+2.4vw,3.75rem)] leading-[1.02] font-extrabold tracking-[-0.025em]"
+              >
+                <SkeletonText tone="page" class="w-full" />
+                <br />
+                <SkeletonText tone="page" class="w-3/5" />
+              </p>
+              <p class="mt-5 max-w-[56ch] text-xl leading-relaxed">
+                <SkeletonText tone="page" class="w-full" />
+                <br />
+                <SkeletonText tone="page" class="w-1/2" />
+              </p>
+              <div class="mt-8 flex flex-wrap gap-y-4 divide-x divide-line-strong/25">
+                <div
+                  v-for="width in ['w-[3.5em]', 'w-[1em]', 'w-[6em]']"
+                  :key="width"
+                  class="flex flex-col px-5 first:pl-0 last:pr-0 sm:px-7"
+                >
+                  <span class="font-display text-xl font-bold sm:text-2xl">
+                    <SkeletonText tone="page" :class="width" />
+                  </span>
+                  <span class="text-sm"><SkeletonText tone="page" class="w-[5.5em]" /></span>
+                </div>
+              </div>
+            </div>
+
+            <div
+              class="rounded-card border border-line bg-surface p-6 shadow-[0_24px_48px_-32px_rgb(18_36_28/0.45)] sm:p-7"
+            >
+              <p class="text-lg font-bold"><SkeletonText class="w-[9em]" /></p>
+              <ul class="mt-4 space-y-3.5">
+                <li
+                  v-for="width in ['w-full', 'w-4/5', 'w-11/12']"
+                  :key="width"
+                  class="flex gap-3 leading-snug"
+                >
+                  <span class="mt-px size-6 shrink-0 rounded-full bg-evergreen-soft" />
+                  <SkeletonText class="mt-1" :class="width" />
+                </li>
+              </ul>
+            </div>
+          </div>
+        </template>
       </div>
     </header>
+
+    <div v-if="loading" class="bg-surface">
+      <LessonBodySkeleton />
+    </div>
 
     <template v-if="lesson && rendered && area">
       <div class="bg-surface">
@@ -331,8 +385,25 @@ onUnmounted(() => {
               What’s next
             </h2>
 
+            <!-- Shaped like the next lesson's card while the area's list loads. -->
+            <div
+              v-if="areaLoading"
+              aria-hidden="true"
+              class="mt-8 rounded-card border border-line bg-mist-soft p-6 sm:p-8"
+            >
+              <p class="text-sm font-semibold"><SkeletonText tone="soft" class="w-[14em]" /></p>
+              <p class="mt-3 font-display text-2xl leading-tight font-bold sm:text-3xl">
+                <SkeletonText tone="soft" class="w-4/5" />
+              </p>
+              <p class="mt-2 max-w-[52ch] leading-relaxed">
+                <SkeletonText tone="soft" class="w-full" />
+                <br />
+                <SkeletonText tone="soft" class="w-1/2" />
+              </p>
+            </div>
+
             <RouterLink
-              v-if="next?.lesson"
+              v-else-if="next?.lesson"
               :to="{ name: 'lesson', params: { slug: next.lesson.slug } }"
               class="group mt-8 flex flex-col gap-6 rounded-card bg-evergreen p-6 text-white transition-colors hover:bg-evergreen-hover focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-evergreen sm:flex-row sm:items-end sm:justify-between sm:p-8"
             >
@@ -435,10 +506,15 @@ onUnmounted(() => {
           </aside>
         </div>
 
-        <div v-if="tiers.length" class="mt-16">
+        <div v-if="tiers.length || areaLoading" class="mt-16">
           <h3 class="text-xl font-bold">All {{ area.label }} lessons</h3>
           <ol class="mt-5 grid gap-4 md:grid-cols-3">
-            <li v-for="item in tiers" :key="item.tier">
+            <template v-if="areaLoading">
+              <li v-for="tier in LESSON_TIERS" :key="tier">
+                <LessonTileSkeleton :tier="tier" />
+              </li>
+            </template>
+            <li v-for="item in tiers" v-else :key="item.tier">
               <LessonTile :tier="item.tier" :lesson="item.lesson" :current="item.current" />
             </li>
           </ol>
