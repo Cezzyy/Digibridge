@@ -3,9 +3,9 @@ import { AREA_CODES, AREA_LABELS, LESSON_TIER_LABELS, LESSON_TIERS } from '@digi
 import { computed } from 'vue'
 import { AREA_DETAILS } from '../../components/landing/areas'
 import LessonTile from '../../components/lessons/LessonTile.vue'
+import LessonTileSkeleton from '../../components/lessons/LessonTileSkeleton.vue'
 import LevelDots from '../../components/lessons/LevelDots.vue'
 import TierMeter from '../../components/lessons/TierMeter.vue'
-import SkeletonText from '../../components/results/SkeletonText.vue'
 import { useLessons } from '../../composables/useLessons'
 import { PRIMARY_BUTTON, SECONDARY_BUTTON } from '../../lib/buttons'
 import { useSessionStore } from '../../stores/session'
@@ -152,32 +152,7 @@ const CTA =
           <ol class="mt-8 grid gap-4 md:grid-cols-3 lg:gap-5">
             <li v-for="item in area.tiers" :key="item.tier">
               <LessonTile v-if="lessons" :tier="item.tier" :lesson="item.lesson" />
-              <!-- Shaped like a lesson tile while the list loads. -->
-              <div
-                v-else
-                aria-hidden="true"
-                class="flex h-full flex-col rounded-card border border-line bg-surface p-5 sm:p-6"
-              >
-                <p class="flex items-center justify-between text-sm font-semibold">
-                  <span class="text-evergreen">{{ LESSON_TIER_LABELS[item.tier] }}</span>
-                  <TierMeter :tier="item.tier" class="opacity-40" />
-                </p>
-                <p class="mt-4 text-xl leading-tight font-bold">
-                  <SkeletonText class="w-full" />
-                  <br />
-                  <SkeletonText class="w-1/2" />
-                </p>
-                <p class="mt-2 leading-relaxed">
-                  <SkeletonText class="w-full" />
-                  <br />
-                  <SkeletonText class="w-2/3" />
-                </p>
-                <p class="mt-auto pt-5">
-                  <span class="block border-t border-line pt-4 text-sm">
-                    <SkeletonText class="w-[9em]" />
-                  </span>
-                </p>
-              </div>
+              <LessonTileSkeleton v-else :tier="item.tier" />
             </li>
           </ol>
         </section>
