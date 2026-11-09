@@ -18,6 +18,9 @@ import {
   ATTEMPT_DURATION_MINUTES,
   CHOICES_PER_QUESTION,
   ITEMS_PER_ATTEMPT,
+  LESSON_TIERS,
+  lessonResourceSchema,
+  lessonSlugSchema,
   MIN_SCENARIO_ITEMS_PER_AREA,
   toIsoDate,
   COURSES,
@@ -26,7 +29,7 @@ import {
   YEAR_LEVELS,
 } from '@digibridge/shared'
 import { OpenAPIHono, createRoute, z } from '@hono/zod-openapi'
-import { eq, inArray, sql } from 'drizzle-orm'
+import { and, eq, inArray, sql } from 'drizzle-orm'
 import { bodyLimit } from 'hono/body-limit'
 import { HTTPException } from 'hono/http-exception'
 import { generateKeyPair } from 'jose'
@@ -1336,6 +1339,214 @@ describe('dev question bank (packages/db/seed/dev-questions.sql)', () => {
   })
 })
 
+describe('lessons', () => {
+  const areaId = async (code: string) =>
+    (
+      await testDb
+        .select({ id: competencyAreas.id })
+        .from(competencyAreas)
+        .where(eq(competencyAreas.code, code))
+    )[0]!.id
+
+  // One lesson row with every field set; `overrides` picks its area, tier and the rest.
+  const lessonRow = async (
+    slug: string,
+    area: string,
+    tier: 'foundations' | 'intermediate' | 'advanced',
+    overrides: Partial<typeof lessons.$inferInsert> = {},
+  ) => ({
+    slug,
+    areaId: await areaId(area),
+    tier,
+    title: `Title of ${slug}`,
+    summary: `Summary of ${slug}`,
+    bodyMd: `## ${slug}`,
+    isPublished: true,
+    ...overrides,
+  })
+
+  beforeEach(async () => {
+    await clearQuestionBank()
+    await addQuestionBank()
+  })
+  afterAll(clearQuestionBank)
+
+  describe('GET /api/v1/lessons', () => {
+    beforeEach(async () => {
+      // Inserted out of order, to check the sorting. One draft, which stays hidden.
+      await testDb.insert(lessons).values([
+        await lessonRow('safety-advanced', 'safety', 'advanced'),
+        await lessonRow('info-intermediate', 'info_literacy', 'intermediate'),
+        await lessonRow('safety-foundations', 'safety', 'foundations'),
+        await lessonRow('info-foundations', 'info_literacy', 'foundations'),
+        await lessonRow('communication-draft', 'communication', 'foundations', {
+          isPublished: false,
+        }),
+      ])
+    })
+
+    it('lists the published lessons by area, then tier, without signing in (LES-01, LES-03)', async () => {
+      const res = await get('/api/v1/lessons')
+      expect(res.status).toBe(200)
+      const { lessons: list } = (await res.json()) as { lessons: Record<string, unknown>[] }
+      expect(list.map((l) => l.slug)).toEqual([
+        'info-foundations',
+        'info-intermediate',
+        'safety-foundations',
+        'safety-advanced',
+      ])
+      expect(list[0]).toEqual({
+        slug: 'info-foundations',
+        area: 'info_literacy',
+        tier: 'foundations',
+        title: 'Title of info-foundations',
+        summary: 'Summary of info-foundations',
+      })
+    })
+
+    it('filters by area and tier', async () => {
+      const slugs = async (query: string) => {
+        const res = await get(`/api/v1/lessons?${query}`)
+        expect(res.status).toBe(200)
+        return ((await res.json()) as { lessons: { slug: string }[] }).lessons.map((l) => l.slug)
+      }
+      expect(await slugs('area=safety')).toEqual(['safety-foundations', 'safety-advanced'])
+      expect(await slugs('tier=foundations')).toEqual(['info-foundations', 'safety-foundations'])
+      expect(await slugs('area=info_literacy&tier=advanced')).toEqual([])
+    })
+
+    it('answers 400 for an unknown area or tier', async () => {
+      for (const query of ['area=math', 'tier=expert']) {
+        const res = await get(`/api/v1/lessons?${query}`)
+        expect(res.status).toBe(400)
+      }
+    })
+  })
+
+  describe('GET /api/v1/lessons/:slug', () => {
+    it('sends the whole lesson without signing in (LES-02, LES-03)', async () => {
+      const resources = [{ label: 'National Privacy Commission', url: 'https://privacy.gov.ph' }]
+      await testDb.insert(lessons).values(
+        await lessonRow('protect-your-data', 'safety', 'advanced', {
+          bodyMd: '## Your rights\n\nYou can ask to see your data.',
+          imageUrl: '/api/v1/media/lesson.png',
+          videoUrl: 'https://www.youtube.com/watch?v=abc',
+          resources,
+        }),
+      )
+      const res = await get('/api/v1/lessons/protect-your-data')
+      expect(res.status).toBe(200)
+      expect(await res.json()).toEqual({
+        slug: 'protect-your-data',
+        area: 'safety',
+        tier: 'advanced',
+        title: 'Title of protect-your-data',
+        summary: 'Summary of protect-your-data',
+        bodyMd: '## Your rights\n\nYou can ask to see your data.',
+        imageUrl: '/api/v1/media/lesson.png',
+        videoUrl: 'https://www.youtube.com/watch?v=abc',
+        resources,
+        updatedAt: expect.stringMatching(/^\d{4}-\d{2}-\d{2}T/),
+      })
+    })
+
+    it('answers 404 for a draft or a slug that doesn’t exist', async () => {
+      await testDb
+        .insert(lessons)
+        .values(await lessonRow('draft', 'safety', 'foundations', { isPublished: false }))
+      for (const slug of ['draft', 'nope']) {
+        const res = await get(`/api/v1/lessons/${slug}`)
+        expect(res.status).toBe(404)
+        expect(await res.json()).toEqual({
+          error: { code: 'not_found', message: expect.any(String) },
+        })
+      }
+    })
+
+    it('answers 400 for something that isn’t a slug', async () => {
+      const res = await get('/api/v1/lessons/Not%20A%20Slug')
+      expect(res.status).toBe(400)
+    })
+  })
+})
+
+describe('starter lessons (packages/db/seed/lessons.sql)', () => {
+  const seed = (name: string) =>
+    fileURLToPath(new URL(`../../../packages/db/seed/${name}`, import.meta.url).href)
+  const load = async (name: string) => testDb.$client.exec(await readFile(seed(name), 'utf8'))
+
+  beforeEach(clearQuestionBank)
+  afterAll(clearQuestionBank)
+
+  it('refuses to run before the areas are loaded', async () => {
+    await expect(load('lessons.sql')).rejects.toThrow(/dev-questions\.sql/)
+    // The SQL editor ends the failed transaction by itself; PGlite needs telling.
+    await testDb.$client.exec('rollback')
+  })
+
+  it('publishes one lesson per area and tier, each with a valid slug and resources (LES-01)', async () => {
+    await load('dev-questions.sql')
+    await load('lessons.sql')
+    // Running it again adds nothing.
+    await load('lessons.sql')
+
+    const rows = await testDb
+      .select({
+        area: competencyAreas.code,
+        tier: lessons.tier,
+        slug: lessons.slug,
+        isPublished: lessons.isPublished,
+        resources: lessons.resources,
+        bodyMd: lessons.bodyMd,
+      })
+      .from(lessons)
+      .innerJoin(competencyAreas, eq(competencyAreas.id, lessons.areaId))
+    expect(rows).toHaveLength(AREA_CODES.length * LESSON_TIERS.length)
+    for (const area of AREA_CODES) {
+      expect(
+        rows
+          .filter((r) => r.area === area)
+          .map((r) => r.tier)
+          .sort(),
+      ).toEqual([...LESSON_TIERS].sort())
+    }
+    for (const row of rows) {
+      expect(row.isPublished).toBe(true)
+      expect(lessonSlugSchema.safeParse(row.slug).success).toBe(true)
+      expect(row.resources.length).toBeGreaterThan(0)
+      for (const resource of row.resources) {
+        expect(lessonResourceSchema.safeParse(resource).success).toBe(true)
+      }
+      // The page shows the title, so a body starts at its first section.
+      expect(row.bodyMd).toMatch(/^## /)
+    }
+  })
+
+  it('leaves out a lesson whose area and tier already have a published one', async () => {
+    await load('dev-questions.sql')
+    const [area] = await testDb
+      .select({ id: competencyAreas.id })
+      .from(competencyAreas)
+      .where(eq(competencyAreas.code, 'safety'))
+    await testDb.insert(lessons).values({
+      slug: 'team-lesson',
+      areaId: area!.id,
+      tier: 'foundations',
+      title: 'The team’s own',
+      summary: 'Written by the team',
+      bodyMd: '## Hi',
+      isPublished: true,
+    })
+    await load('lessons.sql')
+    const published = await testDb
+      .select({ slug: lessons.slug })
+      .from(lessons)
+      .where(and(eq(lessons.areaId, area!.id), eq(lessons.tier, 'foundations')))
+    expect(published).toEqual([{ slug: 'team-lesson' }])
+    expect(await testDb.$count(lessons)).toBe(AREA_CODES.length * LESSON_TIERS.length)
+  })
+})
+
 describe('API docs', () => {
   it('builds the OpenAPI spec with every route', async () => {
     const res = await get('/api/openapi.json')
@@ -1351,6 +1562,8 @@ describe('API docs', () => {
         '/api/v1/attempts/{id}/answers/{questionId}',
         '/api/v1/attempts/{id}/submit',
         '/api/v1/attempts/{id}/result',
+        '/api/v1/lessons',
+        '/api/v1/lessons/{slug}',
       ]),
     )
   })
