@@ -162,3 +162,96 @@
     }
   }
 }
+
+/* A lesson's body: the HTML that lib/markdown.ts makes from its Markdown. The page's <h1> is the
+   lesson title, so the body's sections start at <h2>. Tables scroll sideways on small screens. */
+@layer components {
+  .lesson-prose {
+    @apply text-lg leading-relaxed;
+
+    & > * + * {
+      @apply mt-4;
+    }
+
+    & h2 {
+      @apply mt-10 text-2xl leading-tight font-bold sm:text-3xl;
+    }
+
+    & h3 {
+      @apply mt-8 text-xl leading-snug font-bold;
+    }
+
+    & h2 + *,
+    & h3 + * {
+      @apply mt-3;
+    }
+
+    & a {
+      @apply font-semibold text-evergreen underline decoration-evergreen/40 underline-offset-2 hover:decoration-evergreen;
+    }
+
+    & strong {
+      @apply font-semibold;
+    }
+
+    & ul,
+    & ol {
+      @apply space-y-2 pl-6;
+    }
+
+    & ul {
+      @apply list-disc marker:text-marigold;
+    }
+
+    & ol {
+      @apply list-decimal marker:font-display marker:font-bold marker:text-marigold-text;
+    }
+
+    & li > ul,
+    & li > ol {
+      @apply mt-2;
+    }
+
+    /* Tips and examples. */
+    & blockquote {
+      @apply rounded-card border-l-4 border-marigold bg-marigold-soft px-5 py-4;
+
+      & > * + * {
+        @apply mt-3;
+      }
+    }
+
+    & code {
+      @apply rounded bg-mist px-1.5 py-0.5 font-mono text-[0.9em] break-words;
+    }
+
+    & pre {
+      @apply overflow-x-auto rounded-card bg-mist-soft p-4;
+
+      & code {
+        @apply bg-transparent p-0;
+      }
+    }
+
+    & table {
+      @apply block w-full overflow-x-auto border-collapse text-base;
+    }
+
+    & th,
+    & td {
+      @apply border-b border-line px-3 py-2.5 text-left align-top;
+    }
+
+    & th {
+      @apply border-b-2 bg-mist-soft font-semibold;
+    }
+
+    & hr {
+      @apply my-8 border-line;
+    }
+
+    & img {
+      @apply rounded-card;
+    }
+  }
+}
