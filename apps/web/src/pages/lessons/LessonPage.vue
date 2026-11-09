@@ -1,20 +1,26 @@
 <script setup lang="ts">
 import { AREA_CODES, AREA_LABELS, LESSON_TIER_LABELS, LESSON_TIERS } from '@digibridge/shared'
-import { computed, onUnmounted, watch } from 'vue'
+import { computed, nextTick, onUnmounted, useTemplateRef, watch } from 'vue'
 import { useRoute } from 'vue-router'
+import LessonBody from '../../components/lessons/LessonBody.vue'
 import LessonTile from '../../components/lessons/LessonTile.vue'
+import LessonToc from '../../components/lessons/LessonToc.vue'
 import LessonVideo from '../../components/lessons/LessonVideo.vue'
+import LevelDots from '../../components/lessons/LevelDots.vue'
+import TierMeter from '../../components/lessons/TierMeter.vue'
 import SkeletonText from '../../components/results/SkeletonText.vue'
 import { useLesson } from '../../composables/useLesson'
 import { useLessons } from '../../composables/useLessons'
+import { useReadingPosition } from '../../composables/useReadingPosition'
 import { PRIMARY_BUTTON, SECONDARY_BUTTON } from '../../lib/buttons'
-import { renderMarkdown } from '../../lib/markdown'
+import { renderLesson } from '../../lib/markdown'
 import { useSessionStore } from '../../stores/session'
 
-// One lesson (LES-02): its area and tier, title, summary, image or video, the body rendered from
-// Markdown and cleaned (lib/markdown.ts), and its outside resources. Beside it, the area's other
-// lessons, so a student can go on to the next tier. Open to everyone (LES-03). Loaded lazily by
-// the router, so markdown-it and DOMPurify aren't in the first load.
+// One lesson (LES-02). The header has its area and tier, title, summary, reading time and what
+// it teaches; under it, the lesson's parts (LessonBody) with their contents beside them on
+// desktops, and a bar at the top that fills as the student reads. It ends with the next tier's
+// lesson, the outside resources and the area's 3 lessons. Open to everyone (LES-03). Loaded
+// lazily by the router, so markdown-it and DOMPurify aren't in the first load.
 const route = useRoute()
 const session = useSessionStore()
 const { lesson, notFound, error, load } = useLesson()
@@ -29,12 +35,24 @@ async function fetchLesson() {
 }
 watch(slug, fetchLesson, { immediate: true })
 
-const html = computed(() => (lesson.value ? renderMarkdown(lesson.value.bodyMd) : ''))
+const rendered = computed(() => (lesson.value ? renderLesson(lesson.value.bodyMd) : null))
+const goals = computed(() => rendered.value?.sections.find((s) => s.kind === 'goals') ?? null)
+const sections = computed(() => rendered.value?.sections.filter((s) => s.kind !== 'goals') ?? [])
+const contents = computed(() => sections.value.filter((s) => s.kind !== 'intro'))
+const partCount = computed(() => sections.value.filter((s) => s.kind === 'part').length)
+
+const article = useTemplateRef<HTMLElement>('article')
+const { progress, activeId, refresh } = useReadingPosition(
+  article,
+  computed(() => contents.value.map((s) => s.id)),
+)
+watch(rendered, () => nextTick(refresh))
 
 const area = computed(() => {
   if (!lesson.value) return null
   const code = lesson.value.area
   return {
+    code,
     number: String(AREA_CODES.indexOf(code) + 1).padStart(2, '0'),
     label: AREA_LABELS[code],
   }
@@ -51,12 +69,41 @@ const tiers = computed(() => {
   }))
 })
 
+// The tier after this one, or null on the last tier (or before the list comes in).
+const next = computed(() => {
+  const i = tiers.value.findIndex((t) => t.current)
+  return i < 0 ? null : (tiers.value[i + 1] ?? null)
+})
+const isLastTier = computed(() => tiers.value.length > 0 && next.value === null)
+
+const resources = computed(() =>
+  (lesson.value?.resources ?? []).map((resource) => {
+    let site = ''
+    try {
+      site = new URL(resource.url).hostname.replace(/^www\./, '')
+    } catch {
+      // The API checks every URL, so this shouldn't happen; the label is enough on its own.
+    }
+    return { ...resource, site }
+  }),
+)
+
 const updatedOn = computed(() =>
   lesson.value
-    ? new Intl.DateTimeFormat('en-PH', { dateStyle: 'long', timeZone: 'Asia/Manila' }).format(
+    ? new Intl.DateTimeFormat('en-PH', { dateStyle: 'medium', timeZone: 'Asia/Manila' }).format(
         new Date(lesson.value.updatedAt),
       )
     : '',
+)
+
+const facts = computed(() =>
+  rendered.value
+    ? [
+        { value: `${rendered.value.minutes} min`, label: 'to read' },
+        ...(partCount.value ? [{ value: String(partCount.value), label: 'parts' }] : []),
+        { value: updatedOn.value, label: 'last updated' },
+      ]
+    : [],
 )
 
 // The tab shows the lesson's title while it's open, and the app's own title again after.
@@ -70,169 +117,333 @@ onUnmounted(() => {
 </script>
 
 <template>
-  <main class="mx-auto max-w-6xl px-4 py-8 sm:px-8 sm:py-10 lg:px-10">
-    <nav aria-label="Lessons" class="flex flex-wrap gap-x-6 gap-y-2">
-      <RouterLink
-        :to="{ name: 'lessons' }"
-        class="inline-flex min-h-11 items-center gap-1.5 font-semibold text-evergreen hover:underline"
-      >
-        <svg
-          viewBox="0 0 16 16"
-          aria-hidden="true"
-          class="size-4 fill-none stroke-current stroke-[2.5]"
+  <div>
+    <!-- How far through the lesson the student is. The text itself says where they are. -->
+    <div aria-hidden="true" class="sticky top-header z-20 -mb-1 h-1">
+      <div
+        class="h-full origin-left bg-evergreen transition-transform duration-150 ease-out"
+        :style="{ transform: `scaleX(${lesson ? progress : 0})` }"
+      />
+    </div>
+
+    <header class="border-b border-line">
+      <div class="mx-auto max-w-7xl px-4 pt-4 pb-12 sm:px-8 sm:pb-16 lg:px-10 lg:pb-20">
+        <nav
+          aria-label="Breadcrumb"
+          class="flex flex-wrap items-center justify-between gap-x-6 text-sm font-semibold"
         >
-          <path d="M10 3.5 5.5 8 10 12.5" stroke-linecap="round" stroke-linejoin="round" />
-        </svg>
-        All lessons
-      </RouterLink>
-      <RouterLink
-        v-if="session.attemptFinished"
-        :to="{ name: 'results' }"
-        class="inline-flex min-h-11 items-center font-semibold text-evergreen hover:underline"
-      >
-        Your results
-      </RouterLink>
-    </nav>
-
-    <!-- No such lesson, or not published yet. -->
-    <div
-      v-if="notFound"
-      class="mt-6 flex max-w-xl flex-col items-start gap-4 rounded-card border border-line bg-surface p-6"
-    >
-      <div>
-        <h1 class="text-2xl font-bold">We couldn’t find this lesson</h1>
-        <p class="mt-1 leading-relaxed text-quiet">
-          The link may be wrong, or the lesson isn’t out yet. You can pick another one from the
-          library.
-        </p>
-      </div>
-      <RouterLink :to="{ name: 'lessons' }" :class="PRIMARY_BUTTON">See all lessons</RouterLink>
-    </div>
-
-    <!-- Couldn't load: say so in place, with a way to try again. -->
-    <div
-      v-else-if="error"
-      role="alert"
-      class="mt-6 flex max-w-xl flex-col items-start gap-4 rounded-card border border-error/30 bg-error-soft p-6"
-    >
-      <div>
-        <h1 class="text-xl font-bold">We couldn’t load this lesson</h1>
-        <p class="mt-1 leading-relaxed">{{ error }}</p>
-      </div>
-      <div class="flex flex-wrap gap-3">
-        <button type="button" :class="PRIMARY_BUTTON" @click="fetchLesson">Try again</button>
-        <RouterLink :to="{ name: 'lessons' }" :class="SECONDARY_BUTTON">See all lessons</RouterLink>
-      </div>
-    </div>
-
-    <div
-      v-else
-      class="mt-6 grid gap-10 lg:grid-cols-[minmax(0,1fr)_20rem] lg:gap-12 xl:grid-cols-[minmax(0,1fr)_22rem]"
-      :aria-busy="!lesson"
-    >
-      <p class="sr-only" role="status">{{ lesson ? '' : 'Loading the lesson' }}</p>
-
-      <article v-if="lesson && area" class="min-w-0 motion-safe:animate-rise">
-        <header>
-          <p class="flex flex-wrap items-center gap-x-3 gap-y-2 font-semibold">
-            <span class="flex gap-2 text-quiet">
-              <span class="font-display text-marigold-text tabular-nums">{{ area.number }}</span>
-              {{ area.label }}
-            </span>
-            <span class="rounded-full bg-evergreen-soft px-2.5 py-0.5 text-sm text-evergreen">
-              {{ LESSON_TIER_LABELS[lesson.tier] }}
-            </span>
-          </p>
-          <h1
-            class="mt-3 text-[clamp(2rem,1.5rem+1.6vw,3rem)] leading-[1.05] font-extrabold tracking-[-0.02em] text-balance"
+          <ol class="flex min-w-0 flex-wrap items-center gap-x-2">
+            <li>
+              <RouterLink
+                :to="{ name: 'lessons' }"
+                class="inline-flex min-h-11 items-center text-evergreen hover:underline"
+              >
+                Lessons
+              </RouterLink>
+            </li>
+            <li v-if="area" class="flex min-w-0 items-center gap-2">
+              <span aria-hidden="true" class="text-line-strong">/</span>
+              <RouterLink
+                :to="{ name: 'lessons', hash: `#area-${area.code}` }"
+                class="inline-flex min-h-11 items-center gap-2 text-quiet hover:text-ink hover:underline"
+              >
+                <span class="font-display text-marigold-text tabular-nums">{{ area.number }}</span>
+                {{ area.label }}
+              </RouterLink>
+            </li>
+          </ol>
+          <RouterLink
+            v-if="session.attemptFinished"
+            :to="{ name: 'results' }"
+            class="inline-flex min-h-11 items-center gap-1.5 text-evergreen hover:underline"
           >
-            {{ lesson.title }}
+            Your results
+            <svg
+              viewBox="0 0 16 16"
+              aria-hidden="true"
+              class="size-4 fill-none stroke-current stroke-[2.5]"
+            >
+              <path d="M6 3.5 10.5 8 6 12.5" stroke-linecap="round" stroke-linejoin="round" />
+            </svg>
+          </RouterLink>
+        </nav>
+
+        <!-- No such lesson, or not published yet. -->
+        <div v-if="notFound" class="mt-10 max-w-xl">
+          <h1 class="text-4xl leading-tight font-bold tracking-[-0.02em]">
+            We couldn’t find this lesson
           </h1>
-          <p class="mt-4 max-w-[60ch] text-xl leading-relaxed text-quiet">{{ lesson.summary }}</p>
-        </header>
+          <p class="mt-3 text-lg leading-relaxed text-quiet">
+            The link may be wrong, or the lesson isn’t out yet. You can pick another one from the
+            library.
+          </p>
+          <RouterLink :to="{ name: 'lessons' }" :class="PRIMARY_BUTTON" class="mt-6">
+            See all lessons
+          </RouterLink>
+        </div>
 
-        <img
-          v-if="lesson.imageUrl"
-          :src="lesson.imageUrl"
-          :alt="lesson.title"
-          class="mt-8 w-full rounded-card border border-line object-cover"
-        />
-        <LessonVideo
-          v-if="lesson.videoUrl"
-          :url="lesson.videoUrl"
-          :title="lesson.title"
-          class="mt-8"
-        />
+        <!-- Couldn't load: say so in place, with a way to try again. -->
+        <div
+          v-else-if="error"
+          role="alert"
+          class="mt-10 flex max-w-xl flex-col items-start gap-4 rounded-card border border-error/30 bg-error-soft p-6"
+        >
+          <div>
+            <h1 class="text-xl font-bold">We couldn’t load this lesson</h1>
+            <p class="mt-1 leading-relaxed">{{ error }}</p>
+          </div>
+          <div class="flex flex-wrap gap-3">
+            <button type="button" :class="PRIMARY_BUTTON" @click="fetchLesson">Try again</button>
+            <RouterLink :to="{ name: 'lessons' }" :class="SECONDARY_BUTTON">
+              See all lessons
+            </RouterLink>
+          </div>
+        </div>
 
-        <!-- Markdown rendered by markdown-it and cleaned by DOMPurify (lib/markdown.ts). -->
-        <!-- eslint-disable-next-line vue/no-v-html -->
-        <div class="lesson-prose mt-8 max-w-[68ch]" v-html="html" />
+        <div
+          v-else-if="lesson && rendered"
+          class="mt-8 grid gap-10 motion-safe:animate-rise lg:mt-12"
+          :class="goals && 'xl:grid-cols-[minmax(0,1fr)_25rem] xl:items-end xl:gap-16'"
+        >
+          <div>
+            <p class="flex flex-wrap items-center gap-x-5 gap-y-2">
+              <span class="inline-flex items-center gap-2.5 font-semibold text-evergreen">
+                <TierMeter :tier="lesson.tier" />
+                {{ LESSON_TIER_LABELS[lesson.tier] }} lesson
+              </span>
+              <LevelDots :tier="lesson.tier" ring="ring-mist" class="text-sm text-quiet" />
+            </p>
+            <h1
+              id="lesson-title"
+              class="mt-5 max-w-[22ch] text-[clamp(2.25rem,1.6rem+2.4vw,3.75rem)] leading-[1.02] font-extrabold tracking-[-0.025em] text-balance"
+            >
+              {{ lesson.title }}
+            </h1>
+            <p class="mt-5 max-w-[56ch] text-xl leading-relaxed text-quiet">
+              {{ lesson.summary }}
+            </p>
+            <dl class="mt-8 flex flex-wrap gap-y-4 divide-x divide-line-strong/25">
+              <div
+                v-for="fact in facts"
+                :key="fact.label"
+                class="flex flex-col-reverse px-5 first:pl-0 last:pr-0 sm:px-7"
+              >
+                <dt class="text-sm text-quiet">{{ fact.label }}</dt>
+                <dd class="font-display text-xl font-bold tabular-nums sm:text-2xl">
+                  {{ fact.value }}
+                </dd>
+              </div>
+            </dl>
+          </div>
 
-        <p class="mt-10 border-t border-line pt-4 text-sm text-quiet">Updated {{ updatedOn }}</p>
-      </article>
+          <aside
+            v-if="goals"
+            aria-labelledby="goals-title"
+            class="rounded-card border border-line bg-surface p-6 shadow-[0_24px_48px_-32px_rgb(18_36_28/0.45)] sm:p-7"
+          >
+            <h2 id="goals-title" class="text-lg font-bold">{{ goals.title }}</h2>
+            <ul class="mt-4 space-y-3.5">
+              <li v-for="(goal, i) in goals.items" :key="i" class="flex gap-3 leading-snug">
+                <span
+                  aria-hidden="true"
+                  class="mt-px grid size-6 shrink-0 place-items-center rounded-full bg-evergreen-soft text-evergreen"
+                >
+                  <svg viewBox="0 0 16 16" class="size-3.5 fill-none stroke-current stroke-[2.5]">
+                    <path d="m3.5 8.5 3 3 6-7" stroke-linecap="round" stroke-linejoin="round" />
+                  </svg>
+                </span>
+                <!-- Cleaned by DOMPurify in lib/markdown.ts. -->
+                <!-- eslint-disable-next-line vue/no-v-html -->
+                <span class="min-w-0" v-html="goal" />
+              </li>
+            </ul>
+          </aside>
+        </div>
 
-      <!-- Shaped like the lesson's header and first lines while it loads. -->
-      <div v-else aria-hidden="true" class="min-w-0">
-        <p class="flex items-center gap-3 font-semibold">
-          <SkeletonText class="w-[14em]" />
-          <span class="h-6 w-24 rounded-full bg-mist motion-safe:animate-skeleton" />
-        </p>
-        <p class="mt-3 text-[clamp(2rem,1.5rem+1.6vw,3rem)] leading-[1.05] font-extrabold">
-          <SkeletonText class="w-4/5" />
-        </p>
-        <p class="mt-4 max-w-[60ch] text-xl leading-relaxed">
-          <SkeletonText class="w-full" />
-          <br />
-          <SkeletonText class="w-1/2" />
-        </p>
-        <div class="mt-8 max-w-[68ch] space-y-3 text-lg leading-relaxed">
-          <p><SkeletonText class="w-[10em]" /></p>
-          <p v-for="n in 4" :key="n"><SkeletonText class="w-full" /></p>
-          <p><SkeletonText class="w-3/4" /></p>
+        <!-- Shaped like the header while the lesson loads. -->
+        <p v-else class="sr-only" role="status">Loading the lesson</p>
+        <div v-if="!notFound && !error && !lesson" aria-hidden="true" class="mt-8 lg:mt-12">
+          <p class="font-semibold"><SkeletonText class="w-[16em]" /></p>
+          <p
+            class="mt-5 max-w-[22ch] text-[clamp(2.25rem,1.6rem+2.4vw,3.75rem)] leading-[1.02] font-extrabold"
+          >
+            <SkeletonText class="w-full" />
+            <br />
+            <SkeletonText class="w-3/5" />
+          </p>
+          <p class="mt-5 max-w-[56ch] text-xl leading-relaxed">
+            <SkeletonText class="w-full" />
+            <br />
+            <SkeletonText class="w-1/2" />
+          </p>
+        </div>
+      </div>
+    </header>
+
+    <template v-if="lesson && rendered && area">
+      <div class="bg-surface">
+        <div
+          class="mx-auto grid max-w-7xl gap-12 px-4 py-12 sm:px-8 sm:py-16 lg:grid-cols-[13rem_minmax(0,1fr)] lg:px-10 lg:py-20 xl:grid-cols-[16rem_minmax(0,1fr)] xl:gap-20"
+        >
+          <div class="hidden lg:block">
+            <LessonToc
+              :sections="contents"
+              :active-id="activeId"
+              class="sticky top-[calc(var(--spacing-header)+2.5rem)]"
+            />
+          </div>
+
+          <article ref="article" aria-labelledby="lesson-title" class="min-w-0 max-w-[44rem]">
+            <img
+              v-if="lesson.imageUrl"
+              :src="lesson.imageUrl"
+              :alt="lesson.title"
+              class="mb-14 w-full rounded-card border border-line object-cover"
+            />
+            <LessonVideo
+              v-if="lesson.videoUrl"
+              :url="lesson.videoUrl"
+              :title="lesson.title"
+              class="mb-14"
+            />
+            <LessonBody :sections="sections" />
+          </article>
         </div>
       </div>
 
-      <aside
-        v-if="lesson"
-        class="space-y-8 lg:sticky lg:top-[calc(var(--spacing-header)+2rem)] lg:self-start"
+      <section
+        aria-labelledby="next-title"
+        class="mx-auto max-w-7xl px-4 py-14 sm:px-8 sm:py-20 lg:px-10"
       >
-        <section v-if="lesson.resources.length" aria-labelledby="resources-title">
-          <h2 id="resources-title" class="text-xl font-bold">Learn more</h2>
-          <ul class="mt-3 space-y-2">
-            <li v-for="resource in lesson.resources" :key="resource.url">
-              <a
-                :href="resource.url"
-                target="_blank"
-                rel="noopener noreferrer"
-                class="group flex min-h-11 items-start gap-2.5 rounded-control px-3 py-2.5 font-semibold text-evergreen hover:bg-evergreen-soft"
+        <div
+          class="grid gap-12"
+          :class="resources.length > 0 && 'lg:grid-cols-[minmax(0,1fr)_22rem] xl:gap-20'"
+        >
+          <div>
+            <p class="flex items-center gap-3 font-semibold text-evergreen">
+              <span class="h-px w-8 bg-current" aria-hidden="true" />
+              Keep going
+            </p>
+            <h2
+              id="next-title"
+              class="mt-3 text-4xl leading-[1.05] font-bold tracking-[-0.025em] sm:text-5xl"
+            >
+              What’s next
+            </h2>
+
+            <RouterLink
+              v-if="next?.lesson"
+              :to="{ name: 'lesson', params: { slug: next.lesson.slug } }"
+              class="group mt-8 flex flex-col gap-6 rounded-card bg-evergreen p-6 text-white transition-colors hover:bg-evergreen-hover focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-evergreen sm:flex-row sm:items-end sm:justify-between sm:p-8"
+            >
+              <span class="block">
+                <span class="flex items-center gap-2.5 text-sm font-semibold text-marigold">
+                  <TierMeter :tier="next.tier" tone="on-green" />
+                  Next step · {{ LESSON_TIER_LABELS[next.tier] }} lesson
+                </span>
+                <span
+                  class="mt-3 block font-display text-2xl leading-tight font-bold text-balance sm:text-3xl"
+                >
+                  {{ next.lesson.title }}
+                </span>
+                <span class="mt-2 block max-w-[52ch] leading-relaxed text-white/80">
+                  {{ next.lesson.summary }}
+                </span>
+              </span>
+              <span
+                aria-hidden="true"
+                class="grid size-12 shrink-0 place-items-center rounded-full bg-surface text-evergreen"
               >
                 <svg
-                  viewBox="0 0 16 16"
-                  aria-hidden="true"
-                  class="mt-1 size-4 shrink-0 fill-none stroke-current stroke-2"
-                  stroke-linecap="round"
-                  stroke-linejoin="round"
+                  viewBox="0 0 20 20"
+                  class="size-5 fill-none stroke-current stroke-2 transition-transform group-hover:translate-x-0.5"
                 >
-                  <path d="M9 3h4v4M13 3 7 9M11 9.5V13H3V5h3.5" />
+                  <path d="M4 10h12m-5-5 5 5-5 5" stroke-linecap="round" stroke-linejoin="round" />
                 </svg>
-                <span>
-                  {{ resource.label }}
-                  <span class="sr-only">(opens in a new tab)</span>
-                </span>
-              </a>
-            </li>
-          </ul>
-        </section>
+              </span>
+            </RouterLink>
 
-        <section v-if="tiers.length" aria-labelledby="area-lessons-title">
-          <h2 id="area-lessons-title" class="text-xl font-bold">In this area</h2>
-          <ul class="mt-3 grid gap-3 sm:grid-cols-3 lg:grid-cols-1">
+            <div
+              v-else-if="next"
+              class="mt-8 rounded-card border border-dashed border-line-strong/50 bg-mist-soft p-6 sm:p-8"
+            >
+              <p class="flex items-center gap-2.5 text-sm font-semibold text-quiet">
+                <TierMeter :tier="next.tier" class="opacity-50" />
+                Next step · {{ LESSON_TIER_LABELS[next.tier] }} lesson
+              </p>
+              <p class="mt-3 font-display text-2xl leading-tight font-bold">Coming soon</p>
+              <p class="mt-2 leading-relaxed text-quiet">
+                The team is still writing it. In the meantime, try a lesson from another area.
+              </p>
+            </div>
+
+            <div v-else-if="isLastTier" class="mt-8 rounded-card bg-ink p-6 text-white sm:p-8">
+              <p class="flex items-center gap-2.5 text-sm font-semibold text-marigold">
+                <TierMeter :tier="lesson.tier" tone="on-green" />
+                Top of {{ area.label }}
+              </p>
+              <p class="mt-3 font-display text-2xl leading-tight font-bold sm:text-3xl">
+                That’s the last lesson in this area.
+              </p>
+              <p class="mt-2 max-w-[52ch] leading-relaxed text-white/75">
+                There are {{ AREA_CODES.length - 1 }} more areas to work on. Pick up where your
+                level is lowest.
+              </p>
+              <RouterLink
+                :to="{ name: 'lessons' }"
+                class="mt-6 inline-flex min-h-12 items-center gap-2 rounded-control bg-surface px-6 font-semibold text-evergreen hover:bg-evergreen-soft"
+              >
+                See all lessons
+              </RouterLink>
+            </div>
+          </div>
+
+          <aside v-if="resources.length" aria-labelledby="resources-title" class="lg:pt-2">
+            <h3 id="resources-title" class="text-xl font-bold">Learn more</h3>
+            <p class="mt-1 text-sm text-quiet">Other sites, opened in a new tab.</p>
+            <ul class="mt-5 divide-y divide-line border-y border-line">
+              <li v-for="resource in resources" :key="resource.url">
+                <a
+                  :href="resource.url"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  class="group flex items-start justify-between gap-4 py-4"
+                >
+                  <span class="min-w-0">
+                    <span
+                      class="block leading-snug font-semibold text-evergreen decoration-evergreen/40 underline-offset-2 group-hover:underline"
+                    >
+                      {{ resource.label }}
+                    </span>
+                    <span v-if="resource.site" class="mt-1 block truncate text-sm text-quiet">
+                      {{ resource.site }}
+                    </span>
+                    <span class="sr-only">(opens in a new tab)</span>
+                  </span>
+                  <svg
+                    viewBox="0 0 16 16"
+                    aria-hidden="true"
+                    class="mt-1 size-4 shrink-0 fill-none stroke-quiet stroke-2 transition-transform group-hover:translate-x-0.5 group-hover:-translate-y-0.5 group-hover:stroke-evergreen"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                  >
+                    <path d="M5 11 11 5M6 5h5v5" />
+                  </svg>
+                </a>
+              </li>
+            </ul>
+          </aside>
+        </div>
+
+        <div v-if="tiers.length" class="mt-16">
+          <h3 class="text-xl font-bold">All {{ area.label }} lessons</h3>
+          <ol class="mt-5 grid gap-4 md:grid-cols-3">
             <li v-for="item in tiers" :key="item.tier">
               <LessonTile :tier="item.tier" :lesson="item.lesson" :current="item.current" />
             </li>
-          </ul>
-        </section>
-      </aside>
-    </div>
-  </main>
+          </ol>
+        </div>
+      </section>
+    </template>
+  </div>
 </template>
