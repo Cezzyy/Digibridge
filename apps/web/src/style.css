@@ -163,25 +163,23 @@
   }
 }
 
-/* A lesson's body: the HTML that lib/markdown.ts makes from its Markdown. The page's <h1> is the
-   lesson title, so the body's sections start at <h2>. Tables scroll sideways on small screens. */
+/* A lesson's text: the HTML that lib/markdown.ts makes from its Markdown, one part at a time
+   (the page draws each part's <h2> itself). Bullets are short marigold rules, like the landing's
+   section labels; numbered steps sit in small green circles. `on-green` is for the "Try it"
+   panel. Quotes become `.callout`s, by their label: a tip, a note, something important, a line to
+   remember (set large, like a pull quote) or, with no label, an example message. */
 @layer components {
   .lesson-prose {
-    @apply text-lg leading-relaxed;
+    @apply text-lg leading-[1.7];
 
     & > * + * {
-      @apply mt-4;
-    }
-
-    & h2 {
-      @apply mt-10 text-2xl leading-tight font-bold sm:text-3xl;
+      @apply mt-5;
     }
 
     & h3 {
-      @apply mt-8 text-xl leading-snug font-bold;
+      @apply mt-10 text-xl leading-snug font-bold;
     }
 
-    & h2 + *,
     & h3 + * {
       @apply mt-3;
     }
@@ -196,62 +194,201 @@
 
     & ul,
     & ol {
-      @apply space-y-2 pl-6;
+      @apply space-y-3;
     }
 
-    & ul {
-      @apply list-disc marker:text-marigold;
+    & ul > li {
+      @apply relative pl-7;
+
+      &::before {
+        content: '';
+        @apply absolute top-[0.8em] left-0 h-0.5 w-3.5 rounded-full bg-marigold;
+      }
     }
 
     & ol {
-      @apply list-decimal marker:font-display marker:font-bold marker:text-marigold-text;
+      counter-reset: step;
+    }
+
+    & ol > li {
+      counter-increment: step;
+      @apply relative min-h-8 pl-11;
+
+      &::before {
+        content: counter(step);
+        @apply absolute top-0.5 left-0 grid size-7 place-items-center rounded-full bg-evergreen-soft font-display text-sm leading-none font-bold text-evergreen;
+      }
     }
 
     & li > ul,
     & li > ol {
-      @apply mt-2;
-    }
-
-    /* Tips and examples. */
-    & blockquote {
-      @apply rounded-card border-l-4 border-marigold bg-marigold-soft px-5 py-4;
-
-      & > * + * {
-        @apply mt-3;
-      }
+      @apply mt-3;
     }
 
     & code {
-      @apply rounded bg-mist px-1.5 py-0.5 font-mono text-[0.9em] break-words;
+      @apply rounded-md bg-mist-soft px-1.5 py-0.5 font-mono text-[0.85em] break-words text-evergreen ring-1 ring-line ring-inset box-decoration-clone;
     }
 
     & pre {
       @apply overflow-x-auto rounded-card bg-mist-soft p-4;
 
       & code {
-        @apply bg-transparent p-0;
+        @apply bg-transparent p-0 ring-0;
       }
     }
 
+    & .table-wrap {
+      @apply overflow-x-auto rounded-card border border-line;
+    }
+
     & table {
-      @apply block w-full overflow-x-auto border-collapse text-base;
+      @apply w-full border-collapse text-base leading-normal;
     }
 
     & th,
     & td {
-      @apply border-b border-line px-3 py-2.5 text-left align-top;
+      @apply px-4 py-3 text-left align-top;
     }
 
     & th {
-      @apply border-b-2 bg-mist-soft font-semibold;
+      @apply bg-mist-soft text-sm font-semibold text-quiet;
+    }
+
+    & td {
+      @apply border-t border-line;
     }
 
     & hr {
-      @apply my-8 border-line;
+      @apply my-10 border-line;
     }
 
     & img {
       @apply rounded-card;
+    }
+
+    /* Callouts. */
+    & > .callout {
+      @apply my-9;
+    }
+
+    & .callout {
+      @apply rounded-card p-5 sm:px-6;
+    }
+
+    & .callout-label {
+      @apply flex items-center gap-3 font-display font-bold;
+
+      &::before {
+        content: '';
+        @apply size-8 shrink-0 rounded-control bg-center bg-no-repeat;
+        background-size: 1.25rem;
+      }
+    }
+
+    & .callout-body {
+      @apply mt-3;
+
+      & > * + * {
+        @apply mt-3;
+      }
+    }
+
+    & .callout[data-kind='tip'] {
+      @apply bg-marigold-soft;
+
+      & .callout-label {
+        @apply text-marigold-text;
+      }
+
+      & .callout-label::before {
+        @apply bg-marigold;
+        background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%2312241C' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M9 18h6M10 21h4M12 3a6 6 0 0 0-3.6 10.8c.6.5 1.1 1.3 1.1 2.2h5c0-.9.5-1.7 1.1-2.2A6 6 0 0 0 12 3Z'/%3E%3C/svg%3E");
+      }
+    }
+
+    & .callout[data-kind='note'] {
+      @apply bg-evergreen-soft;
+
+      & .callout-label {
+        @apply text-evergreen;
+      }
+
+      & .callout-label::before {
+        @apply bg-evergreen;
+        background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='white' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='12' cy='12' r='9'/%3E%3Cpath d='M12 11v5M12 7.5h.01'/%3E%3C/svg%3E");
+      }
+    }
+
+    & .callout[data-kind='important'] {
+      @apply bg-ink text-white;
+
+      & .callout-label {
+        @apply text-marigold;
+      }
+
+      & .callout-label::before {
+        @apply bg-marigold;
+        background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%2312241C' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M12 3 5 6v5c0 4.5 3 8.3 7 10 4-1.7 7-5.5 7-10V6Z'/%3E%3Cpath d='M12 8.5v3.5M12 15.5h.01'/%3E%3C/svg%3E");
+      }
+
+      & a {
+        @apply text-white decoration-white/50 hover:decoration-white;
+      }
+
+      & code {
+        @apply bg-white/10 text-white ring-white/20;
+      }
+    }
+
+    /* A line to remember: no box, set large between two rules. */
+    & .callout[data-kind='remember'] {
+      @apply rounded-none border-y border-line px-0 py-7 sm:px-0;
+
+      & .callout-label {
+        @apply font-sans text-base font-semibold text-marigold-text;
+
+        &::before {
+          @apply h-px w-8 rounded-none bg-current;
+        }
+      }
+
+      & .callout-body {
+        @apply mt-4 font-display text-[1.625rem] leading-[1.25] font-semibold tracking-[-0.015em] text-balance text-evergreen sm:text-3xl;
+      }
+    }
+
+    /* An example message or post: a white card with a title bar. */
+    & .callout[data-kind='example'] {
+      @apply overflow-hidden border border-line bg-surface p-0 shadow-[0_18px_40px_-28px_rgb(18_36_28/0.45)] sm:px-0;
+
+      & .callout-label {
+        @apply gap-2 border-b border-line bg-mist-soft px-5 py-2.5 font-sans text-sm font-semibold text-quiet sm:px-6;
+
+        &::before {
+          @apply size-5 rounded-none;
+          background-size: contain;
+          background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%234F6459' stroke-width='1.75' stroke-linecap='round' stroke-linejoin='round'%3E%3Crect x='3.5' y='5.5' width='17' height='13' rx='1.5'/%3E%3Cpath d='m4 7 8 6 8-6'/%3E%3C/svg%3E");
+        }
+      }
+
+      & .callout-body {
+        @apply mt-0 px-5 py-5 text-base leading-relaxed sm:px-6;
+      }
+    }
+
+    /* The "Try it" panel's text, on evergreen. */
+    &.on-green {
+      & a {
+        @apply text-white decoration-white/50 hover:decoration-white;
+      }
+
+      & code {
+        @apply bg-white/10 text-white ring-white/20;
+      }
+
+      & ol > li::before {
+        @apply bg-white/15 text-white;
+      }
     }
   }
 }
