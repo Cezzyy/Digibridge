@@ -2,5 +2,6 @@
 export * from './api'
 export * from './buttons'
 export * from './levels'
+export * from './markdown'
 export * from './motion'
 export * from './supabase'
