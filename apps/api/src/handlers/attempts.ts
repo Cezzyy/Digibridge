@@ -158,8 +158,8 @@ const closedAt = (attempt: { submittedAt: Date | null; expiresAt: Date }) =>
 
 /**
  * The signed-in user's attempt with this ID (`isOwnAttempt`). `lock` takes a row lock inside a
- * transaction: `share` while saving an answer, `update` while submitting, so an answer can't land
- * after the attempt is scored.
+ * transaction: `share` while saving an answer or the survey, `update` while submitting, so an answer
+ * can't land after the attempt is scored, nor a survey after it's voided.
  */
 async function ownAttempt(
   db: Db | Tx,
@@ -418,42 +418,54 @@ export const getResult: RouteHandler<typeof getResultRoute, AuthEnv> = async (c)
 // ---- Usability survey ----
 
 export const saveSus: RouteHandler<typeof saveSusRoute, AuthEnv> = async (c) => {
-  const db = c.var.db
-  const attempt = await ownAttempt(db, c.var.profile.id, c.req.valid('param').id)
-  if (attempt.status === 'in_progress') {
-    throw new ApiError('conflict', 'Submit the assessment before you rate DigiBridge.')
-  }
-  if (attempt.status === 'voided') {
-    throw new ApiError('conflict', 'This assessment was cancelled by the team.')
-  }
-
   const { answers: given } = c.req.valid('json')
   // The schema checked there are exactly SUS_STATEMENT_COUNT answers, one per column.
   const q = (n: number) => given[n - 1]!
-  // The primary key allows one survey per attempt (SUS-04), so a second one, even sent at the
-  // same moment, inserts nothing.
-  const [saved] = await db
-    .insert(susResponses)
-    .values({
-      attemptId: attempt.id,
-      q1: q(1),
-      q2: q(2),
-      q3: q(3),
-      q4: q(4),
-      q5: q(5),
-      q6: q(6),
-      q7: q(7),
-      q8: q(8),
-      q9: q(9),
-      q10: q(10),
-      score: susScore(given),
-    })
-    .onConflictDoNothing()
-    .returning({ score: susResponses.score, submittedAt: susResponses.submittedAt })
-  if (!saved) throw new ApiError('conflict', 'You already rated DigiBridge. Thank you!')
+
+  const saved = await c.var.db.transaction(async (tx) => {
+    // The share lock holds off a void until the survey is in, so none lands on a voided attempt.
+    const attempt = await ownAttempt(tx, c.var.profile.id, c.req.valid('param').id, 'share')
+    if (attempt.status === 'in_progress') {
+      throw new ApiError('conflict', 'Submit the assessment before you rate DigiBridge.')
+    }
+    if (attempt.status === 'voided') {
+      throw new ApiError('conflict', 'This assessment was cancelled by the team.')
+    }
+
+    // The primary key allows one survey per attempt (SUS-04), so a second one, even sent at the
+    // same moment, inserts nothing.
+    const [row] = await tx
+      .insert(susResponses)
+      .values({
+        attemptId: attempt.id,
+        q1: q(1),
+        q2: q(2),
+        q3: q(3),
+        q4: q(4),
+        q5: q(5),
+        q6: q(6),
+        q7: q(7),
+        q8: q(8),
+        q9: q(9),
+        q10: q(10),
+        score: susScore(given),
+      })
+      .onConflictDoNothing()
+      .returning({
+        attemptId: susResponses.attemptId,
+        score: susResponses.score,
+        submittedAt: susResponses.submittedAt,
+      })
+    if (!row) throw new ApiError('already_answered', 'You already rated DigiBridge. Thank you!')
+    return row
+  })
 
   return c.json(
-    { attemptId: attempt.id, score: saved.score, submittedAt: saved.submittedAt.toISOString() },
+    {
+      attemptId: saved.attemptId,
+      score: saved.score,
+      submittedAt: saved.submittedAt.toISOString(),
+    },
     201,
   )
 }

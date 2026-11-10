@@ -9,6 +9,7 @@ export const ERROR_CODES = [
   'forbidden',
   'not_found',
   'conflict',
+  'already_answered',
   'too_large',
   'rate_limited',
   'internal_error',
