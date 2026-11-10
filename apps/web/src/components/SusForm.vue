@@ -9,7 +9,7 @@ import { computed, nextTick, ref, useId, useTemplateRef } from 'vue'
 import { useSaveSus } from '../composables/useSaveSus'
 import { PRIMARY_BUTTON, SECONDARY_BUTTON } from '../lib/buttons'
 
-// The usability survey (SUS-01): the 10 statements, each a row of 5 radio buttons from
+// The usability survey (SUS-01): the 10 statements, one per row with 5 radio buttons from
 // 1 (Strongly disagree) to 5 (Strongly agree), then Send and Skip. Answers are sent together;
 // once saved, the card thanks the student in place and emits `saved`. Skip only emits `skip`:
 // the page decides what that hides. Online it's an optional card under the results (SUS-02);
@@ -31,7 +31,12 @@ const answered = computed(() => answers.value.filter((a) => a !== null).length)
 const blank = computed(() => SUS_STATEMENT_COUNT - answered.value)
 const missing = (i: number) => tried.value && answers.value[i] === null
 
+// The 1 to 5 scale: full width on phones, a fixed row of circles beside the statement from md.
+// The header above the list uses it too, so its end labels line up with the circles.
+const SCALE = 'grid grid-cols-5 gap-2 md:grid-cols-[repeat(5,2.75rem)] md:gap-3'
+
 const statementId = (i: number) => `${id}-s${i}`
+const labelId = (i: number) => `${id}-l${i}`
 const errorId = (i: number) => `${id}-e${i}`
 const number = (i: number) => String(i + 1).padStart(2, '0')
 
@@ -100,47 +105,74 @@ async function send() {
       better.
     </p>
 
-    <form novalidate class="mt-6" @submit.prevent="send">
-      <ol class="grid gap-x-10 gap-y-7 xl:grid-cols-2">
-        <li v-for="(statement, i) in SUS_STATEMENTS" :key="i">
-          <fieldset
-            :id="statementId(i)"
-            :aria-describedby="missing(i) ? errorId(i) : undefined"
-            :data-invalid="missing(i) ? '' : undefined"
-          >
-            <legend class="flex gap-3 leading-snug font-semibold">
+    <form novalidate class="mt-6 max-w-4xl" @submit.prevent="send">
+      <div
+        aria-hidden="true"
+        class="hidden border-b border-line pb-3 text-xs font-semibold whitespace-nowrap text-quiet md:grid md:grid-cols-[minmax(0,1fr)_auto] md:gap-10"
+      >
+        <span>Statement</span>
+        <div :class="SCALE">
+          <span class="col-span-2">{{ SUS_ANSWER_LABELS[0] }}</span>
+          <span class="col-span-2 col-start-4 text-right">
+            {{ SUS_ANSWER_LABELS[SUS_ANSWER_LABELS.length - 1] }}
+          </span>
+        </div>
+      </div>
+
+      <ol class="divide-y divide-line">
+        <li
+          v-for="(statement, i) in SUS_STATEMENTS"
+          :key="i"
+          class="grid gap-3 py-5 md:grid-cols-[minmax(0,1fr)_auto] md:items-center md:gap-10"
+        >
+          <div>
+            <p :id="labelId(i)" class="flex gap-3 leading-snug font-semibold">
               <span class="font-display text-marigold-text tabular-nums">{{ number(i) }}</span>
               <span>{{ statement }}</span>
-            </legend>
+            </p>
+            <p
+              v-if="missing(i)"
+              :id="errorId(i)"
+              class="mt-1.5 ml-9 text-sm font-semibold text-error"
+            >
+              Pick a number for this one.
+            </p>
+          </div>
 
-            <div class="mt-3 max-w-xs sm:ml-9">
-              <div class="grid grid-cols-5 gap-2">
-                <label
-                  v-for="(label, v) in SUS_ANSWER_LABELS"
-                  :key="label"
-                  class="grid h-12 cursor-pointer place-items-center rounded-control border bg-surface transition-[border-color,background-color,color] duration-200 hover:border-evergreen has-checked:border-evergreen has-checked:bg-evergreen has-checked:text-white has-focus-visible:outline-2 has-focus-visible:outline-offset-2 has-focus-visible:outline-evergreen"
-                  :class="missing(i) ? 'border-error' : 'border-line-strong'"
-                >
-                  <input
-                    v-model="answers[i]"
-                    type="radio"
-                    :name="statementId(i)"
-                    :value="v + 1"
-                    class="sr-only"
-                  />
-                  <span class="font-display text-lg font-bold tabular-nums">{{ v + 1 }}</span>
-                  <span class="sr-only">{{ label }}</span>
-                </label>
-              </div>
-              <div aria-hidden="true" class="mt-1.5 flex justify-between text-xs text-quiet">
-                <span>{{ SUS_ANSWER_LABELS[0] }}</span>
-                <span>{{ SUS_ANSWER_LABELS[SUS_ANSWER_LABELS.length - 1] }}</span>
-              </div>
-              <p v-if="missing(i)" :id="errorId(i)" class="mt-2 text-sm font-semibold text-error">
-                Pick a number for this one.
-              </p>
+          <div>
+            <div
+              :id="statementId(i)"
+              role="radiogroup"
+              :aria-labelledby="labelId(i)"
+              :aria-describedby="missing(i) ? errorId(i) : undefined"
+              :aria-invalid="missing(i) || undefined"
+              :class="SCALE"
+            >
+              <label
+                v-for="(label, v) in SUS_ANSWER_LABELS"
+                :key="label"
+                class="grid aspect-square cursor-pointer place-items-center justify-self-center rounded-full border bg-surface transition-[border-color,background-color,color] duration-200 hover:border-evergreen has-checked:border-evergreen has-checked:bg-evergreen has-checked:text-white has-focus-visible:outline-2 has-focus-visible:outline-offset-2 has-focus-visible:outline-evergreen max-md:w-full max-md:max-w-12 md:size-11"
+                :class="missing(i) ? 'border-error' : 'border-line-strong'"
+              >
+                <input
+                  v-model="answers[i]"
+                  type="radio"
+                  :name="statementId(i)"
+                  :value="v + 1"
+                  class="sr-only"
+                />
+                <span class="font-display font-bold tabular-nums">{{ v + 1 }}</span>
+                <span class="sr-only">{{ label }}</span>
+              </label>
             </div>
-          </fieldset>
+            <div
+              aria-hidden="true"
+              class="mt-1.5 flex justify-between text-xs text-quiet md:hidden"
+            >
+              <span>{{ SUS_ANSWER_LABELS[0] }}</span>
+              <span>{{ SUS_ANSWER_LABELS[SUS_ANSWER_LABELS.length - 1] }}</span>
+            </div>
+          </div>
         </li>
       </ol>
 
