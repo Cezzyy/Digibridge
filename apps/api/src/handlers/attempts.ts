@@ -21,11 +21,13 @@ import type { Db } from '../config/db'
 import type { AuthEnv } from '../env'
 import { pickItems, type PoolItem } from '../lib/pick-items'
 import { scoreAndClose, timeIsUp, type Tx } from '../lib/close-attempt'
+import { susScore } from '../lib/sus'
 import { ApiError } from '../middleware'
 import type {
   getAttemptRoute,
   getResultRoute,
   saveAnswerRoute,
+  saveSusRoute,
   startAttemptRoute,
   submitAttemptRoute,
 } from '../routes/attempts'
@@ -410,5 +412,48 @@ export const getResult: RouteHandler<typeof getResultRoute, AuthEnv> = async (c)
       susAnswered: attempt.susAttemptId !== null,
     },
     200,
+  )
+}
+
+// ---- Usability survey ----
+
+export const saveSus: RouteHandler<typeof saveSusRoute, AuthEnv> = async (c) => {
+  const db = c.var.db
+  const attempt = await ownAttempt(db, c.var.profile.id, c.req.valid('param').id)
+  if (attempt.status === 'in_progress') {
+    throw new ApiError('conflict', 'Submit the assessment before you rate DigiBridge.')
+  }
+  if (attempt.status === 'voided') {
+    throw new ApiError('conflict', 'This assessment was cancelled by the team.')
+  }
+
+  const { answers: given } = c.req.valid('json')
+  // The schema checked there are exactly SUS_STATEMENT_COUNT answers, one per column.
+  const q = (n: number) => given[n - 1]!
+  // The primary key allows one survey per attempt (SUS-04), so a second one, even sent at the
+  // same moment, inserts nothing.
+  const [saved] = await db
+    .insert(susResponses)
+    .values({
+      attemptId: attempt.id,
+      q1: q(1),
+      q2: q(2),
+      q3: q(3),
+      q4: q(4),
+      q5: q(5),
+      q6: q(6),
+      q7: q(7),
+      q8: q(8),
+      q9: q(9),
+      q10: q(10),
+      score: susScore(given),
+    })
+    .onConflictDoNothing()
+    .returning({ score: susResponses.score, submittedAt: susResponses.submittedAt })
+  if (!saved) throw new ApiError('conflict', 'You already rated DigiBridge. Thank you!')
+
+  return c.json(
+    { attemptId: attempt.id, score: saved.score, submittedAt: saved.submittedAt.toISOString() },
+    201,
   )
 }
