@@ -34,6 +34,7 @@ import type {
 
 const ALREADY_TAKEN = 'You already took the assessment.'
 const NOT_READY = 'The assessment isn’t ready yet. Please try again later.'
+const VOIDED = 'This assessment was cancelled by the team.'
 
 const summaryColumns = {
   id: attempts.id,
@@ -292,7 +293,7 @@ export const submitAttempt: RouteHandler<typeof submitAttemptRoute, AuthEnv> = a
   const closed = await c.var.db.transaction(async (tx) => {
     const attempt = await ownAttempt(tx, c.var.profile.id, id, 'update')
     if (attempt.status === 'voided') {
-      throw new ApiError('conflict', 'This assessment was cancelled by the team.')
+      throw new ApiError('conflict', VOIDED)
     }
     // Already closed (a second tap, or the timer and the button at once): return it as it is.
     if (attempt.status !== 'in_progress') return attempt
@@ -334,7 +335,7 @@ export const getResult: RouteHandler<typeof getResultRoute, AuthEnv> = async (c)
     throw new ApiError('conflict', 'Submit the assessment to see your results.')
   }
   if (attempt.status === 'voided') {
-    throw new ApiError('conflict', 'This assessment was cancelled by the team.')
+    throw new ApiError('conflict', VOIDED)
   }
   const { totalPoints, overallPct, overallLevel } = attempt
   // Submit and the cron always score before closing; a row closed some other way may not be.
@@ -429,7 +430,7 @@ export const saveSus: RouteHandler<typeof saveSusRoute, AuthEnv> = async (c) => 
       throw new ApiError('conflict', 'Submit the assessment before you rate DigiBridge.')
     }
     if (attempt.status === 'voided') {
-      throw new ApiError('conflict', 'This assessment was cancelled by the team.')
+      throw new ApiError('conflict', VOIDED)
     }
 
     // The primary key allows one survey per attempt (SUS-04), so a second one, even sent at the
