@@ -32,9 +32,11 @@ async function fetchResult() {
 void fetchResult()
 
 // The usability survey sits under the results until it's answered (SUS-02). Skip hides it for
-// this visit only, so it's offered again next time.
+// this visit only, so it's offered again next time. The card's attempt, or null while it's hidden.
 const susSkipped = ref(false)
-const susOpen = computed(() => !!result.value && !result.value.susAnswered && !susSkipped.value)
+const susAttemptId = computed(() =>
+  result.value && !result.value.susAnswered && !susSkipped.value ? result.value.id : null,
+)
 
 const name = computed(() => session.me?.respondent?.fullName ?? session.me?.profile.fullName)
 
@@ -351,8 +353,8 @@ const finishedOn = computed(() =>
       </p>
 
       <SusForm
-        v-if="result && susOpen"
-        :attempt-id="result.id"
+        v-if="susAttemptId"
+        :attempt-id="susAttemptId"
         class="motion-safe:animate-rise"
         @skip="susSkipped = true"
       />
