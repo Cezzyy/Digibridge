@@ -1348,7 +1348,7 @@ describe('attempts in progress', () => {
       expect(await res.json()).toMatchObject({ score: 50 })
     })
 
-    it('sends conflict for a second survey and keeps the first, even when both arrive together', async () => {
+    it('sends already_answered for a second survey and keeps the first, even when both arrive together', async () => {
       const { user, attempt } = await finished()
       const replies = await Promise.all([
         rate(attempt.id, answers, user.headers),
@@ -1360,7 +1360,7 @@ describe('attempts in progress', () => {
       const again = await rate(attempt.id, answers, user.headers)
       expect(again.status).toBe(409)
       expect(await again.json()).toEqual({
-        error: { code: 'conflict', message: 'You already rated DigiBridge. Thank you!' },
+        error: { code: 'already_answered', message: 'You already rated DigiBridge. Thank you!' },
       })
     })
 
@@ -1396,7 +1396,11 @@ describe('attempts in progress', () => {
         .update(attempts)
         .set({ status: 'voided', voidReason: 'Test' })
         .where(eq(attempts.id, attempt.id))
-      expect((await rate(attempt.id, answers, user.headers)).status).toBe(409)
+      const res = await rate(attempt.id, answers, user.headers)
+      expect(res.status).toBe(409)
+      expect(await res.json()).toEqual({
+        error: { code: 'conflict', message: 'This assessment was cancelled by the team.' },
+      })
       expect(await surveysOf(attempt.id)).toHaveLength(0)
     })
 

@@ -260,6 +260,8 @@ export const saveSusRoute = createRoute({
     401: errorResponse('Not signed in, or the sign-in has expired'),
     403: errorResponse('Signed in as staff'),
     404: errorResponse('No such attempt for this respondent'),
-    409: errorResponse('The survey was already answered, or the attempt is in progress or voided'),
+    409: errorResponse(
+      'The survey was already answered (`already_answered`), or the attempt is in progress or voided (`conflict`)',
+    ),
   },
 })

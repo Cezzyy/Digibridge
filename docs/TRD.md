@@ -198,7 +198,7 @@ All routes live under `/api/v1` (only the OpenAPI spec and docs page sit at `/ap
 | PUT | `/api/v1/attempts/:id/answers/:questionId` | Self | Save or change one answer. Rejected after `expires_at` + 30 s. |
 | POST | `/api/v1/attempts/:id/submit` | Self | Score and close the attempt, create `results_token`. Safe to call twice. |
 | GET | `/api/v1/attempts/:id/result` | Self | Overall and per-area scores, levels, recommended lessons (each tier for the area's level, with its published lesson or `null`), `results_token` and whether SUS is answered. No per-item marks. 409 while in progress or voided. |
-| POST | `/api/v1/attempts/:id/sus` | Self | Save the 10 SUS answers and return the score. 409 if already answered. |
+| POST | `/api/v1/attempts/:id/sus` | Self | Save the 10 SUS answers and return the score. 409 `already_answered` if already answered, 409 `conflict` while in progress or voided. |
 | GET | `/api/v1/results/:token` | Public | Results and lessons by private token, opened from the QR code (RES-04) |
 | GET | `/api/v1/lessons` | Public | Published lessons, filterable by area and tier |
 | GET | `/api/v1/lessons/:slug` | Public | One lesson |
