@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { AREA_CODES, AREA_LABELS, LESSON_TIER_LABELS, type Level } from '@digibridge/shared'
-import { computed } from 'vue'
+import { computed, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import LessonCard from '../../components/results/LessonCard.vue'
 import LevelBadge from '../../components/results/LevelBadge.vue'
@@ -10,6 +10,7 @@ import ScoreBar from '../../components/results/ScoreBar.vue'
 import SkeletonText from '../../components/results/SkeletonText.vue'
 import StartLayout from '../../components/start/StartLayout.vue'
 import StartSteps from '../../components/start/StartSteps.vue'
+import SusForm from '../../components/SusForm.vue'
 import { useResult, type AreaResult } from '../../composables/useResult'
 import { PRIMARY_BUTTON } from '../../lib/buttons'
 import { wholePct } from '../../lib/levels'
@@ -18,7 +19,8 @@ import { useSessionStore } from '../../stores/session'
 // The last step: the overall level, a radar chart of the 3 areas, and each area's score, level
 // and lessons (RES-01, RES-02). Scores only, never which answers were right (RES-05). The `step`
 // guard lets in only a respondent whose attempt is submitted or expired; online they can come
-// back to it anytime (RES-03). Loaded lazily by the router, so Chart.js isn't in the first load.
+// back to it anytime (RES-03). The usability survey is an optional card at the end (SUS-02).
+// Loaded lazily by the router, so Chart.js isn't in the first load.
 const session = useSessionStore()
 const router = useRouter()
 const { result, error, load } = useResult()
@@ -28,6 +30,11 @@ async function fetchResult() {
   if ((await load()) === 'moved') await router.replace({ name: 'home' })
 }
 void fetchResult()
+
+// The usability survey sits under the results until it's answered (SUS-02). Skip hides it for
+// this visit only, so it's offered again next time.
+const susSkipped = ref(false)
+const susOpen = computed(() => !!result.value && !result.value.susAnswered && !susSkipped.value)
 
 const name = computed(() => session.me?.respondent?.fullName ?? session.me?.profile.fullName)
 
@@ -342,6 +349,13 @@ const finishedOn = computed(() =>
           questions fair for everyone who takes it after you.
         </span>
       </p>
+
+      <SusForm
+        v-if="result && susOpen"
+        :attempt-id="result.id"
+        class="motion-safe:animate-rise"
+        @skip="susSkipped = true"
+      />
     </div>
   </StartLayout>
 </template>
