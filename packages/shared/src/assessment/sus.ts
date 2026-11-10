@@ -37,12 +37,18 @@ export const SUS_ANSWER_LABELS = [
   'Strongly agree',
 ] as const
 
+const ANSWER_MESSAGE = 'Pick an answer from 1 to 5 for each statement.'
+const ALL_MESSAGE = `Answer all ${SUS_STATEMENT_COUNT} statements.`
+
 /** One answer: a whole number from 1 to 5. */
-export const susAnswerSchema = z.int().min(SUS_ANSWER_MIN).max(SUS_ANSWER_MAX)
+export const susAnswerSchema = z
+  .int(ANSWER_MESSAGE)
+  .min(SUS_ANSWER_MIN, ANSWER_MESSAGE)
+  .max(SUS_ANSWER_MAX, ANSWER_MESSAGE)
 
 /** The 10 answers, in statement order. */
 export const susAnswersSchema = z
-  .array(susAnswerSchema)
-  .length(SUS_STATEMENT_COUNT)
+  .array(susAnswerSchema, ALL_MESSAGE)
+  .length(SUS_STATEMENT_COUNT, ALL_MESSAGE)
   .meta({ id: 'SusAnswers' })
 export type SusAnswers = z.infer<typeof susAnswersSchema>
