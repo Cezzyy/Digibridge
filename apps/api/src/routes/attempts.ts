@@ -4,6 +4,10 @@ import {
   attemptStatusSchema,
   lessonTierSchema,
   levelSchema,
+  SUS_ANSWER_MAX,
+  SUS_ANSWER_MIN,
+  SUS_STATEMENT_COUNT,
+  susAnswersSchema,
 } from '@digibridge/shared'
 import { createRoute, z } from '@hono/zod-openapi'
 import { auth, requireRole } from '../middleware'
@@ -218,5 +222,44 @@ export const getResultRoute = createRoute({
     403: errorResponse('Signed in as staff'),
     404: errorResponse('No such attempt for this respondent'),
     409: errorResponse('The attempt is still in progress, or was voided'),
+  },
+})
+
+const SaveSusBodySchema = z
+  // In statement order, each from 1 (Strongly disagree) to 5 (Strongly agree).
+  .object({ answers: susAnswersSchema })
+  .openapi('SaveSus')
+
+export const SusResultSchema = z
+  .object({
+    attemptId: z.uuid(),
+    // 0 to 100 in steps of 2.5.
+    score: z.number(),
+    submittedAt: z.iso.datetime(),
+  })
+  .openapi('SusResult')
+
+export const saveSusRoute = createRoute({
+  method: 'post',
+  path: '/attempts/{id}/sus',
+  tags: ['Results'],
+  summary: 'Save the usability survey',
+  description: `Saves the ${SUS_STATEMENT_COUNT} System Usability Scale answers, in statement order and each from ${SUS_ANSWER_MIN} (Strongly disagree) to ${SUS_ANSWER_MAX} (Strongly agree), for a submitted or expired attempt, and returns the SUS score, 0 to 100, worked out on the server (SUS-01, SUS-04). One survey per attempt. ${SELF_ONLY}`,
+  middleware: [auth, requireRole('respondent')] as const,
+  security: [{ Bearer: [] }],
+  request: {
+    params: AttemptParamsSchema,
+    body: { required: true, content: { 'application/json': { schema: SaveSusBodySchema } } },
+  },
+  responses: {
+    201: {
+      description: 'The survey was saved',
+      content: { 'application/json': { schema: SusResultSchema } },
+    },
+    400: errorResponse('Not 10 answers, or an answer outside 1 to 5'),
+    401: errorResponse('Not signed in, or the sign-in has expired'),
+    403: errorResponse('Signed in as staff'),
+    404: errorResponse('No such attempt for this respondent'),
+    409: errorResponse('The survey was already answered, or the attempt is in progress or voided'),
   },
 })
