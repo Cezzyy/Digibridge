@@ -7,6 +7,9 @@ export const SUS_STATEMENT_COUNT = 10
 export const SUS_ANSWER_MIN = 1
 export const SUS_ANSWER_MAX = 5
 
+/** Scales the raw total (0 to 40) to the SUS score (0 to 100): 100 / (10 × 4) = 2.5. */
+export const SUS_SCALE = 100 / (SUS_STATEMENT_COUNT * (SUS_ANSWER_MAX - SUS_ANSWER_MIN))
+
 /** Pilot target from the PRD: 68 or higher is above average. */
 export const SUS_TARGET_SCORE = 68
 
