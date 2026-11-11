@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted } from 'vue'
 import { ICONS } from '../../components/admin/admin-icons'
+import ErrorPanel from '../../components/admin/ErrorPanel.vue'
 import { formatIsoDay } from '../../components/admin/link-text'
 import SplitCard, { type SplitPart } from '../../components/admin/SplitCard.vue'
 import StrokeIcon from '../../components/admin/StrokeIcon.vue'
@@ -94,18 +95,12 @@ const progress = computed<SplitPart[]>(() => [
     </button>
   </div>
 
-  <div
+  <ErrorPanel
     v-if="error"
-    role="alert"
-    class="mt-8 flex flex-col gap-4 rounded-card bg-error-soft p-5 sm:flex-row sm:items-center sm:justify-between"
-  >
-    <p class="font-semibold text-error">
-      {{ overview ? `We couldn’t refresh the counts. ${error}` : error }}
-    </p>
-    <button type="button" :class="SECONDARY_BUTTON" class="bg-surface" @click="load">
-      Try again
-    </button>
-  </div>
+    class="mt-8"
+    :message="overview ? `We couldn’t refresh the counts. ${error}` : error"
+    @retry="load"
+  />
 
   <!-- Without counts and with an error, the alert above takes their place. -->
   <template v-if="overview || !error">
