@@ -15,7 +15,7 @@ export const createRespondentRoute = createRoute({
   summary: 'Save consent, profile and identity choice',
   description:
     'Online: the general profile only (PRO-01, PRO-06). Consent is saved with the profile, so declining stores nothing (CON-02). One respondent per Google account (PRO-07). Respondents only: staff try the flow as a preview that saves nothing, so no test rows reach the research data.',
-  // Kiosk mode will let facilitators in too, with a kiosk session.
+  // School-link students get their own route, under the link's code (Stage 2).
   middleware: [auth, requireRole('respondent')] as const,
   security: [{ Bearer: [] }],
   request: {

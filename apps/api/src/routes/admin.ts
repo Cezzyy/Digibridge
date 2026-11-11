@@ -118,7 +118,7 @@ export const closeLinkRoute = createRoute({
   tags: ['Admin'],
   summary: 'Close a school link',
   description:
-    'New students can’t start from it any more; attempts already started can still finish. Closing a closed link changes nothing (LNK-01).',
+    'New students can’t start from it any more; attempts already started can still finish. Closing a closed or expired link changes nothing (LNK-01).',
   middleware: [auth, requireRole('admin')] as const,
   security: [{ Bearer: [] }],
   request: { params: LinkParamsSchema },
