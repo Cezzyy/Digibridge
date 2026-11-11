@@ -56,7 +56,7 @@ const describedBy = computed(
         aria-hidden="true"
         class="pointer-events-none absolute top-1/2 right-3 grid size-6 -translate-y-1/2 place-items-center rounded-full bg-evergreen motion-safe:animate-pop"
       >
-        <svg viewBox="0 0 16 16" class="size-4 fill-none stroke-white stroke-[2.5]">
+        <svg viewBox="0 0 16 16" class="size-4 fill-none stroke-on-evergreen stroke-[2.5]">
           <path d="M3.5 8.5l3 3 6-7" stroke-linecap="round" stroke-linejoin="round" />
         </svg>
       </span>

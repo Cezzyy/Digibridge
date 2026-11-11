@@ -1,7 +1,7 @@
 <!-- DigiBridge mark: a suspension bridge with a marigold deck. Same drawing as public/favicon.svg. -->
 <template>
   <svg viewBox="0 0 32 32" aria-hidden="true" class="shrink-0">
-    <rect width="32" height="32" rx="8" class="fill-evergreen" />
+    <rect width="32" height="32" rx="8" class="fill-brand" />
     <g fill="none" stroke-linecap="round" stroke-linejoin="round">
       <path
         d="M5 15 Q8 12.5 11 8 Q16 20 21 8 Q24 12.5 27 15"

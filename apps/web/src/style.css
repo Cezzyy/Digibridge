@@ -26,6 +26,14 @@
   --color-level-2: #8cc5a6;
   --color-level-3: #2f7d58;
   --color-level-4: #1e5b44;
+  /* Text and icons on an evergreen fill (white here, dark green in the dark theme). */
+  --color-on-evergreen: #ffffff;
+  /* The logo's tile, which keeps its green in both themes. */
+  --color-brand: #1e5b44;
+  /* Loading placeholders on a card. */
+  --color-skeleton: #e4efe8;
+  /* The dim layer behind a modal dialog. */
+  --color-scrim: rgb(18 36 28 / 0.5);
 
   /* Bricolage Grotesque for headings, Source Sans 3 for everything else (self-hosted, see main.ts). */
   --font-sans: 'Source Sans 3 Variable', ui-sans-serif, system-ui, sans-serif;
@@ -95,6 +103,38 @@
     to {
       transform: translateX(300%);
     }
+  }
+}
+
+/* Pages that follow the system theme (route meta `followsSystemTheme`, the admin area) set
+   `data-theme="system"` on <html>. With the system in dark mode, the same tokens get these
+   values, so every class keeps working. The rest of the app stays light. */
+:root[data-theme='system'] {
+  color-scheme: light dark;
+  background: var(--color-mist);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root[data-theme='system'] {
+    --color-evergreen: #74d1a2;
+    --color-evergreen-hover: #93dfb8;
+    --color-evergreen-soft: #1b3a2c;
+    --color-marigold: #f4a51c;
+    --color-marigold-text: #f5c26b;
+    --color-marigold-soft: #3a2d13;
+    --color-ink: #e3eee7;
+    --color-quiet: #a2b7ab;
+    --color-line: #2a3e34;
+    --color-line-strong: #64806f;
+    --color-surface: #16231d;
+    --color-mist: #0e1813;
+    --color-mist-soft: #1c2c24;
+    --color-track: #22352b;
+    --color-error: #ff907d;
+    --color-error-soft: #3b1d18;
+    --color-on-evergreen: #0b1d14;
+    --color-skeleton: #26392f;
+    --color-scrim: rgb(0 0 0 / 0.6);
   }
 }
 
