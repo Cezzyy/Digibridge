@@ -14,17 +14,23 @@ import {
   type SchoolLinkInput,
   type YearLevel,
 } from '@digibridge/shared'
-import { computed, reactive, ref, useId, watch } from 'vue'
+import { computed, reactive, ref, watch } from 'vue'
 import { useToday } from '../../composables/useToday'
 import { PRIMARY_BUTTON, SECONDARY_BUTTON } from '../../lib/buttons'
 import DateField from '../form/DateField.vue'
+import SelectField from '../form/SelectField.vue'
 import TextField from '../form/TextField.vue'
+import FormSection from '../start/FormSection.vue'
+import { ICONS } from './admin-icons'
 import { formatIsoDay } from './link-text'
+import StrokeIcon from './StrokeIcon.vue'
 
 // Makes a school link (LNK-01): the school, a name for the class, the last day it stays open,
-// and optionally a course, a year level and a response limit. Checked with the API's own
-// schema; errors show once Create is pressed, then follow each change. After a link is made
-// the form clears, but keeps the school for the next one.
+// and optionally a course, a year level and a response limit. Laid out like the profile form:
+// one panel, a numbered row per part (the number turns into a check once the part is filled
+// in), and a bar counting the required details. Checked with the API's own schema; errors
+// show once Create is pressed, then follow each change. After a link is made the form clears,
+// but keeps the school for the next one.
 
 defineProps<{ creating: boolean; error: string | null; cancellable: boolean }>()
 const emit = defineEmits<{ submit: [input: SchoolLinkInput]; cancel: [] }>()
@@ -49,12 +55,21 @@ const today = useToday()
 const lastDay = computed(() => addDays(today.value, LINK_MAX_DAYS))
 const thisYear = computed(() => Number(today.value.slice(0, 4)))
 
+const COURSE_OPTIONS: { value: Course | null; label: string }[] = [
+  { value: null, label: 'Any course' },
+  ...COURSES.map((course) => ({ value: course, label: course })),
+]
+
 // A course limits the year levels; a year level the new course doesn't have is cleared.
-const yearOptions = computed(() => (form.course ? yearLevelsFor(form.course) : [...YEAR_LEVELS]))
+const years = computed(() => (form.course ? yearLevelsFor(form.course) : [...YEAR_LEVELS]))
+const yearOptions = computed<{ value: YearLevel | null; label: string }[]>(() => [
+  { value: null, label: 'Any year level' },
+  ...years.value.map((year) => ({ value: year, label: YEAR_LEVEL_LABELS[year] })),
+])
 watch(
   () => form.course,
   () => {
-    if (form.yearLevel && !yearOptions.value.includes(form.yearLevel)) form.yearLevel = null
+    if (form.yearLevel && !years.value.includes(form.yearLevel)) form.yearLevel = null
   },
 )
 
@@ -75,19 +90,36 @@ const result = computed(() => {
   return schoolLinkSchema.safeParse(input.value)
 })
 
-const tried = ref(false)
-const errors = computed(() => {
-  const found: Partial<Record<keyof SchoolLinkInput, string>> = {}
-  if (!tried.value || result.value.success) return found
+type Field = keyof SchoolLinkInput
+
+/** The first problem with each field, shown or not. */
+const issues = computed(() => {
+  const found: Partial<Record<Field, string>> = {}
+  if (result.value.success) return found
   for (const issue of result.value.error.issues) {
-    const field = issue.path[0] as keyof SchoolLinkInput | undefined
+    const field = issue.path[0] as Field | undefined
     if (field && !found[field]) found[field] = issue.message
   }
   return found
 })
 
+const tried = ref(false)
+const errors = computed(() => (tried.value ? issues.value : {}))
+
+const ok = (...fields: Field[]) => fields.every((field) => !issues.value[field])
+
+const REQUIRED: Field[] = ['school', 'label', 'expiresOn']
+const requiredDone = computed(() => REQUIRED.filter((field) => ok(field)).length)
+
+const done = computed(() => ({
+  class: ok('school', 'label'),
+  // Optional: checked once a course or year level is picked.
+  who: (form.course !== null || form.yearLevel !== null) && ok('yearLevel'),
+  open: ok('expiresOn', 'maxResponses'),
+}))
+
 const confirmation = computed(() =>
-  form.expiresOn && result.value.success
+  form.expiresOn && ok('expiresOn')
     ? `It closes at midnight after ${formatIsoDay(form.expiresOn)}.`
     : null,
 )
@@ -96,26 +128,53 @@ function submit() {
   tried.value = true
   if (result.value.success) emit('submit', input.value)
 }
-
-const id = useId()
-const FIELD =
-  'block min-h-12 w-full rounded-control border bg-surface px-4 text-lg transition-colors hover:border-evergreen focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-evergreen'
 </script>
 
 <template>
   <form
-    class="rounded-card border border-line bg-surface p-5 sm:p-7"
     novalidate
     aria-labelledby="new-link-heading"
+    class="divide-y divide-line rounded-card border border-line bg-surface"
     @submit.prevent="submit"
   >
-    <h2 id="new-link-heading" class="text-xl font-bold">New school link</h2>
-    <p class="mt-1 text-quiet">
-      Students who open it go through the school privacy notice and a profile with their student
-      number, course and year level.
-    </p>
+    <header
+      class="flex flex-col gap-5 px-5 py-6 sm:px-7 sm:py-7 md:flex-row md:items-center md:justify-between"
+    >
+      <div class="flex items-center gap-4">
+        <span
+          class="grid size-12 shrink-0 place-items-center rounded-card bg-evergreen-soft text-evergreen"
+        >
+          <StrokeIcon :d="ICONS.link" class="size-7" />
+        </span>
+        <div>
+          <h2 id="new-link-heading" class="text-2xl leading-tight font-bold">New school link</h2>
+          <p class="text-quiet">
+            Students who open it go through the school privacy notice and a profile with their
+            student number, course and year level.
+          </p>
+        </div>
+      </div>
 
-    <div class="mt-6 grid gap-6 md:grid-cols-2">
+      <div class="md:w-64 md:shrink-0">
+        <p class="flex justify-between gap-4 text-sm font-semibold text-quiet">
+          <span>Required details</span>
+          <span class="text-ink">{{ requiredDone }} of {{ REQUIRED.length }}</span>
+        </p>
+        <div class="mt-2 h-1.5 overflow-hidden rounded-full bg-track" aria-hidden="true">
+          <div
+            class="h-full rounded-full bg-evergreen transition-[width] duration-500 ease-glide"
+            :style="{ width: `${(requiredDone / REQUIRED.length) * 100}%` }"
+          />
+        </div>
+      </div>
+    </header>
+
+    <FormSection
+      :number="1"
+      title="The class"
+      description="The school, and a name so you can find this link later."
+      :done="done.class"
+    >
       <TextField
         v-model="form.school"
         label="School"
@@ -132,68 +191,35 @@ const FIELD =
         :maxlength="LINK_LABEL_MAX_LENGTH"
         autocomplete="off"
       />
+    </FormSection>
 
-      <div>
-        <label :for="`${id}-course`" class="text-lg font-semibold">Course</label>
-        <p class="mt-0.5 text-quiet">Only students in this course can use it.</p>
-        <select
-          :id="`${id}-course`"
-          v-model="form.course"
-          class="mt-2 border-line-strong"
-          :class="FIELD"
-        >
-          <option :value="null">Any course</option>
-          <option v-for="course in COURSES" :key="course" :value="course">{{ course }}</option>
-        </select>
-      </div>
+    <FormSection
+      :number="2"
+      title="Who can use it"
+      description="Optional. Leave both on Any to let in every student from the school."
+      :done="done.who"
+    >
+      <SelectField
+        v-model="form.course"
+        label="Course"
+        hint="Only students in this course can use it."
+        :options="COURSE_OPTIONS"
+      />
+      <SelectField
+        v-model="form.yearLevel"
+        label="Year level"
+        hint="Only students in this year can use it."
+        :error="errors.yearLevel"
+        :options="yearOptions"
+      />
+    </FormSection>
 
-      <div :data-invalid="errors.yearLevel ? '' : undefined">
-        <label :for="`${id}-year`" class="text-lg font-semibold">Year level</label>
-        <p class="mt-0.5 text-quiet">Only students in this year can use it.</p>
-        <select
-          :id="`${id}-year`"
-          v-model="form.yearLevel"
-          class="mt-2"
-          :class="[FIELD, errors.yearLevel ? 'border-error' : 'border-line-strong']"
-          :aria-invalid="errors.yearLevel ? 'true' : undefined"
-          :aria-describedby="errors.yearLevel ? `${id}-year-error` : undefined"
-        >
-          <option :value="null">Any year level</option>
-          <option v-for="year in yearOptions" :key="year" :value="year">
-            {{ YEAR_LEVEL_LABELS[year] }}
-          </option>
-        </select>
-        <p v-if="errors.yearLevel" :id="`${id}-year-error`" class="mt-2 font-semibold text-error">
-          {{ errors.yearLevel }}
-        </p>
-      </div>
-
-      <div :data-invalid="errors.maxResponses ? '' : undefined">
-        <label :for="`${id}-limit`" class="text-lg font-semibold">Response limit</label>
-        <p :id="`${id}-limit-hint`" class="mt-0.5 text-quiet">
-          The most students who can start from it, up to {{ LINK_MAX_RESPONSES }}. Leave it empty
-          for no limit.
-        </p>
-        <input
-          :id="`${id}-limit`"
-          v-model="form.maxResponses"
-          type="text"
-          inputmode="numeric"
-          autocomplete="off"
-          class="mt-2"
-          :class="[FIELD, errors.maxResponses ? 'border-error' : 'border-line-strong']"
-          :aria-invalid="errors.maxResponses ? 'true' : undefined"
-          :aria-describedby="`${id}-limit-hint${errors.maxResponses ? ` ${id}-limit-error` : ''}`"
-        />
-        <p
-          v-if="errors.maxResponses"
-          :id="`${id}-limit-error`"
-          class="mt-2 font-semibold text-error"
-        >
-          {{ errors.maxResponses }}
-        </p>
-      </div>
-
+    <FormSection
+      :number="3"
+      title="How long it’s open"
+      description="When the link stops letting new students start."
+      :done="done.open"
+    >
       <DateField
         v-model="form.expiresOn"
         label="Last day open"
@@ -204,23 +230,41 @@ const FIELD =
         :max="lastDay"
         :start-year="thisYear"
       />
-    </div>
+      <TextField
+        v-model="form.maxResponses"
+        label="Response limit"
+        :hint="`Optional. The most students who can start from it, up to ${LINK_MAX_RESPONSES}. Leave it empty for no limit.`"
+        :error="errors.maxResponses"
+        inputmode="numeric"
+        autocomplete="off"
+      />
+    </FormSection>
 
-    <p v-if="error" role="alert" class="mt-6 font-semibold text-error">{{ error }}</p>
+    <footer
+      class="flex flex-col gap-4 rounded-b-card bg-mist-soft px-5 py-5 sm:flex-row sm:items-center sm:justify-between sm:px-7"
+    >
+      <p v-if="error" role="alert" class="font-semibold text-error">{{ error }}</p>
+      <p v-else class="text-quiet">
+        <template v-if="requiredDone === REQUIRED.length">Ready to create.</template>
+        <template v-else
+          >Fill in the {{ REQUIRED.length }} required details to make the link.</template
+        >
+      </p>
 
-    <div class="mt-8 flex flex-col gap-3 sm:flex-row">
-      <button type="submit" :class="PRIMARY_BUTTON" :disabled="creating">
-        {{ creating ? 'Creating…' : 'Create link' }}
-      </button>
-      <button
-        v-if="cancellable"
-        type="button"
-        :class="SECONDARY_BUTTON"
-        :disabled="creating"
-        @click="emit('cancel')"
-      >
-        Cancel
-      </button>
-    </div>
+      <div class="flex flex-col-reverse gap-3 sm:flex-row sm:shrink-0">
+        <button
+          v-if="cancellable"
+          type="button"
+          :class="SECONDARY_BUTTON"
+          :disabled="creating"
+          @click="emit('cancel')"
+        >
+          Cancel
+        </button>
+        <button type="submit" :class="PRIMARY_BUTTON" :disabled="creating">
+          {{ creating ? 'Creating…' : 'Create link' }}
+        </button>
+      </div>
+    </footer>
   </form>
 </template>

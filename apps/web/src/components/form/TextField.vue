@@ -12,6 +12,7 @@ const props = defineProps<{
   valid?: boolean
   autocomplete?: string
   maxlength?: number
+  inputmode?: 'text' | 'numeric' | 'decimal' | 'email' | 'tel' | 'url' | 'search'
 }>()
 const model = defineModel<string>({ required: true })
 const emit = defineEmits<{ touch: [] }>()
@@ -45,6 +46,7 @@ const describedBy = computed(
         type="text"
         :autocomplete="autocomplete"
         :maxlength="maxlength"
+        :inputmode="inputmode"
         :aria-invalid="error ? 'true' : undefined"
         :aria-describedby="describedBy"
         class="block min-h-12 w-full rounded-control border bg-surface pr-12 text-lg transition-colors hover:border-evergreen focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-evergreen"

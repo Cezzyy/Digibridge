@@ -19,7 +19,7 @@ const id = useId()
         <span
           aria-hidden="true"
           class="grid size-10 shrink-0 place-items-center rounded-control font-display font-bold transition-colors duration-300"
-          :class="done ? 'bg-evergreen text-white' : 'bg-evergreen-soft text-evergreen'"
+          :class="done ? 'bg-evergreen text-on-evergreen' : 'bg-evergreen-soft text-evergreen'"
         >
           <svg
             v-if="done"
