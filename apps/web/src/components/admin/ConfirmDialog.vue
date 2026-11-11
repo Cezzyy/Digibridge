@@ -40,7 +40,7 @@ function onCancel(event: Event) {
     ref="dialog"
     :aria-labelledby="`${id}-title`"
     :aria-describedby="`${id}-body`"
-    class="m-auto w-[calc(100%-2rem)] max-w-md rounded-card bg-surface p-6 text-ink shadow-lg backdrop:bg-ink/50 sm:p-7"
+    class="m-auto w-[calc(100%-2rem)] max-w-md rounded-card bg-surface p-6 text-ink shadow-lg backdrop:bg-scrim sm:p-7"
     @cancel="onCancel"
     @close="emit('close')"
   >

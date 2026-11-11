@@ -180,7 +180,7 @@ function onKeydown(event: KeyboardEvent) {
 const CELL =
   'grid place-items-center font-semibold transition-colors focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-evergreen disabled:cursor-not-allowed disabled:font-normal disabled:text-line-strong disabled:opacity-50'
 const cellState = (isPicked: boolean) =>
-  isPicked ? 'bg-evergreen text-white hover:bg-evergreen-hover' : 'hover:bg-evergreen-soft'
+  isPicked ? 'bg-evergreen text-on-evergreen hover:bg-evergreen-hover' : 'hover:bg-evergreen-soft'
 
 const HEADER_BUTTON =
   'inline-flex min-h-10 items-center gap-1 rounded-control px-2.5 font-display text-lg font-bold transition-colors hover:bg-evergreen-soft focus-visible:outline-2 focus-visible:outline-evergreen'

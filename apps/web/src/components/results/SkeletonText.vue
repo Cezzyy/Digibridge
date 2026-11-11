@@ -9,7 +9,7 @@ const props = withDefaults(
   { tone: 'mist' },
 )
 const TONE = {
-  mist: 'bg-mist',
+  mist: 'bg-skeleton',
   page: 'bg-line-strong/20',
   soft: 'bg-line/70',
   marigold: 'bg-marigold/25',

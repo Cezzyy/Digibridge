@@ -7,6 +7,7 @@ import {
   type RouteLocationNormalized,
 } from 'vue-router'
 import { findCallbackParams, isCallbackParam, returningFromGoogle } from './lib/supabase'
+import { followSystemTheme } from './lib/theme'
 import AssessmentPage from './pages/assessment/AssessmentPage.vue'
 import HomePage from './pages/HomePage.vue'
 import LandingPage from './pages/LandingPage.vue'
@@ -34,6 +35,8 @@ declare module 'vue-router' {
     step?: Step
     /** The page draws its own top bar instead of AppHeader. */
     hideHeader?: boolean
+    /** Dark when the system is dark (lib/theme.ts). Children inherit it. */
+    followsSystemTheme?: boolean
   }
 }
 
@@ -112,7 +115,7 @@ export const router = createRouter({
     {
       path: '/admin',
       component: () => import('./pages/admin/AdminLayout.vue'),
-      meta: { requires: 'staff' },
+      meta: { requires: 'staff', followsSystemTheme: true },
       children: [
         {
           path: '',
@@ -214,6 +217,11 @@ router.beforeEach(async (to, from) => {
 // page never opens, and on the first one App.vue would show the splash for good. Show the error
 // screen instead; its Try again reloads, which also picks up a new deploy's file names.
 router.onError(() => useSessionStore().failPage())
+
+// The page that opened sets the theme. A navigation that failed leaves the current one.
+router.afterEach((to, _from, failure) => {
+  if (!failure) followSystemTheme(to.matched.some((route) => route.meta.followsSystemTheme))
+})
 
 // Going to any page after the first one (a button, the logo, the back button) closes the error
 // screen. This runs in afterEach because a link to the page already open (the logo on `/`, where
