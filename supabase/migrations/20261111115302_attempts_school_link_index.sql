@@ -1,0 +1,1 @@
+CREATE INDEX "attempts_school_link_id_idx" ON "attempts" USING btree ("school_link_id");
