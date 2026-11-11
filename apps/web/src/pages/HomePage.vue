@@ -26,7 +26,7 @@ import { useSessionStore } from '../stores/session'
 // Where signed-in users land. Respondents without a profile never see it: the `step` guard sends
 // them to the privacy notice, and those who have finished go to their results. Respondents see
 // their next step: the assessment's rules and Start, then, once started, the way back to it.
-// Staff (later /admin) get a preview of the student steps, which saves nothing.
+// Staff land on /admin and come here for a preview of the student steps, which saves nothing.
 //
 // Start begins the attempt (the 25-minute timer starts on the server) and opens the assessment;
 // Continue goes back to the one in progress.
