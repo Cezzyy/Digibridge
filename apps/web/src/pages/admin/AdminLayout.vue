@@ -1,6 +1,8 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import type { RouteLocationRaw } from 'vue-router'
+import { ICONS } from '../../components/admin/admin-icons'
+import StrokeIcon from '../../components/admin/StrokeIcon.vue'
 import { useSessionStore } from '../../stores/session'
 
 // The frame of every /admin page, under AppHeader: a menu on the left from `lg`, which stays put
@@ -9,33 +11,27 @@ import { useSessionStore } from '../../stores/session'
 // /home, where staff can try the student steps without saving anything.
 const session = useSessionStore()
 
-type NavItem = { label: string; to: RouteLocationRaw; icon: string[] }
+type NavItem = { label: string; to: RouteLocationRaw; icon: string | readonly string[] }
 
 const items = computed<NavItem[]>(() => [
   {
     label: 'Overview',
     to: { name: 'admin' },
-    icon: ['M4 13h6V4H4z', 'M14 20h6v-9h-6z', 'M14 4h6v3h-6z', 'M4 17h6v3H4z'],
+    icon: ICONS.overview,
   },
   ...(session.isAdmin
     ? [
         {
           label: 'School links',
           to: { name: 'admin-links' },
-          icon: [
-            'M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1',
-            'M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1',
-          ],
+          icon: ICONS.link,
         },
       ]
     : []),
   {
     label: 'Student preview',
     to: { name: 'home' },
-    icon: [
-      'M2.5 12S6 5 12 5s9.5 7 9.5 7-3.5 7-9.5 7-9.5-7-9.5-7z',
-      'M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6z',
-    ],
+    icon: ICONS.preview,
   },
 ])
 </script>
@@ -57,15 +53,7 @@ const items = computed<NavItem[]>(() => [
               :to="item.to"
               class="flex min-h-11 items-center gap-3 rounded-control px-3 font-semibold whitespace-nowrap text-quiet transition-colors hover:bg-mist-soft hover:text-ink aria-[current=page]:bg-evergreen-soft aria-[current=page]:text-evergreen"
             >
-              <svg
-                viewBox="0 0 24 24"
-                aria-hidden="true"
-                class="size-5 shrink-0 fill-none stroke-current stroke-[1.75]"
-                stroke-linecap="round"
-                stroke-linejoin="round"
-              >
-                <path v-for="d in item.icon" :key="d" :d="d" />
-              </svg>
+              <StrokeIcon :d="item.icon" class="size-5" />
               {{ item.label }}
             </RouterLink>
           </li>
