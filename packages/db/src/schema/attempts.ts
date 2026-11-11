@@ -49,6 +49,8 @@ export const attempts = pgTable(
       .on(t.respondentId)
       .where(sql`${t.status} <> 'voided'`),
     index('attempts_status_submitted_at_idx').on(t.status, t.submittedAt),
+    // Each link's response count, on the links page and when a student starts from it.
+    index('attempts_school_link_id_idx').on(t.schoolLinkId),
   ],
 ).enableRLS()
 
