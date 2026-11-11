@@ -1705,6 +1705,7 @@ const school = {
   studentNumber: STUDENT_NUMBER_EXAMPLE,
   course: COURSES[0],
   yearLevel: YEAR_LEVELS[0],
+  accessTokenHash: 'a'.repeat(64),
 }
 
 // The Postgres error sits under Drizzle's wrapper, as `cause`.
@@ -1717,9 +1718,9 @@ const insertError = async (values: typeof respondents.$inferInsert) => {
 }
 
 describe('respondents_school_fields_by_mode', () => {
-  it('takes a kiosk row with school details and an online row without', async () => {
+  it('takes a school row with school details and a token, and an online row without', async () => {
     const user = await signedIn()
-    expect(await insertError({ ...base, ...school, mode: 'kiosk' })).toBeUndefined()
+    expect(await insertError({ ...base, ...school, mode: 'school' })).toBeUndefined()
     expect(await insertError({ ...base, mode: 'online', profileId: user.id })).toBeUndefined()
   })
 
@@ -1727,15 +1728,16 @@ describe('respondents_school_fields_by_mode', () => {
     ['without a student number', { ...school, studentNumber: null }],
     ['without a course', { ...school, course: null }],
     ['without a year level', { ...school, yearLevel: null }],
-  ])('refuses a kiosk row %s', async (_, fields) => {
-    expect(await insertError({ ...base, ...fields, mode: 'kiosk' })).toBe(
+    ['without a token', { ...school, accessTokenHash: null }],
+  ])('refuses a school row %s', async (_, fields) => {
+    expect(await insertError({ ...base, ...fields, mode: 'school' })).toBe(
       'respondents_school_fields_by_mode',
     )
   })
 
-  it('refuses a kiosk row linked to a profile', async () => {
+  it('refuses a school row linked to a profile', async () => {
     const user = await signedIn()
-    expect(await insertError({ ...base, ...school, mode: 'kiosk', profileId: user.id })).toBe(
+    expect(await insertError({ ...base, ...school, mode: 'school', profileId: user.id })).toBe(
       'respondents_school_fields_by_mode',
     )
   })
@@ -1744,6 +1746,7 @@ describe('respondents_school_fields_by_mode', () => {
     ['a student number', { studentNumber: school.studentNumber }],
     ['a course', { course: school.course }],
     ['a year level', { yearLevel: school.yearLevel }],
+    ['a token', { accessTokenHash: school.accessTokenHash }],
   ])('refuses an online row with %s', async (_, fields) => {
     const user = await signedIn()
     expect(await insertError({ ...base, ...fields, mode: 'online', profileId: user.id })).toBe(

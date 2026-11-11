@@ -7,7 +7,7 @@ export { schema }
 export type Profile = typeof schema.profiles.$inferSelect
 export type Respondent = typeof schema.respondents.$inferSelect
 export type NewRespondent = typeof schema.respondents.$inferInsert
-export type KioskSession = typeof schema.kioskSessions.$inferSelect
+export type SchoolLink = typeof schema.schoolLinks.$inferSelect
 export type CompetencyArea = typeof schema.competencyAreas.$inferSelect
 export type Question = typeof schema.questions.$inferSelect
 export type Choice = typeof schema.choices.$inferSelect

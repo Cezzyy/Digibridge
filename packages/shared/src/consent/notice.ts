@@ -1,8 +1,8 @@
 // The privacy notice respondents agree to before the profile (CON-01), under the Data Privacy
 // Act of 2012. The API saves `version` with each respondent (CON-02), so change the version
-// whenever the text changes. Online and kiosk have their own notice: the online one is general,
-// for anyone on the public site, and doesn't mention the study or a school. The kiosk one, which
-// explains the research and the school details, comes with kiosk mode.
+// whenever the text changes. Online and school links have their own notice: the online one is general,
+// for anyone on the public site, and doesn't mention the study or a school. The school one, which
+// explains the research and the school details, comes with the school-link pages.
 
 export type ConsentSection = { title: string; body: string[] }
 export type ConsentNotice = { version: string; title: string; sections: ConsentSection[] }
