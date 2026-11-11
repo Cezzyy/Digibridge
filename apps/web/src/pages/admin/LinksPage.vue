@@ -1,19 +1,31 @@
 <script setup lang="ts">
 import type { SchoolLinkInput } from '@digibridge/shared'
 import { computed, onMounted, ref, useTemplateRef } from 'vue'
+import { ICONS } from '../../components/admin/admin-icons'
 import ConfirmDialog from '../../components/admin/ConfirmDialog.vue'
 import LinkCard from '../../components/admin/LinkCard.vue'
+import LinkCardSkeleton from '../../components/admin/LinkCardSkeleton.vue'
 import LinkForm from '../../components/admin/LinkForm.vue'
+import {
+  inFilter,
+  LINK_FILTER_LABELS,
+  LINK_FILTERS,
+  type LinkFilter,
+} from '../../components/admin/link-text'
+import StrokeIcon from '../../components/admin/StrokeIcon.vue'
+import SkeletonText from '../../components/results/SkeletonText.vue'
 import { useSchoolLinks, type SchoolLinkRow } from '../../composables/useSchoolLinks'
 import { PRIMARY_BUTTON, SECONDARY_BUTTON } from '../../lib/buttons'
 
 // School links (LNK-01), admin only: make a link for a class, copy it to send to the students,
 // see each link's school, expiry, status and how many have started, and close it. With no links
-// yet, the form is already open.
+// yet, the form is already open. While the list loads, the filter and three LinkCardSkeletons
+// stand in for it, in the same places.
 const { links, loadError, load, creating, createError, create, closingId, closeError, close } =
   useSchoolLinks()
 onMounted(load)
 
+const filter = ref<LinkFilter>('all')
 const formOpen = ref(false)
 const showForm = computed(() => formOpen.value || links.value?.length === 0)
 const form = useTemplateRef('form')
@@ -27,7 +39,18 @@ async function submit(input: SchoolLinkInput) {
   newId.value = link.id
   formOpen.value = false
   form.value?.reset()
+  // A new link is open, so make sure the list shows it.
+  if (!inFilter(link.status, filter.value)) filter.value = 'all'
 }
+
+const counts = computed(() => {
+  const list = links.value
+  if (!list) return null
+  return Object.fromEntries(
+    LINK_FILTERS.map((f) => [f, list.filter((link) => inFilter(link.status, f)).length]),
+  ) as Record<LinkFilter, number>
+})
+const shown = computed(() => links.value?.filter((link) => inFilter(link.status, filter.value)))
 
 // Closing asks first: students who haven't started can't use the link after that.
 const closing = ref<SchoolLinkRow | null>(null)
@@ -46,13 +69,16 @@ const newLabel = computed(() => links.value?.find((link) => link.id === newId.va
         own phone or laptop, without signing in.
       </p>
     </div>
+    <!-- Shown while the list loads too (only a first, empty list opens the form instead). -->
     <button
-      v-if="links && !showForm"
+      v-if="!showForm"
       type="button"
       :class="PRIMARY_BUTTON"
-      class="shrink-0"
+      class="shrink-0 self-start sm:self-auto"
+      :disabled="!links"
       @click="formOpen = true"
     >
+      <StrokeIcon :d="ICONS.plus" class="size-5" />
       New link
     </button>
   </div>
@@ -71,13 +97,39 @@ const newLabel = computed(() => links.value?.find((link) => link.id === newId.va
   <p
     v-if="newLabel && !showForm"
     role="status"
-    class="mt-8 rounded-card bg-evergreen-soft p-4 font-semibold text-evergreen"
+    class="mt-8 flex items-center gap-3 rounded-card bg-evergreen-soft p-4 font-semibold text-evergreen"
   >
+    <StrokeIcon :d="ICONS.finished" class="size-6" />
     The link for {{ newLabel }} is ready. Copy it below and send it to the students.
   </p>
 
   <section aria-labelledby="links-heading" class="mt-10">
-    <h2 id="links-heading" class="text-xl font-bold">Your links</h2>
+    <div class="flex flex-wrap items-center justify-between gap-3">
+      <h2 id="links-heading" class="text-xl font-bold">Your links</h2>
+
+      <div
+        v-if="!loadError && links?.length !== 0"
+        role="group"
+        aria-label="Show"
+        class="flex flex-wrap gap-1 rounded-card border border-line bg-surface p-1"
+      >
+        <button
+          v-for="f in LINK_FILTERS"
+          :key="f"
+          type="button"
+          :aria-pressed="filter === f"
+          :disabled="!counts"
+          class="flex min-h-11 items-center gap-2 rounded-control px-3 font-semibold text-quiet transition-colors hover:text-ink focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-evergreen disabled:cursor-wait aria-pressed:bg-evergreen-soft aria-pressed:text-evergreen"
+          @click="filter = f"
+        >
+          {{ LINK_FILTER_LABELS[f] }}
+          <span class="rounded-full bg-mist-soft px-2 text-sm text-quiet tabular-nums">
+            <template v-if="counts">{{ counts[f] }}</template>
+            <SkeletonText v-else tone="soft" class="w-[1ch]" />
+          </span>
+        </button>
+      </div>
+    </div>
 
     <div
       v-if="loadError"
@@ -91,20 +143,31 @@ const newLabel = computed(() => links.value?.find((link) => link.id === newId.va
     </div>
 
     <ul v-else-if="!links" class="mt-4 space-y-4" aria-busy="true">
-      <li v-for="n in 3" :key="n" class="rounded-card border border-line bg-surface p-6">
-        <span class="sr-only">Loading</span>
-        <span class="block h-6 w-40 rounded bg-track motion-safe:animate-pulse" />
-        <span class="mt-3 block h-4 w-64 max-w-full rounded bg-track motion-safe:animate-pulse" />
-        <span class="mt-5 block h-4 w-full rounded bg-track motion-safe:animate-pulse" />
-      </li>
+      <li v-for="n in 3" :key="n"><LinkCardSkeleton /></li>
+      <li class="sr-only">Loading your links</li>
     </ul>
 
-    <p v-else-if="links.length === 0" class="mt-4 rounded-card bg-mist-soft p-5 text-quiet">
-      No school links yet. Make the first one above.
+    <div
+      v-else-if="links.length === 0"
+      class="mt-4 flex items-center gap-4 rounded-card border border-dashed border-line-strong/60 p-5 text-quiet"
+    >
+      <StrokeIcon :d="ICONS.link" class="size-6" />
+      <p>No school links yet. Make the first one above.</p>
+    </div>
+
+    <p v-else-if="shown?.length === 0" class="mt-4 rounded-card bg-mist-soft p-5 text-quiet">
+      No {{ LINK_FILTER_LABELS[filter].toLowerCase() }} links.
+      <button
+        type="button"
+        class="font-semibold text-evergreen underline underline-offset-2"
+        @click="filter = 'all'"
+      >
+        Show all
+      </button>
     </p>
 
     <ul v-else class="mt-4 space-y-4">
-      <li v-for="link in links" :key="link.id">
+      <li v-for="link in shown" :key="link.id">
         <LinkCard :link="link" :is-new="link.id === newId" @close="closing = link" />
       </li>
     </ul>

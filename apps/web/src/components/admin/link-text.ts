@@ -46,3 +46,26 @@ export const STATUS_BADGE = {
   expired: 'bg-mist-soft text-quiet',
   closed: 'bg-mist-soft text-quiet',
 } as const satisfies Record<LinkStatus, string>
+
+export const STATUS_DOT = {
+  open: 'bg-evergreen',
+  full: 'bg-marigold',
+  expired: 'bg-line-strong',
+  closed: 'bg-line-strong',
+} as const satisfies Record<LinkStatus, string>
+
+/** The status filter on the links page: ended is expired and closed together. */
+export const LINK_FILTERS = ['all', 'open', 'full', 'ended'] as const
+export type LinkFilter = (typeof LINK_FILTERS)[number]
+
+export const LINK_FILTER_LABELS = {
+  all: 'All',
+  open: 'Open',
+  full: 'Full',
+  ended: 'Ended',
+} as const satisfies Record<LinkFilter, string>
+
+export const inFilter = (status: LinkStatus, filter: LinkFilter) =>
+  filter === 'all' ||
+  status === filter ||
+  (filter === 'ended' && (status === 'expired' || status === 'closed'))
