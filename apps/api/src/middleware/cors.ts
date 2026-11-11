@@ -7,6 +7,6 @@ import type { AppEnv } from '../env'
 export const corsMiddleware = cors({
   origin: (origin, c: Context<AppEnv>) => (origin === c.env.WEB_ORIGIN ? origin : null),
   allowMethods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE'],
-  allowHeaders: ['Authorization', 'Content-Type', 'X-Kiosk-Session'],
+  allowHeaders: ['Authorization', 'Content-Type'],
   maxAge: 86400,
 })

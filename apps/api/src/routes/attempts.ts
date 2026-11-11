@@ -32,7 +32,7 @@ export const startAttemptRoute = createRoute({
   summary: 'Start the attempt, or return the one in progress',
   description:
     'Picks 4 basic, 4 intermediate and 2 advanced active items per area, shuffles the items together and each item’s choices, and sets `expires_at` (ASM-01, ASM-02). Calling it again returns the attempt in progress. One attempt per respondent; a voided one frees the slot (PRO-07). Respondents only: staff preview the flow without saving.',
-  // Kiosk mode will let facilitators in too, with a kiosk session.
+  // School-link students will come in too, with a respondent token (Stage 2).
   middleware: [auth, requireRole('respondent')] as const,
   security: [{ Bearer: [] }],
   responses: {

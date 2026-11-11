@@ -1994,6 +1994,14 @@ describe('admin', () => {
       expect(again.closedAt).toBe(closed.closedAt)
     })
 
+    it('leaves an expired link expired', async () => {
+      const link = await addLink({ expiresAt: new Date(Date.now() - 60_000) })
+      const admin = await signedIn('admin')
+      const res = await send('POST', `/api/v1/admin/links/${link.id}/close`, admin.headers)
+      expect(res.status).toBe(200)
+      expect(await res.json()).toMatchObject({ status: 'expired', closedAt: null })
+    })
+
     it('answers 404 for an unknown link and 403 for facilitators', async () => {
       const admin = await signedIn('admin')
       const unknown = `/api/v1/admin/links/${crypto.randomUUID()}/close`
