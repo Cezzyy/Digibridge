@@ -76,7 +76,10 @@ function findTyped(key: string) {
   typedTimer = setTimeout(() => (typed = ''), 600)
   typed += key.toLowerCase()
   const count = props.options.length
-  const start = typed.length === 1 ? active.value + 1 : active.value
+  // Closed, it searches from the picked option, as a native select does; open, from the one
+  // under the cursor.
+  const from = open.value ? active.value : Math.max(selectedIndex.value, 0)
+  const start = typed.length === 1 ? from + 1 : from
   for (let step = 0; step < count; step++) {
     const index = (start + step) % count
     if (props.options[index]?.label.toLowerCase().startsWith(typed)) return index

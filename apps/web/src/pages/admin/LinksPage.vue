@@ -1,8 +1,9 @@
 <script setup lang="ts">
 import type { SchoolLinkInput } from '@digibridge/shared'
-import { computed, onMounted, ref, useTemplateRef } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import { ICONS } from '../../components/admin/admin-icons'
 import ConfirmDialog from '../../components/admin/ConfirmDialog.vue'
+import ErrorPanel from '../../components/admin/ErrorPanel.vue'
 import LinkCard from '../../components/admin/LinkCard.vue'
 import LinkCardSkeleton from '../../components/admin/LinkCardSkeleton.vue'
 import LinkForm from '../../components/admin/LinkForm.vue'
@@ -15,7 +16,7 @@ import {
 import StrokeIcon from '../../components/admin/StrokeIcon.vue'
 import SkeletonText from '../../components/results/SkeletonText.vue'
 import { useSchoolLinks, type SchoolLinkRow } from '../../composables/useSchoolLinks'
-import { PRIMARY_BUTTON, SECONDARY_BUTTON } from '../../lib/buttons'
+import { PRIMARY_BUTTON } from '../../lib/buttons'
 
 // School links (LNK-01), admin only: make a link for a class, copy it to send to the students,
 // see each link's school, expiry, status and how many have started, and close it. With no links
@@ -28,7 +29,8 @@ onMounted(load)
 const filter = ref<LinkFilter>('all')
 const formOpen = ref(false)
 const showForm = computed(() => formOpen.value || links.value?.length === 0)
-const form = useTemplateRef('form')
+/** The school of the last link made, filled in on the next form. */
+const lastSchool = ref('')
 
 /** The link just made, outlined in the list until another is made. */
 const newId = ref<string | null>(null)
@@ -37,8 +39,8 @@ async function submit(input: SchoolLinkInput) {
   const link = await create(input)
   if (!link) return
   newId.value = link.id
+  lastSchool.value = input.school
   formOpen.value = false
-  form.value?.reset()
   // A new link is open, so make sure the list shows it.
   if (!inFilter(link.status, filter.value)) filter.value = 'all'
 }
@@ -58,6 +60,16 @@ async function confirmClose() {
   if (closing.value && (await close(closing.value.id))) closing.value = null
 }
 const newLabel = computed(() => links.value?.find((link) => link.id === newId.value)?.label)
+
+// A failed create or close shouldn't still show the next time the form or dialog opens.
+function cancelForm() {
+  formOpen.value = false
+  createError.value = null
+}
+function stopClosing() {
+  closing.value = null
+  closeError.value = null
+}
 </script>
 
 <template>
@@ -85,13 +97,13 @@ const newLabel = computed(() => links.value?.find((link) => link.id === newId.va
 
   <LinkForm
     v-if="showForm"
-    ref="form"
     class="mt-8"
+    :school="lastSchool"
     :creating="creating"
     :error="createError"
     :cancellable="(links?.length ?? 0) > 0"
     @submit="submit"
-    @cancel="formOpen = false"
+    @cancel="cancelForm"
   />
 
   <p
@@ -131,16 +143,7 @@ const newLabel = computed(() => links.value?.find((link) => link.id === newId.va
       </div>
     </div>
 
-    <div
-      v-if="loadError"
-      role="alert"
-      class="mt-4 flex flex-col gap-4 rounded-card bg-error-soft p-5 sm:flex-row sm:items-center sm:justify-between"
-    >
-      <p class="font-semibold text-error">{{ loadError }}</p>
-      <button type="button" :class="SECONDARY_BUTTON" class="bg-surface" @click="load">
-        Try again
-      </button>
-    </div>
+    <ErrorPanel v-if="loadError" class="mt-4" :message="loadError" @retry="load" />
 
     <ul v-else-if="!links" class="mt-4 space-y-4" aria-busy="true">
       <li v-for="n in 3" :key="n"><LinkCardSkeleton /></li>
@@ -182,6 +185,6 @@ const newLabel = computed(() => links.value?.find((link) => link.id === newId.va
     :busy="closingId !== null"
     :error="closeError"
     @confirm="confirmClose"
-    @close="closing = null"
+    @close="stopClosing"
   />
 </template>

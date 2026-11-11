@@ -29,27 +29,26 @@ import StrokeIcon from './StrokeIcon.vue'
 // and optionally a course, a year level and a response limit. Laid out like the profile form:
 // one panel, a numbered row per part (the number turns into a check once the part is filled
 // in), and a bar counting the required details. Checked with the API's own schema; errors
-// show once Create is pressed, then follow each change. After a link is made the form clears,
-// but keeps the school for the next one.
+// show once Create is pressed, then follow each change. The page closes the form once a link
+// is made and passes the school back in `school`, so the next form starts with it.
 
-defineProps<{ creating: boolean; error: string | null; cancellable: boolean }>()
+const props = defineProps<{
+  creating: boolean
+  error: string | null
+  cancellable: boolean
+  /** Filled in to start with: the school of the last link made. */
+  school?: string
+}>()
 const emit = defineEmits<{ submit: [input: SchoolLinkInput]; cancel: [] }>()
 
-const blank = () => ({
+const form = reactive({
+  school: props.school ?? '',
   label: '',
   course: null as Course | null,
   yearLevel: null as YearLevel | null,
   maxResponses: '',
   expiresOn: null as string | null,
 })
-const form = reactive({ school: '', ...blank() })
-
-/** Clears the form after a link is made, keeping the school. */
-function reset() {
-  Object.assign(form, blank())
-  tried.value = false
-}
-defineExpose({ reset })
 
 const today = useToday()
 const lastDay = computed(() => addDays(today.value, LINK_MAX_DAYS))
@@ -110,6 +109,14 @@ const ok = (...fields: Field[]) => fields.every((field) => !issues.value[field])
 
 const REQUIRED: Field[] = ['school', 'label', 'expiresOn']
 const requiredDone = computed(() => REQUIRED.filter((field) => ok(field)).length)
+
+const footerNote = computed(() => {
+  if (result.value.success) return 'Ready to create.'
+  if (requiredDone.value < REQUIRED.length)
+    return `Fill in the ${REQUIRED.length} required details to make the link.`
+  // Only an optional detail is wrong, like a response limit that isn't a number.
+  return tried.value ? 'Fix what’s marked above.' : 'Check the optional details.'
+})
 
 const done = computed(() => ({
   class: ok('school', 'label'),
@@ -244,12 +251,7 @@ function submit() {
       class="flex flex-col gap-4 rounded-b-card bg-mist-soft px-5 py-5 sm:flex-row sm:items-center sm:justify-between sm:px-7"
     >
       <p v-if="error" role="alert" class="font-semibold text-error">{{ error }}</p>
-      <p v-else class="text-quiet">
-        <template v-if="requiredDone === REQUIRED.length">Ready to create.</template>
-        <template v-else
-          >Fill in the {{ REQUIRED.length }} required details to make the link.</template
-        >
-      </p>
+      <p v-else class="text-quiet">{{ footerNote }}</p>
 
       <div class="flex flex-col-reverse gap-3 sm:flex-row sm:shrink-0">
         <button
