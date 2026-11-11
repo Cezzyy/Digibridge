@@ -8,6 +8,7 @@ import {
   startAttempt,
   submitAttempt,
 } from './handlers/attempts'
+import { closeLink, createLink, getOverview, listLinks } from './handlers/admin'
 import { getHealth } from './handlers/health'
 import { getLesson, listLessons } from './handlers/lessons'
 import { getMe } from './handlers/me'
@@ -20,6 +21,7 @@ import {
   validationHook,
 } from './middleware'
 import { addApiDocs } from './openapi'
+import { closeLinkRoute, createLinkRoute, listLinksRoute, overviewRoute } from './routes/admin'
 import {
   getAttemptRoute,
   getResultRoute,
@@ -49,6 +51,10 @@ const v1Routes = v1
   .openapi(saveSusRoute, saveSus)
   .openapi(listLessonsRoute, listLessons)
   .openapi(getLessonRoute, getLesson)
+  .openapi(overviewRoute, getOverview)
+  .openapi(listLinksRoute, listLinks)
+  .openapi(createLinkRoute, createLink)
+  .openapi(closeLinkRoute, closeLink)
 
 // Builds the Hono app: routes under /api/v1, docs under /api.
 // CORS is added before the routes so it runs on every response, errors included.
