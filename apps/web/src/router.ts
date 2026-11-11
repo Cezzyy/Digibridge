@@ -52,7 +52,8 @@ export const router = createRouter({
     return { top: 0, behavior: 'instant' }
   },
   routes: [
-    // Google sends users back to `/`, and the `guest` guard there moves them on to /home.
+    // Google sends users back to `/`, and the `guest` guard there moves them on: staff to /admin,
+    // everyone else to /home.
     {
       path: '/',
       name: 'landing',
@@ -105,6 +106,27 @@ export const router = createRouter({
       name: 'lesson',
       component: () => import('./pages/lessons/LessonPage.vue'),
     },
+    // The admin area, lazy so students never download it. Staff (facilitators and admins) see the
+    // overview; making school links is for admins only (LNK-01). Children inherit `requires`
+    // unless they set their own.
+    {
+      path: '/admin',
+      component: () => import('./pages/admin/AdminLayout.vue'),
+      meta: { requires: 'staff' },
+      children: [
+        {
+          path: '',
+          name: 'admin',
+          component: () => import('./pages/admin/OverviewPage.vue'),
+        },
+        {
+          path: 'links',
+          name: 'admin-links',
+          component: () => import('./pages/admin/LinksPage.vue'),
+          meta: { requires: 'admin' },
+        },
+      ],
+    },
     {
       path: '/:pathMatch(.*)*',
       name: 'not-found',
@@ -130,15 +152,16 @@ function withoutCallbackParams(to: RouteLocationNormalized, from: RouteLocationN
 // Whether the signed-in user may open a page, or where to go instead.
 function checkRequirement(requires: Requirement) {
   const session = useSessionStore()
+  const signedInHome = session.isSignedIn ? session.startPage : { name: 'sign-in' }
   switch (requires) {
     case 'guest':
-      return !session.isSignedIn || { name: 'home' }
+      return !session.isSignedIn || session.startPage
     case 'signedIn':
       return session.isSignedIn || { name: 'sign-in' }
     case 'staff':
-      return session.isStaff || { name: session.isSignedIn ? 'home' : 'sign-in' }
+      return session.isStaff || signedInHome
     case 'admin':
-      return session.isAdmin || { name: session.isSignedIn ? 'home' : 'sign-in' }
+      return session.isAdmin || signedInHome
   }
 }
 
@@ -146,8 +169,8 @@ function checkRequirement(requires: Requirement) {
 // respondent's first sign-in lands on /home and goes on to the notice; once the profile is saved,
 // both start pages send them home, and Start on home opens the assessment. Only an attempt in
 // progress can be opened; once it's submitted or expired, home and /assessment send them to
-// their results, and so does every later sign-in (PRO-07, RES-03). Staff stay on /home and can
-// open the notice from there to try the flow; they never get an attempt, so never results.
+// their results, and so does every later sign-in (PRO-07, RES-03). Staff land on /admin, and can
+// open /home from there to try the flow; they never get an attempt, so never results.
 function checkStep(step: Step) {
   const session = useSessionStore()
   const me = session.me
