@@ -5,7 +5,7 @@ import { generalProfileSchema } from './general'
 // What a respondent sends to start: consent, profile and the show-identity choice, saved
 // together so declining stores nothing (CON-02, PRO-05).
 
-/** True lets the team see the respondent's name (and, in kiosk mode, student number). */
+/** True lets the team see the respondent's name (and, through a school link, student number). */
 export const showIdentitySchema = z.boolean({
   error: 'Choose whether the DigiBridge team may see your name.',
 })

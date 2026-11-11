@@ -16,7 +16,7 @@ import {
 } from 'drizzle-orm/pg-core'
 import { choices, competencyAreas, questions } from './content'
 import { attemptStatusEnum, levelEnum } from './enums'
-import { kioskSessions, profiles, respondents } from './people'
+import { profiles, respondents, schoolLinks } from './people'
 
 // Question ID -> choice IDs in the order shown to the respondent.
 export type ChoiceOrder = Record<string, string[]>
@@ -28,7 +28,8 @@ export const attempts = pgTable(
     respondentId: uuid('respondent_id')
       .notNull()
       .references(() => respondents.id, { onDelete: 'cascade' }),
-    kioskSessionId: uuid('kiosk_session_id').references(() => kioskSessions.id),
+    // The school link it came from (LNK-05); null online.
+    schoolLinkId: uuid('school_link_id').references(() => schoolLinks.id),
     status: attemptStatusEnum('status').notNull().default('in_progress'),
     startedAt: timestamp('started_at', { withTimezone: true }).notNull().defaultNow(),
     expiresAt: timestamp('expires_at', { withTimezone: true }).notNull(),

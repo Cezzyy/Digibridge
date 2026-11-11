@@ -8,7 +8,7 @@ import {
 import { generalProfileSchema } from './general'
 import { studentNumberSchema } from './student-number'
 
-// The kiosk profile (KIO-03): the general profile plus ACLC's school details, all required.
+// The school-link profile (LNK-03): the general profile plus ACLC's school details, all required.
 // The school lists live in their own files, so another school's could be added later
 // without touching the general profile.
 
@@ -18,11 +18,11 @@ export const schoolDetailsShape = {
   yearLevel: yearLevelSchema,
 }
 
-/** Fields only the kiosk profile has. The general profile refuses them (PRO-06). */
+/** Fields only the school profile has. The general profile refuses them (PRO-06). */
 export const SCHOOL_FIELDS = Object.keys(schoolDetailsShape) as (keyof typeof schoolDetailsShape)[]
 
 /** Refined, so build on it with `.safeExtend()`, not `.extend()`. */
-export const kioskProfileSchema = generalProfileSchema
+export const schoolProfileSchema = generalProfileSchema
   .extend(schoolDetailsShape)
   .superRefine((profile, ctx) => {
     if (!isYearLevelInCourse(profile.course, profile.yearLevel)) {
@@ -33,4 +33,4 @@ export const kioskProfileSchema = generalProfileSchema
       })
     }
   })
-export type KioskProfile = z.infer<typeof kioskProfileSchema>
+export type SchoolProfile = z.infer<typeof schoolProfileSchema>

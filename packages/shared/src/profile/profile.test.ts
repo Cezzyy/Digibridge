@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { generalProfileSchema } from './general'
-import { kioskProfileSchema, SCHOOL_FIELDS } from './kiosk'
+import { schoolProfileSchema, SCHOOL_FIELDS } from './school'
 
 const general = {
   fullName: '  Juan Dela Cruz ',
@@ -90,7 +90,7 @@ describe('profile messages', () => {
 
   it.each([
     ['general', generalProfileSchema, {}],
-    ['kiosk', kioskProfileSchema, { studentNumber: 7557, course: 'BSN', yearLevel: '2' }],
+    ['school', schoolProfileSchema, { studentNumber: 7557, course: 'BSN', yearLevel: '2' }],
   ] as const)('are plain English for every bad %s field', (_, schema, schoolFields) => {
     const result = schema.safeParse({ ...bad, ...schoolFields })
     expect(result.error?.issues.length).toBeGreaterThan(0)
@@ -100,15 +100,15 @@ describe('profile messages', () => {
   })
 
   it('are plain English when the profile is not an object', () => {
-    expect(kioskProfileSchema.safeParse(null).error?.issues[0]?.message).toBe(
+    expect(schoolProfileSchema.safeParse(null).error?.issues[0]?.message).toBe(
       'Fill in your profile.',
     )
   })
 })
 
-describe('kioskProfileSchema', () => {
+describe('schoolProfileSchema', () => {
   it('accepts the general fields plus school details, student number uppercased', () => {
-    expect(kioskProfileSchema.parse({ ...general, ...school })).toMatchObject({
+    expect(schoolProfileSchema.parse({ ...general, ...school })).toMatchObject({
       studentNumber: 'C23-01-7557-MAN121',
       course: 'BSIT',
       yearLevel: 2,
@@ -118,11 +118,11 @@ describe('kioskProfileSchema', () => {
   it.each(SCHOOL_FIELDS)('requires %s', (field) => {
     const profile: Record<string, unknown> = { ...general, ...school }
     delete profile[field]
-    expect(kioskProfileSchema.safeParse(profile).success).toBe(false)
+    expect(schoolProfileSchema.safeParse(profile).success).toBe(false)
   })
 
   it('checks the year level against the course', () => {
-    const result = kioskProfileSchema.safeParse({
+    const result = schoolProfileSchema.safeParse({
       ...general,
       ...school,
       course: 'HRT',
@@ -136,7 +136,7 @@ describe('kioskProfileSchema', () => {
   })
 
   it('still refuses fields neither profile has', () => {
-    expect(kioskProfileSchema.safeParse({ ...general, ...school, email: 'a@b.c' }).success).toBe(
+    expect(schoolProfileSchema.safeParse({ ...general, ...school, email: 'a@b.c' }).success).toBe(
       false,
     )
   })

@@ -4,7 +4,7 @@ import { birthDateSchema } from './birth-date'
 import { deviceSchema, internetAccessSchema } from './digital-access'
 
 // The general profile (PRO-01), asked in both modes. Online uses it on its own; the
-// kiosk profile adds the school details (see kiosk.ts).
+// school profile adds the school details (see school.ts).
 
 export const FULL_NAME_MAX_LENGTH = 100
 

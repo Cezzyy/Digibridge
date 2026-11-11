@@ -2,11 +2,11 @@
 import { relations } from 'drizzle-orm'
 import { answers, areaResults, attempts, susResponses } from './attempts'
 import { choices, competencyAreas, lessons, questions } from './content'
-import { kioskSessions, profiles, respondents } from './people'
+import { profiles, respondents, schoolLinks } from './people'
 
 export const profilesRelations = relations(profiles, ({ one, many }) => ({
   respondent: one(respondents),
-  kioskSessions: many(kioskSessions),
+  schoolLinks: many(schoolLinks),
 }))
 
 export const respondentsRelations = relations(respondents, ({ one, many }) => ({
@@ -14,8 +14,8 @@ export const respondentsRelations = relations(respondents, ({ one, many }) => ({
   attempts: many(attempts),
 }))
 
-export const kioskSessionsRelations = relations(kioskSessions, ({ one, many }) => ({
-  facilitator: one(profiles, { fields: [kioskSessions.facilitatorId], references: [profiles.id] }),
+export const schoolLinksRelations = relations(schoolLinks, ({ one, many }) => ({
+  creator: one(profiles, { fields: [schoolLinks.createdBy], references: [profiles.id] }),
   attempts: many(attempts),
 }))
 
@@ -44,9 +44,9 @@ export const attemptsRelations = relations(attempts, ({ one, many }) => ({
     fields: [attempts.respondentId],
     references: [respondents.id],
   }),
-  kioskSession: one(kioskSessions, {
-    fields: [attempts.kioskSessionId],
-    references: [kioskSessions.id],
+  schoolLink: one(schoolLinks, {
+    fields: [attempts.schoolLinkId],
+    references: [schoolLinks.id],
   }),
   answers: many(answers),
   areaResults: many(areaResults),

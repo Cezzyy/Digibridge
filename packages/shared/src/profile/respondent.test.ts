@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { ONLINE_CONSENT_NOTICE } from '../consent'
-import { SCHOOL_FIELDS } from './kiosk'
+import { SCHOOL_FIELDS } from './school'
 import { onlineRespondentSchema } from './respondent'
 
 const online = {

@@ -5,6 +5,7 @@ import {
   check,
   date,
   index,
+  integer,
   pgTable,
   smallint,
   text,
@@ -35,14 +36,15 @@ export const profiles = pgTable('profiles', {
   lastSignInAt: timestamp('last_sign_in_at', { withTimezone: true }).notNull().defaultNow(),
 }).enableRLS()
 
-// Someone taking the assessment, online (linked to a profile) or on a kiosk (no profile).
-// Online rows are keyed by profile, kiosk rows by student number. School details
-// (student number, course, year level) are kiosk only; the mode check enforces it.
+// Someone taking the assessment, online (linked to a profile) or through a school link (no
+// profile). Online rows are keyed by profile, school rows by student number. School details
+// (student number, course, year level) and the respondent token are school only; the mode check
+// enforces it.
 export const respondents = pgTable(
   'respondents',
   {
     id: uuid('id').primaryKey().defaultRandom(),
-    // Unique allows many nulls in Postgres, so kiosk rows (no profile) and
+    // Unique allows many nulls in Postgres, so school rows (no profile) and
     // online rows (no student number) don't clash.
     profileId: uuid('profile_id')
       .unique()
@@ -63,6 +65,8 @@ export const respondents = pgTable(
       .notNull()
       .default(sql`'{}'`),
     showIdentity: boolean('show_identity').notNull().default(false),
+    // SHA-256 of the token a school-link student's browser keeps in place of a Google sign-in.
+    accessTokenHash: text('access_token_hash').unique(),
     mode: modeEnum('mode').notNull(),
     consentVersion: text('consent_version').notNull(),
     consentedAt: timestamp('consented_at', { withTimezone: true }).notNull(),
@@ -84,25 +88,44 @@ export const respondents = pgTable(
     // No profile_id check for online: it turns null when the account is deleted.
     check(
       'respondents_school_fields_by_mode',
-      sql`(${t.mode} = ${modeLiteral('kiosk')} and ${t.studentNumber} is not null and ${t.course} is not null
-          and ${t.yearLevel} is not null and ${t.profileId} is null)
+      sql`(${t.mode} = ${modeLiteral('school')} and ${t.studentNumber} is not null and ${t.course} is not null
+          and ${t.yearLevel} is not null and ${t.profileId} is null and ${t.accessTokenHash} is not null)
         or (${t.mode} = ${modeLiteral('online')} and ${t.studentNumber} is null and ${t.course} is null
-          and ${t.yearLevel} is null)`,
+          and ${t.yearLevel} is null and ${t.accessTokenHash} is null)`,
     ),
-    // Kiosk rows only: online rows have no course. A query on course = X still uses it.
+    // School rows only: online rows have no course. A query on course = X still uses it.
     index('respondents_course_year_level_idx')
       .on(t.course, t.yearLevel)
       .where(sql`${t.course} is not null`),
   ],
 ).enableRLS()
 
-// A tablet or laptop a facilitator has locked into kiosk mode.
-export const kioskSessions = pgTable('kiosk_sessions', {
-  id: uuid('id').primaryKey().defaultRandom(),
-  // Null once the facilitator's account is deleted; the session and its attempts stay.
-  facilitatorId: uuid('facilitator_id').references(() => profiles.id, { onDelete: 'set null' }),
-  deviceLabel: text('device_label').notNull(),
-  pinHash: text('pin_hash').notNull(),
-  startedAt: timestamp('started_at', { withTimezone: true }).notNull().defaultNow(),
-  endedAt: timestamp('ended_at', { withTimezone: true }),
-}).enableRLS()
+// A link an admin makes for a class (LNK-01). Students open /s/<code> without signing in.
+// Its status (open, closed, expired, full) is worked out when read: see linkStatus in
+// packages/shared.
+export const schoolLinks = pgTable(
+  'school_links',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    code: text('code').notNull().unique(),
+    school: text('school').notNull(),
+    label: text('label').notNull(),
+    // Null once the admin's account is deleted; the link and its attempts stay.
+    createdBy: uuid('created_by').references(() => profiles.id, { onDelete: 'set null' }),
+    // Null for any course and any year level.
+    course: text('course'),
+    yearLevel: smallint('year_level'),
+    // Null for no limit.
+    maxResponses: integer('max_responses'),
+    expiresAt: timestamp('expires_at', { withTimezone: true }).notNull(),
+    closedAt: timestamp('closed_at', { withTimezone: true }),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    check(
+      'school_links_year_level_range',
+      sql`${t.yearLevel} between ${sql.raw(String(YEAR_LEVELS[0]))} and ${sql.raw(String(YEAR_LEVELS.at(-1)))}`,
+    ),
+    check('school_links_max_responses_positive', sql`${t.maxResponses} > 0`),
+  ],
+).enableRLS()
