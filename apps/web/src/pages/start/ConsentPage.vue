@@ -4,25 +4,28 @@ import {
   ATTEMPT_DURATION_MINUTES,
   CONSENT_CONTACT,
   ITEMS_PER_ATTEMPT,
-  ONLINE_CONSENT_NOTICE,
 } from '@digibridge/shared'
-import { nextTick, ref, useTemplateRef } from 'vue'
+import { computed, nextTick, ref, useTemplateRef } from 'vue'
 import { useRouter } from 'vue-router'
 import { NOTICE_ICONS } from '../../components/start/choice-icons'
+import LinkTag from '../../components/start/LinkTag.vue'
 import StartLayout from '../../components/start/StartLayout.vue'
 import StartSteps from '../../components/start/StartSteps.vue'
+import { useRespondentFlow } from '../../composables/useRespondentFlow'
 import { askSignOut } from '../../composables/useSignOut'
 import { PRIMARY_BUTTON, SECONDARY_BUTTON } from '../../lib/buttons'
 import { useConsentStore } from '../../stores/consent'
 import { useSessionStore } from '../../stores/session'
 
-// The privacy notice (CON-01), the first thing a new respondent sees after signing in.
+// The privacy notice (CON-01), the first thing a new respondent sees: online after signing in,
+// and through a school link (/s/:code) as soon as the link opens, with the school notice.
 // Agreeing is kept in memory and saved with the profile on the next page (CON-02), so declining
 // saves nothing. The `step` guard sends respondents who already have a profile home.
 const session = useSessionStore()
 const consent = useConsentStore()
+const flow = useRespondentFlow()
 const router = useRouter()
-const notice = ONLINE_CONSENT_NOTICE
+const notice = flow.notice.value
 
 // A section whose every paragraph starts with a short label ("From Google: …") is a list of
 // sources, shown as one tile per label instead of paragraphs.
@@ -36,7 +39,8 @@ const sections = notice.sections.map((section) => {
   return { ...section, items }
 })
 
-const name = session.me?.profile.fullName
+// Online, the Google name; a school-link student hasn't told us theirs yet.
+const name = flow.isSchool.value ? null : session.me?.profile.fullName
 const declined = ref(false)
 const declinedHeading = useTemplateRef('declined-heading')
 
@@ -47,10 +51,14 @@ const facts = [
 ]
 
 async function agree() {
-  if (!session.me) return
-  consent.agree(session.me.profile.id, notice.version)
-  await router.push({ name: 'profile' })
+  const key = flow.consentKey.value
+  if (!key) return
+  consent.agree(key, notice.version)
+  await router.push(flow.page('profile'))
 }
+
+// Online, declining leaves the student signed in, so Sign out is offered; a link has no sign-in.
+const canSignOut = computed(() => !flow.isSchool.value)
 
 async function decline() {
   consent.clear()
@@ -66,6 +74,7 @@ async function decline() {
     <template #rail>
       <!-- Phones show the step bar above the heading; desktops list the steps under it. -->
       <StartSteps current="consent" class="mb-6 lg:order-1 lg:mt-10 lg:mb-0" />
+      <LinkTag />
 
       <h1
         class="text-[clamp(2rem,1.5rem+1.6vw,3.25rem)] leading-[1.02] font-extrabold tracking-[-0.02em] text-balance motion-safe:animate-rise"
@@ -144,7 +153,9 @@ async function decline() {
         <button type="button" :class="PRIMARY_BUTTON" @click="declined = false">
           Read the notice again
         </button>
-        <button type="button" :class="SECONDARY_BUTTON" @click="askSignOut">Sign out</button>
+        <button v-if="canSignOut" type="button" :class="SECONDARY_BUTTON" @click="askSignOut">
+          Sign out
+        </button>
       </div>
     </section>
 

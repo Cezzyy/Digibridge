@@ -2,7 +2,7 @@ import type { InferResponseType } from 'hono/client'
 import { defineStore } from 'pinia'
 import { computed, ref, shallowRef } from 'vue'
 import { api, ApiRequestError, call, messageOf } from '../lib/api'
-import { useSessionStore } from './session'
+import { useRespondentFlow } from '../composables/useRespondentFlow'
 
 export type Attempt = InferResponseType<(typeof api.attempts)[':id']['$get'], 200>
 export type AttemptItem = Attempt['items'][number]
@@ -40,7 +40,7 @@ const canRetry = (err: unknown) =>
  * question go one at a time, newest choice last, so a slow older save can't overwrite a newer one.
  */
 export const useAttemptStore = defineStore('attempt', () => {
-  const session = useSessionStore()
+  const flow = useRespondentFlow()
 
   const attempt = shallowRef<Attempt | null>(null)
   const answers = ref<Record<string, string>>({})
@@ -251,7 +251,7 @@ export const useAttemptStore = defineStore('attempt', () => {
         return null
       }
       const result = await call(api.attempts[':id'].submit.$post({ param: { id } }))
-      session.setAttempt({ id: result.id, status: result.status })
+      flow.setAttempt({ id: result.id, status: result.status })
       return result
     } catch (err) {
       // The only 409 on submit: the team voided the attempt.

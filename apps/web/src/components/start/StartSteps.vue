@@ -1,18 +1,22 @@
 <script setup lang="ts">
 import { computed } from 'vue'
+import { useRespondentFlow } from '../../composables/useRespondentFlow'
 import type { StepScreenId } from '../landing/StepScreen.vue'
-import { STEPS } from '../landing/steps'
+import { SCHOOL_STEPS, STEPS as ONLINE_STEPS } from '../landing/steps'
 
 // Where the respondent is on the way from sign-in to lessons: the same steps the landing and
 // sign-in pages list, with the ones before this page marked done. Made for StartLayout's green
 // panel. Phones, tablets and most laptops show "Step 2 of 5", the step's name and a bar per step;
 // desktops with tall screens (`tall:`) show the whole list with the current step's line.
-// Home passes `questions` or `results`, the step the respondent is on there.
+// Home passes `questions` or `results`, the step the respondent is on there. Through a school
+// link there's no sign-in step (SCHOOL_STEPS).
 export type StartStep = Exclude<StepScreenId, 'sign-in'>
 
 const props = defineProps<{ current: StartStep }>()
-const index = computed(() => STEPS.findIndex((step) => step.screen === props.current))
-const LAST = STEPS.length - 1
+const { isSchool } = useRespondentFlow()
+const STEPS = computed(() => (isSchool.value ? SCHOOL_STEPS : ONLINE_STEPS))
+const index = computed(() => STEPS.value.findIndex((step) => step.screen === props.current))
+const LAST = computed(() => STEPS.value.length - 1)
 </script>
 
 <template>

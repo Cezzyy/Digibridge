@@ -1,8 +1,10 @@
-// Composables: useAuth, useAttempt, useCountdown, useKiosk, useApi.
+// Composables: useCountdown, useRespondentFlow, the data loaders and the form savers.
 export * from './useCountdown'
 export * from './useCreateRespondent'
+export * from './useJoinLink'
 export * from './useLesson'
 export * from './useLessons'
+export * from './useRespondentFlow'
 export * from './useResult'
 export * from './useSaveSus'
 export * from './useSignOut'

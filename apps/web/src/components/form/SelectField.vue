@@ -5,12 +5,14 @@ import { computed, nextTick, onBeforeUnmount, ref, useId, useTemplateRef } from 
 // the ARIA select-only combobox pattern: focus stays on the box while the list is open, and
 // `aria-activedescendant` points at the option under the cursor. Keyboard: Down, Up, Enter or
 // Space opens; arrows, Home and End move; Enter, Space or Tab picks; Escape closes. Typing a
-// few letters jumps to the first option that starts with them.
+// few letters jumps to the first option that starts with them. With nothing picked, the box
+// shows `placeholder`.
 
 const props = defineProps<{
   label: string
   hint?: string
   error?: string | null
+  placeholder?: string
   options: readonly { value: T; label: string }[]
 }>()
 const model = defineModel<T>({ required: true })
@@ -168,7 +170,8 @@ function onKeydown(event: KeyboardEvent) {
         @keydown="onKeydown"
         @blur="open = false"
       >
-        <span class="truncate">{{ selected?.label }}</span>
+        <span v-if="selected" class="truncate">{{ selected.label }}</span>
+        <span v-else class="truncate text-quiet">{{ placeholder }}</span>
         <svg
           viewBox="0 0 24 24"
           aria-hidden="true"

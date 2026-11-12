@@ -29,3 +29,17 @@ export const STEPS: readonly { screen: StepScreenId; title: string; body: string
     body: 'Your results show up as soon as you submit.',
   },
 ]
+
+/**
+ * The same steps through a school link: no sign-in (the link is the way in), and the profile
+ * asks for the school details too.
+ */
+export const SCHOOL_STEPS: readonly { screen: StepScreenId; title: string; body: string }[] =
+  STEPS.filter((step) => step.screen !== 'sign-in').map((step) =>
+    step.screen === 'profile'
+      ? {
+          ...step,
+          body: 'Your student number, course and year level, then the same questions as everyone.',
+        }
+      : step,
+  )

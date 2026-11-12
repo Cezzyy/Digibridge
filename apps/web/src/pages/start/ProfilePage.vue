@@ -1,52 +1,86 @@
 <script setup lang="ts">
 import {
+  COURSES,
   DEVICE_LABELS,
   DEVICES,
   FULL_NAME_MAX_LENGTH,
   INTERNET_ACCESS,
   INTERNET_ACCESS_LABELS,
+  isYearLevelInCourse,
   normalizeFullName,
   onlineRespondentSchema,
+  schoolRespondentSchema,
   SEX_LABELS,
   SEXES,
+  STUDENT_NUMBER_EXAMPLE,
+  yearLevelLabel,
+  YEAR_LEVELS,
+  yearLevelsFor,
+  type Course,
   type Device,
   type InternetAccess,
   type Sex,
+  type YearLevel,
 } from '@digibridge/shared'
 import { computed, nextTick, reactive, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
+import FixedField from '../../components/form/FixedField.vue'
+import SelectField from '../../components/form/SelectField.vue'
+import TextField from '../../components/form/TextField.vue'
 import BirthDateField from '../../components/start/BirthDateField.vue'
 import {
   DEVICE_ICONS,
   IDENTITY_ICONS,
   INTERNET_ACCESS_ICONS,
 } from '../../components/start/choice-icons'
-import TextField from '../../components/form/TextField.vue'
 import FormSection from '../../components/start/FormSection.vue'
+import LinkTag from '../../components/start/LinkTag.vue'
 import OptionGroup, { type Option } from '../../components/start/OptionGroup.vue'
 import StartLayout from '../../components/start/StartLayout.vue'
 import StartSteps from '../../components/start/StartSteps.vue'
 import { useCreateRespondent } from '../../composables/useCreateRespondent'
+import { useJoinLink } from '../../composables/useJoinLink'
+import { useRespondentFlow } from '../../composables/useRespondentFlow'
 import { useToday } from '../../composables/useToday'
 import { PRIMARY_BUTTON, SECONDARY_BUTTON } from '../../lib/buttons'
 import { useConsentStore } from '../../stores/consent'
+import { useSchoolLinkStore } from '../../stores/schoolLink'
 import { useSessionStore } from '../../stores/session'
 
-// The online profile (PRO-01) and the show-identity choice (PRO-05). No school details: online
-// never asks for them (PRO-06). Saving sends the consent from the previous page with it, which
-// the `step` guard makes sure exists. Staff get a preview: the answers are checked but not
-// saved (the API refuses them), so their tries stay out of the research data.
+// The profile (PRO-01) and the show-identity choice (PRO-05). Online it's the general profile
+// only: online never asks for school details (PRO-06). Through a school link it adds student
+// number, course and year level (LNK-03); a link made for one course or year level fills that in
+// and the student can't change it. Saving sends the consent from the previous page with it,
+// which the `step` guard makes sure exists. Staff online get a preview: the answers are checked
+// but not saved (the API refuses them), so their tries stay out of the research data.
 const session = useSessionStore()
-const preview = computed(() => session.isStaff)
+const school = useSchoolLinkStore()
+const flow = useRespondentFlow()
 const consent = useConsentStore()
 const router = useRouter()
-const { save, saving, error: saveError } = useCreateRespondent()
+const online = useCreateRespondent()
+const joining = useJoinLink()
 
-const googleName = session.me?.profile.fullName ?? ''
+// The page is opened for one mode and stays in it: online and school links have their own routes.
+const isSchool = flow.isSchool.value
+const preview = computed(() => !isSchool && session.isStaff)
+const saving = computed(() => online.saving.value || joining.saving.value)
+const saveError = computed(() => online.error.value ?? joining.error.value)
+
+// The link's course and year-level lock (null for any).
+const lock = {
+  course: (school.link?.course ?? null) as Course | null,
+  yearLevel: (school.link?.yearLevel ?? null) as YearLevel | null,
+}
+
+const googleName = isSchool ? '' : (session.me?.profile.fullName ?? '')
 const form = reactive({
   fullName: googleName,
   birthDate: null as string | null,
   sex: null as Sex | null,
+  studentNumber: '',
+  course: lock.course,
+  yearLevel: lock.yearLevel,
   devices: [] as Device[],
   internetAccess: [] as InternetAccess[],
   showIdentity: null as boolean | null,
@@ -63,35 +97,73 @@ const internetOptions: Option<InternetAccess>[] = INTERNET_ACCESS.map((value) =>
   label: INTERNET_ACCESS_LABELS[value],
   icon: INTERNET_ACCESS_ICONS[value],
 }))
+
+// Only the courses that have the link's year level, and only the year levels the course has.
+const courseOptions = COURSES.filter(
+  (course) => lock.yearLevel === null || isYearLevelInCourse(course, lock.yearLevel),
+).map((course) => ({ value: course as Course | null, label: course }))
+const yearOptions = computed(() =>
+  (form.course ? yearLevelsFor(form.course) : [...YEAR_LEVELS]).map((year) => ({
+    value: year as YearLevel | null,
+    label: yearLevelLabel(year),
+  })),
+)
+// A course that doesn't go up to the year picked clears it, so the student picks again.
+watch(
+  () => form.course,
+  (course) => {
+    if (lock.yearLevel === null && course && form.yearLevel !== null) {
+      if (!isYearLevelInCourse(course, form.yearLevel)) form.yearLevel = null
+    }
+  },
+)
+
+const who = isSchool ? 'your name and student number' : 'your name'
 const identityOptions: Option<boolean>[] = [
   {
     value: true,
     label: 'Yes, show my name',
-    hint: 'The DigiBridge team sees your name with your answers.',
+    hint: `The DigiBridge team sees ${who} with your answers.`,
     icon: IDENTITY_ICONS.show,
   },
   {
     value: false,
     label: 'No, hide my name',
-    hint: 'The team still sees your answers, but your name shows as Hidden.',
+    hint: `The team still sees your answers, but ${who} ${isSchool ? 'show' : 'shows'} as Hidden.`,
     icon: IDENTITY_ICONS.hide,
   },
 ]
 
 // The birth date checks read the clock, so reading `today` runs them again on a new day.
 const today = useToday()
-const result = computed(() => {
+const consentVersion = () => {
+  const key = flow.consentKey.value
+  return key ? consent.versionFor(key) : null
+}
+const general = () => ({
+  fullName: form.fullName,
+  birthDate: form.birthDate ?? undefined,
+  sex: form.sex ?? undefined,
+  devices: form.devices,
+  internetAccess: form.internetAccess,
+  showIdentity: form.showIdentity ?? undefined,
+  consentVersion: consentVersion(),
+})
+const onlineResult = computed(() => {
   void today.value
-  return onlineRespondentSchema.safeParse({
-    fullName: form.fullName,
-    birthDate: form.birthDate ?? undefined,
-    sex: form.sex ?? undefined,
-    devices: form.devices,
-    internetAccess: form.internetAccess,
-    showIdentity: form.showIdentity ?? undefined,
-    consentVersion: session.me ? consent.versionFor(session.me.profile.id) : null,
+  return isSchool ? null : onlineRespondentSchema.safeParse(general())
+})
+const schoolResult = computed(() => {
+  void today.value
+  if (!isSchool) return null
+  return schoolRespondentSchema.safeParse({
+    ...general(),
+    studentNumber: form.studentNumber,
+    course: form.course ?? undefined,
+    yearLevel: form.yearLevel ?? undefined,
   })
 })
+const result = computed(() => (isSchool ? schoolResult.value : onlineResult.value)!)
 
 // Each answer's error shows once the student has left or answered that question, or tried to
 // save, and then follows the answer as it changes.
@@ -99,7 +171,14 @@ const tried = ref(false)
 type Field = keyof typeof form
 const touched = reactive(new Set<Field>())
 const touch = (field: Field) => touched.add(field)
-for (const field of ['sex', 'devices', 'internetAccess', 'showIdentity'] as const) {
+for (const field of [
+  'sex',
+  'course',
+  'yearLevel',
+  'devices',
+  'internetAccess',
+  'showIdentity',
+] as const) {
   watch(
     () => form[field],
     () => touch(field),
@@ -110,6 +189,12 @@ for (const field of ['sex', 'devices', 'internetAccess', 'showIdentity'] as cons
 function leaveName() {
   form.fullName = normalizeFullName(form.fullName)
   touch('fullName')
+}
+
+// Likewise the student number: capitals, no spaces around it.
+function leaveStudentNumber() {
+  form.studentNumber = form.studentNumber.trim().toUpperCase()
+  touch('studentNumber')
 }
 
 /** The first message for each field (or the form), whether shown yet or not. */
@@ -133,13 +218,26 @@ const errors = computed(() => {
 const fieldErrorCount = computed(() => Object.keys(errors.value).filter((k) => k !== 'form').length)
 
 // The form's sections, for the side panel's links and the check mark on each finished one.
-// A question counts as answered once its answer passes the checks.
-const SECTIONS = [
+// A question counts as answered once its answer passes the checks. The school details come
+// second, through a link only.
+type Section = { id: string; title: string; fields: readonly Field[] }
+const SECTIONS: Section[] = [
   { id: 'profile-about', title: 'About you', fields: ['fullName', 'birthDate', 'sex'] },
+  ...(isSchool
+    ? [
+        {
+          id: 'profile-school',
+          title: 'Your school',
+          fields: ['studentNumber', 'course', 'yearLevel'],
+        } satisfies Section,
+      ]
+    : []),
   { id: 'profile-devices', title: 'Devices and internet', fields: ['devices', 'internetAccess'] },
   { id: 'profile-privacy', title: 'Your privacy', fields: ['showIdentity'] },
-] as const satisfies readonly { id: string; title: string; fields: readonly Field[] }[]
+]
 const QUESTION_COUNT = SECTIONS.reduce((sum, section) => sum + section.fields.length, 0)
+/** Each section's number in the form, which shifts by one through a school link. */
+const numberOf = (id: string) => SECTIONS.findIndex((section) => section.id === id) + 1
 
 const answeredIn = (fields: readonly Field[]) => fields.filter((f) => !issues.value[f]).length
 const sections = computed(() =>
@@ -149,8 +247,7 @@ const sections = computed(() =>
   }),
 )
 const answered = computed(() => sections.value.reduce((sum, s) => sum + s.answered, 0))
-const doneIn = (id: (typeof SECTIONS)[number]['id']) =>
-  sections.value.find((s) => s.id === id)?.done ?? false
+const doneIn = (id: string) => sections.value.find((s) => s.id === id)?.done ?? false
 
 async function submit() {
   tried.value = true
@@ -158,17 +255,23 @@ async function submit() {
     await nextTick()
     // Move to the first question that needs an answer.
     const first = document.querySelector<HTMLElement>(
-      '[data-invalid] input, input[aria-invalid="true"]',
+      '[data-invalid] input, [data-invalid] [role="combobox"], input[aria-invalid="true"]',
     )
     first?.focus()
     return
   }
   if (preview.value) {
     consent.clear()
-    await router.replace({ name: 'home' })
+    await router.replace(flow.page('home'))
     return
   }
-  if (await save(result.value.data)) await router.replace({ name: 'home' })
+  const saved =
+    schoolResult.value?.success && school.code
+      ? await joining.save(school.code, schoolResult.value.data)
+      : onlineResult.value?.success
+        ? await online.save(onlineResult.value.data)
+        : false
+  if (saved) await router.replace(flow.page('home'))
 }
 </script>
 
@@ -177,6 +280,7 @@ async function submit() {
     <template #rail>
       <!-- Phones show the step bar above the heading; desktops list the steps under it. -->
       <StartSteps current="profile" class="mb-6 lg:order-1 lg:mt-10 lg:mb-0" />
+      <LinkTag />
 
       <h1
         class="text-[clamp(2rem,1.5rem+1.6vw,3.25rem)] leading-[1.02] font-extrabold tracking-[-0.02em] text-balance motion-safe:animate-rise"
@@ -278,7 +382,7 @@ async function submit() {
     >
       <FormSection
         id="profile-about"
-        :number="1"
+        :number="numberOf('profile-about')"
         title="About you"
         description="Your name, date of birth and sex."
         :done="doneIn('profile-about')"
@@ -324,9 +428,67 @@ async function submit() {
         />
       </FormSection>
 
+      <!-- Through a school link only (LNK-03). -->
+      <FormSection
+        v-if="isSchool"
+        id="profile-school"
+        :number="numberOf('profile-school')"
+        title="Your school"
+        description="Your student number, course and year level."
+        :done="doneIn('profile-school')"
+      >
+        <TextField
+          v-model="form.studentNumber"
+          label="Student number"
+          :hint="`Type it with the dashes, like ${STUDENT_NUMBER_EXAMPLE}.`"
+          autocomplete="off"
+          :maxlength="STUDENT_NUMBER_EXAMPLE.length + 2"
+          :error="errors.studentNumber"
+          :valid="touched.has('studentNumber') && !issues.studentNumber"
+          @touch="leaveStudentNumber"
+        >
+          <template #icon>
+            <rect x="3" y="5" width="18" height="14" rx="2" />
+            <path d="M7 10h4M7 14h6" />
+            <circle cx="16.5" cy="11" r="1.5" />
+          </template>
+        </TextField>
+
+        <div class="grid gap-8 xl:grid-cols-2 xl:gap-x-6">
+          <FixedField
+            v-if="lock.course"
+            label="Course"
+            :value="lock.course"
+            hint="Your link is for this course."
+          />
+          <SelectField
+            v-else
+            v-model="form.course"
+            label="Course"
+            placeholder="Pick your course"
+            :options="courseOptions"
+            :error="errors.course"
+          />
+          <FixedField
+            v-if="lock.yearLevel"
+            label="Year level"
+            :value="yearLevelLabel(lock.yearLevel)"
+            hint="Your link is for this year level."
+          />
+          <SelectField
+            v-else
+            v-model="form.yearLevel"
+            label="Year level"
+            placeholder="Pick your year level"
+            :options="yearOptions"
+            :error="errors.yearLevel"
+          />
+        </div>
+      </FormSection>
+
       <FormSection
         id="profile-devices"
-        :number="2"
+        :number="numberOf('profile-devices')"
         title="Your devices and internet"
         description="So we can see how people get online."
         :done="doneIn('profile-devices')"
@@ -356,14 +518,14 @@ async function submit() {
 
       <FormSection
         id="profile-privacy"
-        :number="3"
+        :number="numberOf('profile-privacy')"
         title="Your privacy"
         description="Either way, your answers count the same."
         :done="doneIn('profile-privacy')"
       >
         <OptionGroup
           v-model="form.showIdentity"
-          legend="May the DigiBridge team see your name?"
+          :legend="`May the DigiBridge team see ${who}?`"
           :options="identityOptions"
           :columns="2"
           :error="errors.showIdentity"
@@ -406,7 +568,7 @@ async function submit() {
         </div>
 
         <div class="flex shrink-0 flex-col-reverse gap-3 sm:flex-row sm:justify-end">
-          <RouterLink :to="{ name: 'consent' }" :class="SECONDARY_BUTTON">
+          <RouterLink :to="flow.page('consent')" :class="SECONDARY_BUTTON">
             Back to the notice
           </RouterLink>
           <button type="submit" form="profile-form" :class="PRIMARY_BUTTON" :disabled="saving">
