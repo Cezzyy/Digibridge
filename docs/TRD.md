@@ -217,9 +217,10 @@ Kiosk respondents use the same respondent-flow routes with the `X-Kiosk-Session`
 
 | Method | Path | Auth | Purpose |
 | --- | --- | --- | --- |
-| GET | `/api/v1/admin/stats` | Facilitator, admin | Summary cards (including mean SUS and SUS count), level counts, comparison by a `groupBy` field. Takes all dashboard filters as query params. A course or year-level filter or grouping counts kiosk respondents only. |
+| GET | `/api/v1/admin/stats` | Facilitator, admin | Summary cards (including mean SUS and SUS count), level counts, SUS spread and statement averages, comparison by a `groupBy` field. Takes all dashboard filters as query params. A course, year-level or school link filter or grouping counts school respondents only. Age groups (17 and under, 18 to 20, 21 to 23, 24 and over) use the age on the consent day; the date range is the consent day too. |
 | GET | `/api/v1/admin/respondents` | Facilitator, admin | Paged, filtered, sorted list. Name and student number show as Hidden unless the respondent allowed them. |
-| GET | `/api/v1/admin/respondents/:id` | Facilitator, admin | Profile and area results of one respondent |
+| GET | `/api/v1/admin/respondents/:id` | Facilitator, admin | Profile, area results and SUS answers of one respondent. Admins also get the answer sheet: each item in the order shown, with the choice picked and the right one |
+| GET | `/api/v1/admin/items` | Admin | Item analysis: per question how many saw it, got it right or left it blank, picks per choice, and flags (too easy at 90% or more right, too hard below 20%, confusing when a wrong choice beats the right one; none until 5 have seen it). Takes the dashboard filters |
 | GET | `/api/v1/admin/export.csv` | Admin | Filtered respondents with profile, area scores, levels and SUS score; hidden identities stay hidden |
 | POST | `/api/v1/admin/attempts/:id/void` | Admin | Void an attempt with a reason |
 | DELETE | `/api/v1/admin/respondents/:id` | Admin | Delete a respondent and their attempt on request |
