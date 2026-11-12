@@ -1,4 +1,4 @@
-import type { LessonTier, Level, Role, Sex } from './values'
+import type { Difficulty, LessonTier, Level, Mode, Role, Sex } from './values'
 
 // Labels shown to students for the enum values they see.
 
@@ -26,3 +26,15 @@ export const ROLE_LABELS = {
   facilitator: 'Facilitator',
   admin: 'Admin',
 } as const satisfies Record<Role, string>
+
+/** How a respondent came in, for the team's pages. */
+export const MODE_LABELS = {
+  online: 'Online',
+  school: 'School link',
+} as const satisfies Record<Mode, string>
+
+export const DIFFICULTY_LABELS = {
+  basic: 'Basic',
+  intermediate: 'Intermediate',
+  advanced: 'Advanced',
+} as const satisfies Record<Difficulty, string>
