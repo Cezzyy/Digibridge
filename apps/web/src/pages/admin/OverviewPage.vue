@@ -12,9 +12,9 @@ import { PRIMARY_BUTTON, SECONDARY_BUTTON } from '../../lib/buttons'
 import { useSessionStore } from '../../stores/session'
 
 // Where staff land after signing in: the counts so far, how respondents came in and where their
-// attempts stand, while the full dashboard (charts, filters, the respondents table) is still to
-// come. Admins also get a way to the school links page. While the counts load, the same cards
-// are drawn with placeholders where the numbers go, so nothing moves when they arrive.
+// attempts stand, with ways on to the respondents and analysis pages. Admins also get a way to
+// the school links page. While the counts load, the same cards are drawn with placeholders where
+// the numbers go, so nothing moves when they arrive.
 const session = useSessionStore()
 const { overview, error, loading, load } = useAdminOverview()
 onMounted(load)
@@ -61,6 +61,21 @@ const byMode = computed<SplitPart[]>(() => [
   { label: 'Online, with Google', value: overview.value?.respondents.online, tone: 'evergreen' },
   { label: 'Through school links', value: overview.value?.respondents.school, tone: 'marigold' },
 ])
+
+const pages = [
+  {
+    label: 'Respondents',
+    text: 'Everyone who took part, with their profile and scores.',
+    to: { name: 'admin-respondents' },
+    icon: ICONS.people,
+  },
+  {
+    label: 'Analysis',
+    text: 'Levels per area, group comparisons and the usability survey.',
+    to: { name: 'admin-analysis' },
+    icon: ICONS.started,
+  },
+]
 
 const progress = computed<SplitPart[]>(() => [
   { label: 'Finished', value: overview.value?.attempts.finished, tone: 'evergreen' },
@@ -163,8 +178,24 @@ const progress = computed<SplitPart[]>(() => [
     </RouterLink>
   </section>
 
-  <p class="mt-4 rounded-card border border-dashed border-line-strong/60 p-5 text-quiet sm:px-6">
-    <span class="font-semibold text-ink">Coming next:</span> charts by skill area, filters, and the
-    respondents table.
-  </p>
+  <nav aria-label="More" class="mt-4 grid gap-4 sm:grid-cols-2">
+    <RouterLink
+      v-for="page in pages"
+      :key="page.label"
+      :to="page.to"
+      class="group flex items-center gap-4 rounded-card border border-line bg-surface p-5 transition-colors hover:border-evergreen focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-evergreen"
+    >
+      <span
+        aria-hidden="true"
+        class="grid size-12 shrink-0 place-items-center rounded-card bg-evergreen-soft text-evergreen"
+      >
+        <StrokeIcon :d="page.icon" class="size-6" />
+      </span>
+      <span class="min-w-0 flex-1">
+        <span class="block text-lg leading-tight font-bold">{{ page.label }}</span>
+        <span class="mt-1 block text-quiet">{{ page.text }}</span>
+      </span>
+      <StrokeIcon :d="ICONS.arrow" class="size-5 shrink-0 text-quiet group-hover:text-evergreen" />
+    </RouterLink>
+  </nav>
 </template>
