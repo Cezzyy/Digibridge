@@ -1,15 +1,19 @@
 <script setup lang="ts">
 import { computed } from 'vue'
-import type { RouteLocationRaw } from 'vue-router'
+import { useRoute, type RouteLocationRaw } from 'vue-router'
 import { ICONS } from '../../components/admin/admin-icons'
 import StrokeIcon from '../../components/admin/StrokeIcon.vue'
+import { filterQuery, filtersFrom } from '../../composables/useDashboardFilters'
 import { useSessionStore } from '../../stores/session'
 
 // The frame of every /admin page, under AppHeader: a menu on the left from `lg`, which stays put
 // while the page scrolls, and a row of tabs under the header on smaller screens. Links shows
 // for admins only (LNK-01); the router keeps facilitators out of it too. Student preview opens
-// /home, where staff can try the student steps without saving anything.
+// /home, where staff can try the student steps without saving anything. The pages that take
+// the dashboard filters get the ones set now, so they carry over (DSH-03).
 const session = useSessionStore()
+const route = useRoute()
+const filters = computed(() => filterQuery(filtersFrom(route.query)))
 
 type NavItem = { label: string; to: RouteLocationRaw; icon: string | readonly string[] }
 
@@ -18,6 +22,11 @@ const items = computed<NavItem[]>(() => [
     label: 'Overview',
     to: { name: 'admin' },
     icon: ICONS.overview,
+  },
+  {
+    label: 'Respondents',
+    to: { name: 'admin-respondents', query: filters.value },
+    icon: ICONS.people,
   },
   ...(session.isAdmin
     ? [

@@ -122,6 +122,12 @@ export const router = createRouter({
           name: 'admin',
           component: () => import('./pages/admin/OverviewPage.vue'),
         },
+        // Staff, read only for facilitators (DSH-07); the answer sheet is for admins only.
+        {
+          path: 'respondents',
+          name: 'admin-respondents',
+          component: () => import('./pages/admin/RespondentsPage.vue'),
+        },
         {
           path: 'links',
           name: 'admin-links',
