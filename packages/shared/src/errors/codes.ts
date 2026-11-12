@@ -10,6 +10,8 @@ export const ERROR_CODES = [
   'not_found',
   'conflict',
   'already_answered',
+  // A school link that closed, expired or filled up (410).
+  'gone',
   'too_large',
   'rate_limited',
   'internal_error',

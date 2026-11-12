@@ -3,8 +3,10 @@ import { addDays, isRealDate, todayInPhilippines, type IsoDate } from '../profil
 import {
   courseSchema,
   isYearLevelInCourse,
+  YEAR_LEVEL_LABELS,
   yearLevelNotInCourseMessage,
   yearLevelSchema,
+  type YearLevel,
 } from '../profile/course'
 
 // School links (LNK-01, LNK-02): an admin makes one for a class, with the school it's for, a
@@ -46,6 +48,39 @@ export function linkStatus(link: LinkState, now = new Date()): LinkStatus {
   if (link.expiresAt <= now) return 'expired'
   if (link.maxResponses !== null && link.responses >= link.maxResponses) return 'full'
   return 'open'
+}
+
+const ASK_FOR_A_NEW_LINK = 'Ask whoever sent it to you for a new one.'
+
+/** Why a link that isn't open turns new students away (LNK-02), as the API says it. */
+export const LINK_GONE_MESSAGES = {
+  closed: `This link has been closed, so it can’t take new students. ${ASK_FOR_A_NEW_LINK}`,
+  expired: `This link has expired, so it can’t take new students. ${ASK_FOR_A_NEW_LINK}`,
+  full: `This link already has all the students it can take. ${ASK_FOR_A_NEW_LINK}`,
+} as const satisfies Record<Exclude<LinkStatus, 'open'>, string>
+
+/** A link's course and year-level lock; null lets in any. */
+export type LinkLock = { course: string | null; yearLevel: number | null }
+
+export const yearLevelLabel = (yearLevel: number) =>
+  YEAR_LEVEL_LABELS[yearLevel as YearLevel] ?? `Year ${yearLevel}`
+
+/**
+ * Where a school profile doesn't fit the link's lock (LNK-03), as issues on the profile's fields.
+ * The profile form fixes these fields to the lock, so only a hand-made request meets them.
+ */
+export function linkLockIssues(lock: LinkLock, profile: { course: string; yearLevel: number }) {
+  const issues: { path: ['course' | 'yearLevel']; message: string }[] = []
+  if (lock.course !== null && profile.course !== lock.course) {
+    issues.push({ path: ['course'], message: `This link is only for ${lock.course} students.` })
+  }
+  if (lock.yearLevel !== null && profile.yearLevel !== lock.yearLevel) {
+    issues.push({
+      path: ['yearLevel'],
+      message: `This link is only for ${yearLevelLabel(lock.yearLevel).toLowerCase()} students.`,
+    })
+  }
+  return issues
 }
 
 /**
