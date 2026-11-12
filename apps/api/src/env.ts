@@ -17,3 +17,13 @@ export type AppEnv = { Bindings: Bindings; Variables: { db: Db } }
 
 // Routes with the auth middleware also get the signed-in user's profile.
 export type AuthEnv = AppEnv & { Variables: { profile: Profile } }
+
+/**
+ * Who a respondent route is for: an online respondent by their Google account, or a school-link
+ * student by the hash of the token their browser sends (LNK-04). See `respondentIs`.
+ */
+export type RespondentKey = { profileId: string } | { tokenHash: string }
+
+// Routes with the respondent middleware get the caller's key; the row itself is looked up by the
+// handler's own query, so this costs no extra round trip.
+export type RespondentEnv = AppEnv & { Variables: { respondentKey: RespondentKey } }
