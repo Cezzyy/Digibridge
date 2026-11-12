@@ -37,7 +37,7 @@ declare module 'vue-router' {
     hideHeader?: boolean
     /** Dark when the system is dark (lib/theme.ts). Children inherit it. */
     followsSystemTheme?: boolean
-    /** Below `lg`, AppHeader puts the admin pages and the account in a menu (AdminMenu). */
+    /** Below `lg`, AppHeader's menu has the admin pages (AdminMenu) instead of AppMenu. */
     adminMenu?: boolean
   }
 }

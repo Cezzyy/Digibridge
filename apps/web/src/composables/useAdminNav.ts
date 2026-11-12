@@ -1,10 +1,9 @@
 import { computed } from 'vue'
-import { useRoute, type RouteLocationRaw } from 'vue-router'
+import { useRoute } from 'vue-router'
 import { ICONS } from '../components/admin/admin-icons'
+import type { NavItem } from '../lib/nav'
 import { useSessionStore } from '../stores/session'
 import { filterQuery, filtersFrom } from './useDashboardFilters'
-
-export type AdminNavItem = { label: string; to: RouteLocationRaw; icon: string | readonly string[] }
 
 // The admin area's pages, for the side menu (AdminLayout, from `lg`) and the menu that opens from
 // the header below that (AdminMenu). School links (LNK-01) and Item analysis, which shows the right
@@ -16,7 +15,7 @@ export function useAdminNav() {
   const route = useRoute()
   const filters = computed(() => filterQuery(filtersFrom(route.query)))
 
-  return computed<AdminNavItem[]>(() => [
+  return computed<NavItem[]>(() => [
     { label: 'Overview', to: { name: 'admin' }, icon: ICONS.overview },
     {
       label: 'Respondents',

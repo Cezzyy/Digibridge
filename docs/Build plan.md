@@ -26,7 +26,7 @@ Done when you can sign in with Google on the deployed site and `/api/v1/me` answ
 - [x] **Supabase project:** Google provider on, redirect URLs for `localhost` and the Pages URL.
 - [x] **Cloudflare resources:** Pages project `digibridge-web`, R2 bucket `digibridge-media`, Hyperdrive config `digibridge-db`, all bound in `wrangler.toml`.
 - [x] **Full schema** in `packages/db`: all 11 tables and 7 enums from the TRD, the partial unique indexes (one attempt per respondent, one correct choice per question) and the 3 dashboard indexes. `db:generate`, `db:push`.
-- [ ] **Seeds:** `packages/db/seed/dev-questions.sql` for the 3 areas and 13 practice items per area (5 basic, 5 intermediate, 3 advanced; 5 per area can't fill the 4/4/2 mix), run in the Supabase SQL editor.
+- [x] **Seeds:** `packages/db/seed/dev-questions.sql` for the 3 areas and 13 practice items per area (5 basic, 5 intermediate, 3 advanced; 5 per area can't fill the 4/4/2 mix), run in the Supabase SQL editor.
 - [x] **Shared package:** enums, course and year-level lists, student number regex, scoring weights and level cut-offs.
 - [x] **API skeleton:** OpenAPIHono app, error handler that returns `{ error: { code, message } }`, CORS for the Pages origin, `config/db` connection, docs in `openapi/`.
 - [x] **Auth middleware and `GET /api/v1/me`:** verify the Supabase token with `jose`, create the profile on first call, `ADMIN_EMAILS` makes you admin, `requireRole` (AUTH-01, AUTH-02, AUTH-04).
@@ -46,7 +46,7 @@ Done when a test account goes from consent to results and lessons on a phone, us
 - [x] **Cron:** `scheduled` handler in `index.ts` closes attempts past `expires_at` + 30 s as expired.
 - [x] **Results page:** overall level, radar chart, score and level per area, recommended lessons, no per-item marks (RES-01 to RES-03, RES-05).
 - [x] **Lessons:** public library and lesson page with Markdown rendered through DOMPurify (LES-01 to LES-03).
-- [ ] **SUS:** `lib/sus.ts` with its tests, `POST /api/v1/attempts/:id/sus`, `SusForm` as an optional card under results (SUS-01, SUS-02, SUS-04).
+- [x] **SUS:** `lib/sus.ts` with its tests, `POST /api/v1/attempts/:id/sus`, `SusForm` as an optional card under results (SUS-01, SUS-02, SUS-04).
 - [ ] **QR code:** `results_token` at submit, `GET /api/v1/results/:token`, `ResultsQr` on the results page, so a student can reopen their results on another device (RES-04).
 
 ## Stage 2: School links
@@ -69,15 +69,15 @@ New requirements, replacing KIO-01 to KIO-06:
 In this order:
 
 - [ ] **Docs:** in the PRD, swap Kiosk mode for School links (the table above), and reword the roles table, the flow, the screens, SUS-03, RES-04, DSH-03 to DSH-06 and the risks. In the TRD, update the auth section, the `kiosk_sessions` row, the kiosk routes, guards and stores. In CLAUDE.md, update the online and kiosk rule.
-- [ ] **Schema:** one migration. `kiosk_sessions` becomes `school_links` (`id`, `code` random and unique for the URL, `school`, `label`, `created_by` to profiles with set null, `course` and `year_level` null for any, `max_responses` null for no limit, `expires_at`, `closed_at`, `created_at`, `.enableRLS()`). `attempts.kiosk_session_id` becomes `school_link_id`. The mode value `kiosk` becomes `school` in `MODES` and the enum. `respondents.access_token_hash` (unique when not null) is set on school rows only, and `respondents_school_fields_by_mode` checks it. drizzle-kit asks rename or drop-and-create for each change: pick rename, and check the SQL renames the enum value (`alter type ... rename value`) instead of rebuilding the type.
+- [x] **Schema:** one migration. `kiosk_sessions` becomes `school_links` (`id`, `code` random and unique for the URL, `school`, `label`, `created_by` to profiles with set null, `course` and `year_level` null for any, `max_responses` null for no limit, `expires_at`, `closed_at`, `created_at`, `.enableRLS()`). `attempts.kiosk_session_id` becomes `school_link_id`. The mode value `kiosk` becomes `school` in `MODES` and the enum. `respondents.access_token_hash` (unique when not null) is set on school rows only, and `respondents_school_fields_by_mode` checks it. drizzle-kit asks rename or drop-and-create for each change: pick rename, and check the SQL renames the enum value (`alter type ... rename value`) instead of rebuilding the type.
 - [ ] **Shared:** `MODES` with `school`; the kiosk profile schema renamed `schoolRespondentSchema` (general profile plus student number, course, year level limited by course); `schoolLinkSchema` for creating a link; the school consent notice in `consent/` with its own `version` (the research, the school details, Cez as group leader and contact); the respondent token header name.
-- [ ] **Admin links API:** `POST /api/v1/admin/links`, `GET /api/v1/admin/links` (each with its response count and whether it's open, closed, expired or full), `POST /api/v1/admin/links/:id/close`. Admin only (LNK-01).
+- [x] **Admin links API:** `POST /api/v1/admin/links`, `GET /api/v1/admin/links` (each with its response count and whether it's open, closed, expired or full), `POST /api/v1/admin/links/:id/close`. Admin only (LNK-01).
 - [ ] **Open a link:** `GET /api/v1/links/:code`, no sign-in: the label and any course or year-level lock while open; 404 for an unknown code; 410 when closed, expired or full (LNK-02).
 - [ ] **School profile:** `POST /api/v1/links/:code/respondents`, no sign-in: the school consent version, `schoolRespondentSchema`, course and year level must match the link's lock, show-identity choice; 409 for a used student number, 410 if the link has closed. It creates a `mode = school` respondent with no `profile_id` and returns a respondent token once (32 random bytes, only the SHA-256 hash is saved) (LNK-03, PRO-02 to PRO-05).
 - [ ] **Respondent token on the attempt routes:** a `respondent` middleware that takes either the Google token (online) or the `X-Respondent-Token` header (school) and sets `c.var.respondent`, used by start, read, answer, submit, result and SUS. A school attempt stores `school_link_id`. Closing a link stops new students, but attempts already started can finish. Add the header to CORS. Tests: both kinds of caller, a wrong token, and a token used on someone else's attempt (LNK-04, LNK-05).
 - [ ] **Web:** `/s/:code` checks the link, then runs the existing start, assessment and results pages in school mode: the school notice, the profile page with the school fields (fixed when the link sets them), no Google sign-in. `stores/schoolLink.ts` keeps the code and token in `localStorage`, `lib/api.ts` sends the header when one is stored, and the `step` guard accepts a school token in place of a Google session. A closed, expired or full link shows `ErrorScreen` in plain words (LNK-02, LNK-04).
 - [ ] **Ending:** for school-link students the SUS form opens by itself after results (they can still skip), then Done clears the stored token and attempt (SUS-03, LNK-06).
-- [ ] **Links page:** `/admin/links` to make a link, copy it, see its status and response count, and close it (LNK-01).
+- [x] **Links page:** `/admin/links` to make a link, copy it, see its status and response count, and close it (LNK-01).
 
 ## Stage 3: Admin side
 
@@ -87,12 +87,12 @@ Done when an admin can load the 30 real items by CSV and read the pilot data on 
 - [ ] **Uploads:** `POST /api/v1/admin/uploads` to the R2 `MEDIA` bucket, PNG, JPEG or WebP up to 2 MB, and `GET /api/v1/media/:key` to serve them (CMS-05).
 - [ ] **CSV import:** columns from the TRD, report row errors, and the readiness check of 10 active items per area in the 4/4/2 mix (CMS-06, CMS-07). Needed before the real items can go in.
 - [ ] **Lessons editor:** list and Markdown editor with preview (CMS-04).
-- [ ] **Dashboard:** `GET /api/v1/admin/stats` with every filter, including mode and school link, summary cards including mean SUS, level chart per area, comparison chart by a chosen grouping; course and year level count school-link respondents only and say so (DSH-01 to DSH-04, SUS-05).
+- [x] **Dashboard:** `GET /api/v1/admin/stats` with every filter, including mode and school link, summary cards including mean SUS, level chart per area, comparison chart by a chosen grouping; course and year level count school-link respondents only and say so (DSH-01 to DSH-04, SUS-05).
 - [ ] **Respondents:** paged table, detail drawer, Hidden for respondents who chose it, the school link's label, empty school cells for online respondents, read only for facilitators (DSH-05, DSH-07, PRO-05).
 - [ ] **CSV export:** admin only, follows the filters, includes SUS and the school link, keeps hidden identities hidden (DSH-06).
 - [ ] **Users:** list, change role, last admin can't be demoted (USR-01, USR-02).
 - [ ] **Void and delete:** void an attempt with a reason; delete a respondent on request (USR-03).
-- [ ] **Item analysis:** percent correct per item on the questions page (DSH-08).
+- [x] **Item analysis:** percent correct per item on the questions page (DSH-08).
 
 ## Small items and backend safety
 
@@ -102,18 +102,18 @@ Small, fit in anywhere:
 - [ ] Error screens in plain words, no technical terms or stack traces.
 - [ ] Empty states: dashboard with 0 respondents, lessons not yet published, no questions in an area, no school links yet.
 - [ ] Mobile pass at 360 px on every page; tap targets at least 44 px.
-- [ ] Landing page copy: what DigiBridge is, how long it takes, privacy line. The public pages are for online mode, so they don't mention course or year level: change the profile step in `components/landing/steps.ts` and its demo in `StepScreen.vue`, which still show them.
+- [x] Landing page copy: what DigiBridge is, how long it takes, privacy line. The public pages are for online mode, so they don't mention course or year level: change the profile step in `components/landing/steps.ts` and its demo in `StepScreen.vue`, which still show them.
 - [ ] Loading and saving states on every button that calls the API.
 
 Backend safety, before the pilot. Most urgent first:
 
 - [ ] **RLS on** for every `public` table with no policies; check the anon key can read nothing.
 - [ ] **Rate limits** on the school link routes (open and profile), answer saves and CSV import.
-- [ ] **Secrets** only in Wrangler secrets and local env files; `.env.example` in the repo.
+- [x] **Secrets** only in Wrangler secrets and local env files; `.env.example` in the repo.
 - [ ] **Security headers** on the API and the web.
 - [ ] **Supabase settings:** only the Pages URL and `localhost` as redirect URLs.
 - [ ] **Decide whether `/api/reference` stays open in prod**, with an `API_DOCS` flag.
-- [ ] **Dependency audit:** `pnpm audit`.
+- [x] **Dependency audit:** `pnpm audit`.
 
 ## Stage 4: Real content and freeze
 

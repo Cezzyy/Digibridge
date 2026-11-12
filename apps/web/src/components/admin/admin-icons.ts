@@ -1,4 +1,4 @@
-// Paths for the admin area's line icons (StrokeIcon), on a 24 px grid.
+// Paths for the line icons (StrokeIcon) in the admin area and the menus, on a 24 px grid.
 const CIRCLE = 'M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18z'
 
 export const ICONS = {
@@ -52,5 +52,6 @@ export const ICONS = {
     'm3.5 18 1.5 1.5 2.5-2.5',
   ],
   search: ['M11 18a7 7 0 1 0 0-14 7 7 0 0 0 0 14z', 'm20 20-4-4'],
+  home: ['m3.5 10.5 8.5-7 8.5 7', 'M5.5 9v11h13V9', 'M10 20v-5.5h4V20'],
   person: ['M12 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8z', 'M5 20a7 7 0 0 1 14 0'],
 } as const satisfies Record<string, string | readonly string[]>

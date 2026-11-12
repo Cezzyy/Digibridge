@@ -3,16 +3,18 @@ import { computed, defineAsyncComponent } from 'vue'
 import { useRoute } from 'vue-router'
 import { useSessionStore } from '../stores/session'
 import AccountControls from './AccountControls.vue'
+import AppMenu from './AppMenu.vue'
 import BrandMark from './BrandMark.vue'
 
 // Top bar on every page, so users can sign in or out from anywhere (AUTH-03). It stays at the
-// top while the page scrolls, and spans the whole width like the start pages under it. The
-// lessons and admin links show from `sm`: on phones there's no room beside Sign out. The logo
+// top while the page scrolls, and spans the whole width like the start pages under it. The logo
 // goes to where the user starts: the admin overview for staff, home for respondents.
 //
-// In the admin area (`meta.adminMenu`), screens below `lg` get a menu button before the logo
-// instead: AdminMenu holds the admin pages, Lessons and the account, so the bar keeps only the
-// logo. It loads with the admin area, so students never download it.
+// On phones there's no room for the links beside the account, so below `sm` a menu button before
+// the logo opens AppMenu (the user's page, Lessons, Admin for staff, and the account or Sign in)
+// and the bar keeps only the logo. In the admin area (`meta.adminMenu`) the button shows below
+// `lg` instead and opens AdminMenu, with the admin pages; it loads with the admin area, so
+// students never download it.
 const AdminMenu = defineAsyncComponent(() => import('./admin/AdminMenu.vue'))
 
 const session = useSessionStore()
@@ -27,6 +29,9 @@ const adminMenu = computed(() => !!route.meta.adminMenu && session.isStaff)
         <div v-if="adminMenu" class="lg:hidden">
           <AdminMenu />
         </div>
+        <div v-else class="sm:hidden">
+          <AppMenu />
+        </div>
         <RouterLink
           :to="session.isSignedIn ? session.startPage : { name: 'landing' }"
           class="flex min-h-11 items-center gap-2.5 font-display text-xl font-bold text-evergreen"
@@ -36,7 +41,10 @@ const adminMenu = computed(() => !!route.meta.adminMenu && session.isStaff)
         </RouterLink>
       </div>
 
-      <div class="flex min-w-0 items-center gap-2 sm:gap-4" :class="{ 'max-lg:hidden': adminMenu }">
+      <div
+        class="flex min-w-0 items-center gap-4"
+        :class="adminMenu ? 'max-lg:hidden' : 'max-sm:hidden'"
+      >
         <RouterLink
           v-if="session.isStaff"
           :to="{ name: 'admin' }"
