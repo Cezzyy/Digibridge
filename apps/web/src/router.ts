@@ -129,6 +129,11 @@ export const router = createRouter({
           component: () => import('./pages/admin/RespondentsPage.vue'),
         },
         {
+          path: 'analysis',
+          name: 'admin-analysis',
+          component: () => import('./pages/admin/AnalysisPage.vue'),
+        },
+        {
           path: 'links',
           name: 'admin-links',
           component: () => import('./pages/admin/LinksPage.vue'),

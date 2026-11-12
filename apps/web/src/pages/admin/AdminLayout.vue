@@ -28,6 +28,11 @@ const items = computed<NavItem[]>(() => [
     to: { name: 'admin-respondents', query: filters.value },
     icon: ICONS.people,
   },
+  {
+    label: 'Analysis',
+    to: { name: 'admin-analysis', query: filters.value },
+    icon: ICONS.started,
+  },
   ...(session.isAdmin
     ? [
         {
