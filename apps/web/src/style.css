@@ -170,6 +170,61 @@
   }
 }
 
+/* `.side-menu`: a modal <dialog> that slides in from the left over a fading dim layer, and slides
+   back out when it closes (AdminMenu). Opening glides in; closing is quicker, so it gets out of the
+   way. `allow-discrete` on `display` and `overlay` keeps the dialog on screen until it has slid
+   out. Each `.side-menu-item` fades in a moment after the one before it (`--item`, its index). */
+@layer components {
+  @media (prefers-reduced-motion: no-preference) {
+    .side-menu,
+    .side-menu::backdrop {
+      transition:
+        translate 0.22s cubic-bezier(0.4, 0, 1, 1),
+        opacity 0.22s ease-in,
+        display 0.22s allow-discrete,
+        overlay 0.22s allow-discrete;
+    }
+
+    .side-menu:not([open]) {
+      translate: -100% 0;
+    }
+
+    .side-menu:not([open])::backdrop {
+      opacity: 0;
+    }
+
+    .side-menu[open],
+    .side-menu[open]::backdrop {
+      transition-duration: 0.4s;
+      transition-timing-function: var(--ease-glide);
+    }
+
+    @starting-style {
+      .side-menu[open] {
+        translate: -100% 0;
+      }
+
+      .side-menu[open]::backdrop {
+        opacity: 0;
+      }
+    }
+
+    .side-menu[open] .side-menu-item {
+      transition:
+        opacity 0.4s var(--ease-glide),
+        translate 0.4s var(--ease-glide);
+      transition-delay: calc(0.08s + var(--item, 0) * 0.035s);
+    }
+
+    @starting-style {
+      .side-menu[open] .side-menu-item {
+        opacity: 0;
+        translate: -1rem 0;
+      }
+    }
+  }
+}
+
 /* `v-reveal` (lib/motion.ts): hidden until it first scrolls into view, then slides in from
    `data-reveal` after `--reveal-delay`. Put it on wrappers that have no translate, scale or
    transition classes of their own, since this sets those properties. */
