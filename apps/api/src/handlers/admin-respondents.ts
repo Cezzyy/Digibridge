@@ -20,22 +20,14 @@ import type { RouteHandler } from '@hono/zod-openapi'
 import { and, asc, count, desc, eq, ilike, inArray, or, sql, type SQL } from 'drizzle-orm'
 import type { Db } from '../config/db'
 import type { AuthEnv } from '../env'
-import { ageAtConsent, dashboardConditions } from '../lib/dashboard-filters'
+import {
+  ageAtConsent,
+  currentAttempts,
+  dashboardConditions,
+  type CurrentAttempts,
+} from '../lib/dashboard-filters'
 import { ApiError } from '../middleware'
 import type { getRespondentRoute, listRespondentsRoute } from '../routes/admin-respondents'
-
-/**
- * Each respondent's attempt: the one that isn't voided (there's at most one), or else the latest
- * voided one.
- */
-const currentAttempts = (db: Db) =>
-  db
-    .selectDistinctOn([attempts.respondentId])
-    .from(attempts)
-    .orderBy(attempts.respondentId, sql`${attempts.status} = 'voided'`, desc(attempts.startedAt))
-    .as('current_attempt')
-
-type CurrentAttempts = ReturnType<typeof currentAttempts>
 
 /** RESPONDENT_STATUSES from the respondent's attempt. Submitted and expired both have results. */
 const statusOf = (current: CurrentAttempts) =>
