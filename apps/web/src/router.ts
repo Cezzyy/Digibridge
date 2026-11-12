@@ -37,6 +37,8 @@ declare module 'vue-router' {
     hideHeader?: boolean
     /** Dark when the system is dark (lib/theme.ts). Children inherit it. */
     followsSystemTheme?: boolean
+    /** Below `lg`, AppHeader puts the admin pages and the account in a menu (AdminMenu). */
+    adminMenu?: boolean
   }
 }
 
@@ -115,7 +117,7 @@ export const router = createRouter({
     {
       path: '/admin',
       component: () => import('./pages/admin/AdminLayout.vue'),
-      meta: { requires: 'staff', followsSystemTheme: true },
+      meta: { requires: 'staff', followsSystemTheme: true, adminMenu: true },
       children: [
         {
           path: '',
