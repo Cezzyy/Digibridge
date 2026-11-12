@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref, useId, watch } from 'vue'
-import { useRoute, useRouter } from 'vue-router'
+import { useRoute } from 'vue-router'
+import { askSignOut } from '../composables/useSignOut'
 import type { NavItem } from '../lib/nav'
 import { useSessionStore } from '../stores/session'
 import { ICONS } from './admin/admin-icons'
@@ -8,8 +9,9 @@ import StrokeIcon from './admin/StrokeIcon.vue'
 
 // The phone menu behind AppHeader's menu button, used by AdminMenu (below `lg`) and AppMenu (the
 // respondent pages, below `sm`): a panel from the left with the pages in `sections` (a line
-// between each), then the signed-in user with Sign out (AUTH-03), or Sign in when signed out, so
-// the header keeps only the logo and this button. A native modal dialog, so focus stays inside,
+// between each), then the signed-in user with Sign out (AUTH-03; it asks first, in a dialog over
+// the menu, which closes once signed out), or Sign in when signed out, so the header keeps only
+// the logo and this button. A native modal dialog, so focus stays inside,
 // Esc closes it and focus goes back to the button. Picking a page, tapping the dim layer, going
 // back, or widening the screen to `closeFrom` (where the header's own links are back) closes it
 // too. It slides in and out, and its rows follow one after another (`.side-menu` in style.css),
@@ -26,7 +28,6 @@ const props = defineProps<{
 
 const session = useSessionStore()
 const route = useRoute()
-const router = useRouter()
 const id = useId()
 
 const dialog = ref<HTMLDialogElement | null>(null)
@@ -63,12 +64,6 @@ function onWidthChange(event: MediaQueryListEvent) {
 }
 onMounted(() => wide.addEventListener('change', onWidthChange))
 onUnmounted(() => wide.removeEventListener('change', onWidthChange))
-
-async function signOut() {
-  close()
-  await session.signOut()
-  await router.push({ name: 'landing' })
-}
 
 const LINK =
   'flex min-h-11 items-center gap-3 rounded-control px-3 font-semibold text-quiet transition-colors hover:bg-mist-soft hover:text-ink aria-[current=page]:bg-evergreen-soft aria-[current=page]:text-evergreen'
@@ -157,7 +152,7 @@ const FOOTER_BUTTON =
             </p>
           </div>
         </div>
-        <button type="button" :class="['mt-3', FOOTER_BUTTON]" @click="signOut">
+        <button type="button" :class="['mt-3', FOOTER_BUTTON]" @click="askSignOut">
           <StrokeIcon :d="ICONS.signOut" class="size-5" />
           Sign out
         </button>

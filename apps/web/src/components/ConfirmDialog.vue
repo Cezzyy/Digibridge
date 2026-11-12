@@ -1,9 +1,10 @@
 <script setup lang="ts">
 import { ref, useId, watch } from 'vue'
-import { PRIMARY_BUTTON, SECONDARY_BUTTON } from '../../lib/buttons'
+import { PRIMARY_BUTTON, SECONDARY_BUTTON } from '../lib/buttons'
 
-// Asks before an action that can't be undone, like closing a school link. A native modal
-// dialog, so focus stays inside it and Esc closes it (unless the action is running).
+// Asks before an action that can't be undone, like closing a school link or signing out. A
+// native modal dialog, so focus stays inside it, Cancel has focus (so a stray Enter doesn't
+// confirm) and Esc closes it (unless the action is running).
 const props = defineProps<{
   open: boolean
   title: string

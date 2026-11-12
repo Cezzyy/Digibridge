@@ -11,6 +11,7 @@ import { useRouter } from 'vue-router'
 import { NOTICE_ICONS } from '../../components/start/choice-icons'
 import StartLayout from '../../components/start/StartLayout.vue'
 import StartSteps from '../../components/start/StartSteps.vue'
+import { askSignOut } from '../../composables/useSignOut'
 import { PRIMARY_BUTTON, SECONDARY_BUTTON } from '../../lib/buttons'
 import { useConsentStore } from '../../stores/consent'
 import { useSessionStore } from '../../stores/session'
@@ -57,11 +58,6 @@ async function decline() {
   await nextTick()
   window.scrollTo({ top: 0 })
   declinedHeading.value?.focus()
-}
-
-async function signOut() {
-  await session.signOut()
-  await router.push({ name: 'landing' })
 }
 </script>
 
@@ -148,7 +144,7 @@ async function signOut() {
         <button type="button" :class="PRIMARY_BUTTON" @click="declined = false">
           Read the notice again
         </button>
-        <button type="button" :class="SECONDARY_BUTTON" @click="signOut">Sign out</button>
+        <button type="button" :class="SECONDARY_BUTTON" @click="askSignOut">Sign out</button>
       </div>
     </section>
 

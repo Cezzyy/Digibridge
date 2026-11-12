@@ -1,16 +1,10 @@
 <script setup lang="ts">
-import { useRouter } from 'vue-router'
+import { askSignOut } from '../composables/useSignOut'
 import { useSessionStore } from '../stores/session'
 
 // The signed-in user's picture, name and Sign out button, for every top bar that a signed-in
-// user can see (AUTH-03). Shows nothing when signed out.
+// user can see (AUTH-03). Sign out asks first (`SignOutDialog`). Shows nothing when signed out.
 const session = useSessionStore()
-const router = useRouter()
-
-async function signOut() {
-  await session.signOut()
-  await router.push({ name: 'landing' })
-}
 </script>
 
 <template>
@@ -28,7 +22,7 @@ async function signOut() {
     <button
       type="button"
       class="min-h-11 shrink-0 rounded-control border border-line-strong px-4 font-semibold text-evergreen hover:bg-evergreen-soft"
-      @click="signOut"
+      @click="askSignOut"
     >
       Sign out
     </button>

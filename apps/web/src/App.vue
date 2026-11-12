@@ -5,6 +5,7 @@ import AppHeader from './components/AppHeader.vue'
 import AppSplash from './components/AppSplash.vue'
 import ErrorScreen, { type ErrorAction } from './components/ErrorScreen.vue'
 import IntroSplash from './components/IntroSplash.vue'
+import SignOutDialog from './components/SignOutDialog.vue'
 import { useSessionStore } from './stores/session'
 
 // Load the session for every page, including public ones that have no guard.
@@ -66,5 +67,7 @@ const failureScreen = computed(() => {
     <AppHeader v-if="showHeader" />
     <RouterView />
   </template>
+  <!-- Outside the v-if, so Sign out on the error screen's top bar asks too. -->
+  <SignOutDialog />
   <IntroSplash />
 </template>

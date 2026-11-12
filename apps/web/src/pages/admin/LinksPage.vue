@@ -2,7 +2,7 @@
 import type { SchoolLinkInput } from '@digibridge/shared'
 import { computed, onMounted, ref } from 'vue'
 import { ICONS } from '../../components/admin/admin-icons'
-import ConfirmDialog from '../../components/admin/ConfirmDialog.vue'
+import ConfirmDialog from '../../components/ConfirmDialog.vue'
 import ErrorPanel from '../../components/admin/ErrorPanel.vue'
 import LinkCard from '../../components/admin/LinkCard.vue'
 import LinkCardSkeleton from '../../components/admin/LinkCardSkeleton.vue'
