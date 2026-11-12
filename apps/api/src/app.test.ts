@@ -2015,3 +2015,315 @@ describe('admin', () => {
     })
   })
 })
+
+describe('admin respondents', () => {
+  beforeEach(async () => {
+    await clearQuestionBank()
+    await addQuestionBank()
+  })
+  afterAll(clearQuestionBank)
+
+  type Listed = {
+    respondents: Record<string, unknown>[]
+    total: number
+    page: number
+    pageSize: number
+  }
+  const list = async (query: string, headers: Record<string, string>) => {
+    const res = await get(`/api/v1/admin/respondents${query}`, headers)
+    return { status: res.status, body: (await res.json()) as Listed }
+  }
+
+  const linkFor = async (label: string) => {
+    const [row] = await testDb
+      .insert(schoolLinks)
+      .values({
+        code: crypto.randomUUID().slice(0, LINK_CODE_LENGTH).toUpperCase(),
+        school: 'ACLC College of Mandaue',
+        label,
+        expiresAt: new Date(Date.now() + 86_400_000),
+      })
+      .returning()
+    return row!
+  }
+
+  /** A school respondent, straight into the database, with an attempt in the given state. */
+  let studentNumber = 2000
+  const addSchoolRespondent = async (
+    values: Partial<typeof respondents.$inferInsert>,
+    attempt?: {
+      status: 'in_progress' | 'submitted' | 'expired' | 'voided'
+      linkId: string
+      pct?: number
+    },
+  ) => {
+    const [row] = await testDb
+      .insert(respondents)
+      .values({
+        ...base,
+        ...school,
+        studentNumber: `C23-01-${++studentNumber}-MAN121`,
+        accessTokenHash: crypto.randomUUID(),
+        mode: 'school',
+        ...values,
+      })
+      .returning()
+    if (attempt) {
+      const finished = attempt.status === 'submitted' || attempt.status === 'expired'
+      await testDb.insert(attempts).values({
+        respondentId: row!.id,
+        schoolLinkId: attempt.linkId,
+        status: attempt.status,
+        expiresAt: new Date(Date.now() + 25 * 60_000),
+        submittedAt: finished ? new Date() : null,
+        overallPct: attempt.pct ?? null,
+        overallLevel: attempt.pct === undefined ? null : 'basic',
+        totalPoints: attempt.pct === undefined ? null : 20,
+        questionOrder: [],
+        choiceOrder: {},
+      })
+    }
+    return row!
+  }
+
+  describe('GET /api/v1/admin/respondents', () => {
+    it('lists respondents newest first, with hidden identities left out (DSH-05, PRO-05)', async () => {
+      const link = await linkFor('BSIT 2A')
+      const hidden = await addSchoolRespondent(
+        { fullName: 'Maria Santos', consentedAt: new Date('2026-11-10T02:00:00Z') },
+        { status: 'submitted', linkId: link.id, pct: 55.5 },
+      )
+      const shown = await addSchoolRespondent({
+        fullName: 'Pedro Reyes',
+        showIdentity: true,
+        consentedAt: new Date('2026-11-11T02:00:00Z'),
+      })
+
+      const staff = await signedIn('facilitator')
+      const { status, body } = await list('', staff.headers)
+      expect(status).toBe(200)
+      expect(body).toMatchObject({ total: 2, page: 1, pageSize: 20 })
+      expect(body.respondents.map((r) => r.id)).toEqual([shown.id, hidden.id])
+      expect(body.respondents[0]).toMatchObject({
+        fullName: 'Pedro Reyes',
+        studentNumber: shown.studentNumber,
+        identityHidden: false,
+        status: 'not_started',
+        schoolLink: null,
+        attemptId: null,
+      })
+      expect(body.respondents[1]).toMatchObject({
+        mode: 'school',
+        fullName: null,
+        studentNumber: null,
+        identityHidden: true,
+        course: school.course,
+        yearLevel: school.yearLevel,
+        // Born 2007-06-15, consented 2026-11-10.
+        age: 19,
+        ageGroup: '18_20',
+        status: 'finished',
+        schoolLink: { id: link.id, label: 'BSIT 2A' },
+        overallPct: 55.5,
+        overallLevel: 'basic',
+      })
+      expect(JSON.stringify(body)).not.toContain('Maria Santos')
+    })
+
+    it('shows online respondents with empty school cells', async () => {
+      await respondent()
+      const admin = await signedIn('admin')
+      const { body } = await list('', admin.headers)
+      expect(body.respondents[0]).toMatchObject({
+        mode: 'online',
+        studentNumber: null,
+        course: null,
+        yearLevel: null,
+        schoolLink: null,
+      })
+    })
+
+    it('filters by status, mode, link, course, age group and consent date', async () => {
+      const a = await linkFor('BSIT 2A')
+      const b = await linkFor('BSCS 1A')
+      const finishedA = await addSchoolRespondent({}, { status: 'expired', linkId: a.id, pct: 40 })
+      const startedB = await addSchoolRespondent(
+        { course: 'BSCS', consentedAt: new Date('2026-11-01T02:00:00Z') },
+        { status: 'in_progress', linkId: b.id },
+      )
+      const voided = await addSchoolRespondent({}, { status: 'voided', linkId: a.id })
+      const online = await respondent()
+
+      const admin = await signedIn('admin')
+      const ids = async (query: string) =>
+        (await list(query, admin.headers)).body.respondents.map((r) => r.id).sort()
+
+      expect(await ids('?status=finished')).toEqual([finishedA.id])
+      expect(await ids('?status=in_progress')).toEqual([startedB.id])
+      expect(await ids('?status=voided')).toEqual([voided.id])
+      expect(await ids('?status=not_started')).toEqual([online.respondentId])
+      expect(await ids('?mode=online')).toEqual([online.respondentId])
+      expect(await ids(`?schoolLinkId=${a.id}`)).toEqual([finishedA.id, voided.id].sort())
+      expect(await ids('?course=BSCS')).toEqual([startedB.id])
+      expect(await ids('?ageGroup=21_23')).toEqual([])
+      expect(await ids('?from=2026-11-01&to=2026-11-01')).toEqual([startedB.id])
+    })
+
+    it('finds shown names and student numbers only, and sorts hidden names last', async () => {
+      const shown = await addSchoolRespondent({ fullName: 'Ana Cruz', showIdentity: true })
+      const hidden = await addSchoolRespondent({ fullName: 'Aaron Cruz' })
+      const admin = await signedIn('admin')
+
+      const found = await list('?q=cruz', admin.headers)
+      expect(found.body.respondents.map((r) => r.id)).toEqual([shown.id])
+      const byNumber = await list(`?q=${hidden.studentNumber}`, admin.headers)
+      expect(byNumber.body.total).toBe(0)
+
+      const sorted = await list('?sort=name', admin.headers)
+      expect(sorted.body.respondents.map((r) => r.id)).toEqual([shown.id, hidden.id])
+    })
+
+    it('sorts by score and pages', async () => {
+      const link = await linkFor('BSIT 2A')
+      const low = await addSchoolRespondent({}, { status: 'submitted', linkId: link.id, pct: 30 })
+      const high = await addSchoolRespondent({}, { status: 'submitted', linkId: link.id, pct: 90 })
+      const none = await addSchoolRespondent({})
+      const admin = await signedIn('admin')
+
+      const best = await list('?sort=score_high', admin.headers)
+      expect(best.body.respondents.map((r) => r.id)).toEqual([high.id, low.id, none.id])
+      const worst = await list('?sort=score_low', admin.headers)
+      expect(worst.body.respondents.map((r) => r.id)).toEqual([low.id, high.id, none.id])
+
+      const second = await list('?page=2', admin.headers)
+      expect(second.body).toMatchObject({ respondents: [], total: 3, page: 2 })
+    })
+
+    it('refuses respondents and bad filters', async () => {
+      const user = await signedIn()
+      expect((await list('', user.headers)).status).toBe(403)
+      const admin = await signedIn('admin')
+      expect((await list('?sex=other', admin.headers)).status).toBe(400)
+      expect((await list('?page=0', admin.headers)).status).toBe(400)
+    })
+  })
+
+  describe('GET /api/v1/admin/respondents/:id', () => {
+    /** An online respondent who answered 2 items (1 right, 1 wrong), then submitted. */
+    const finished = async () => {
+      const user = await respondent()
+      await start(user.headers)
+      const [attempt] = await attemptsOf(user.respondentId)
+      const [first, second] = attempt!.questionOrder
+      const choicesOf = (id: string) =>
+        testDb.select().from(choices).where(eq(choices.questionId, id))
+      const right = (await choicesOf(first!)).find((c) => c.isCorrect)!
+      const wrong = (await choicesOf(second!)).find((c) => !c.isCorrect)!
+      const json = { ...user.headers, 'Content-Type': 'application/json' }
+      for (const [questionId, choiceId] of [
+        [first!, right.id],
+        [second!, wrong.id],
+      ] as const) {
+        await app.request(
+          `/api/v1/attempts/${attempt!.id}/answers/${questionId}`,
+          { method: 'PUT', headers: json, body: JSON.stringify({ choiceId }) },
+          env,
+        )
+      }
+      await app.request(
+        `/api/v1/attempts/${attempt!.id}/submit`,
+        { method: 'POST', headers: user.headers },
+        env,
+      )
+      return { user, attempt: attempt!, right, wrong }
+    }
+
+    type Detail = {
+      respondent: Record<string, unknown>
+      attempt: {
+        status: string
+        timeTakenSeconds: number | null
+        areas: unknown[]
+        sus: unknown
+        answers:
+          | {
+              questionId: string
+              choices: { id: string }[]
+              pickedChoiceId: string | null
+              correct: boolean
+              points: number | null
+            }[]
+          | null
+      } | null
+    }
+    const detail = async (id: string, headers: Record<string, string>) => {
+      const res = await get(`/api/v1/admin/respondents/${id}`, headers)
+      return { status: res.status, body: (await res.json()) as Detail }
+    }
+
+    it('gives admins the answer sheet in the order shown (DSH-05)', async () => {
+      const { user, attempt, right, wrong } = await finished()
+      const admin = await signedIn('admin')
+      const { status, body } = await detail(user.respondentId, admin.headers)
+      expect(status).toBe(200)
+      expect(body.respondent).toMatchObject({ id: user.respondentId, status: 'finished' })
+      expect(body.attempt).toMatchObject({
+        status: 'submitted',
+        timeTakenSeconds: expect.any(Number),
+        sus: null,
+      })
+      expect(body.attempt!.areas).toHaveLength(AREA_CODES.length)
+
+      const sheet = body.attempt!.answers!
+      expect(sheet.map((item) => item.questionId)).toEqual(attempt.questionOrder)
+      expect(sheet[0]!.choices.map((c) => c.id)).toEqual(
+        attempt.choiceOrder[attempt.questionOrder[0]!],
+      )
+      expect(sheet[0]).toMatchObject({ pickedChoiceId: right.id, correct: true })
+      expect(sheet[1]).toMatchObject({ pickedChoiceId: wrong.id, correct: false, points: 0 })
+      expect(sheet[2]).toMatchObject({ pickedChoiceId: null, correct: false, points: null })
+    })
+
+    it('leaves the answer sheet out for facilitators (DSH-07)', async () => {
+      const { user } = await finished()
+      const staff = await signedIn('facilitator')
+      const { status, body } = await detail(user.respondentId, staff.headers)
+      expect(status).toBe(200)
+      expect(body.attempt!.areas).toHaveLength(AREA_CODES.length)
+      expect(body.attempt!.answers).toBeNull()
+    })
+
+    it('includes the SUS answers once given', async () => {
+      const { user, attempt } = await finished()
+      await app.request(
+        `/api/v1/attempts/${attempt.id}/sus`,
+        {
+          method: 'POST',
+          headers: { ...user.headers, 'Content-Type': 'application/json' },
+          body: JSON.stringify({ answers: [5, 1, 5, 1, 5, 1, 5, 1, 5, 1] }),
+        },
+        env,
+      )
+      const admin = await signedIn('admin')
+      const { body } = await detail(user.respondentId, admin.headers)
+      expect(body.attempt!.sus).toEqual({ score: 100, answers: [5, 1, 5, 1, 5, 1, 5, 1, 5, 1] })
+    })
+
+    it('has no attempt before they start, and hides a hidden name', async () => {
+      const row = await addSchoolRespondent({ fullName: 'Maria Santos' })
+      const admin = await signedIn('admin')
+      const { body } = await detail(row.id, admin.headers)
+      expect(body).toMatchObject({
+        respondent: { fullName: null, studentNumber: null, identityHidden: true },
+        attempt: null,
+      })
+    })
+
+    it('answers 404 for an unknown respondent and 403 for respondents', async () => {
+      const admin = await signedIn('admin')
+      expect((await detail(crypto.randomUUID(), admin.headers)).status).toBe(404)
+      const { user } = await finished()
+      expect((await detail(user.respondentId, user.headers)).status).toBe(403)
+    })
+  })
+})
