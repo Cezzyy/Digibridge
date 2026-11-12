@@ -2,8 +2,8 @@ import { LEVEL_CUTOFFS, type Level } from '@digibridge/shared'
 
 /** Background and text classes for each level (docs/design.md, "Levels"). */
 export const LEVEL_TONE = {
-  beginner: 'bg-level-1 text-ink',
-  basic: 'bg-level-2 text-ink',
+  beginner: 'bg-level-1 text-on-level',
+  basic: 'bg-level-2 text-on-level',
   intermediate: 'bg-level-3 text-white',
   advanced: 'bg-level-4 text-white',
 } as const satisfies Record<Level, string>

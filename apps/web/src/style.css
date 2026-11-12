@@ -26,6 +26,8 @@
   --color-level-2: #8cc5a6;
   --color-level-3: #2f7d58;
   --color-level-4: #1e5b44;
+  /* Text on the pale levels (1 and 2), which keep their colors in both themes, so it stays dark. */
+  --color-on-level: #12241c;
   /* Text and icons on an evergreen fill (white here, dark green in the dark theme). */
   --color-on-evergreen: #ffffff;
   /* The logo's tile, which keeps its green in both themes. */
