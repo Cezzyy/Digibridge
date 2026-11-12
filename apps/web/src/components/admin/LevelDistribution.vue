@@ -1,41 +1,62 @@
 <script setup lang="ts">
-import { AREA_LABELS, LEVEL_LABELS, LEVELS, type AreaCode, type Level } from '@digibridge/shared'
+import {
+  AREA_CODES,
+  AREA_LABELS,
+  LEVEL_LABELS,
+  LEVELS,
+  type AreaCode,
+  type Level,
+} from '@digibridge/shared'
 import { computed } from 'vue'
 import { LEVEL_TONE } from '../../lib/levels'
 import LevelKey from '../results/LevelKey.vue'
+import SkeletonText from '../results/SkeletonText.vue'
 import { shareOf } from './stats-text'
 
 // How many reached each level, overall and in each area (DSH-02): one 100% bar per row, a
 // segment per level in its level color, lowest first, with 2 px gaps. Counts sit in segments
 // wide enough for them; hovering a segment shows its count and share. The key names the colors,
-// and "Show as a table" gives the same numbers as text.
+// and "Show as a table" gives the same numbers as text. Null while the numbers load: the rows'
+// names and the key are known, so they're drawn, with placeholders for the counts and bars.
 const props = defineProps<{
-  overall: Record<Level, number>
-  areas: readonly { area: AreaCode; levels: Record<Level, number> }[]
+  overall: Record<Level, number> | null
+  areas: readonly { area: AreaCode; levels: Record<Level, number> }[] | null
 }>()
 
 const rows = computed(() =>
-  [
-    { label: 'Overall', levels: props.overall },
-    ...props.areas.map((a) => ({ label: AREA_LABELS[a.area], levels: a.levels })),
-  ].map((row) => {
-    const total = LEVELS.reduce((sum, level) => sum + row.levels[level], 0)
-    return {
-      ...row,
-      total,
-      parts: LEVELS.map((level) => ({
-        level,
-        count: row.levels[level],
-        share: shareOf(row.levels[level], total),
-      })).filter((part) => part.count > 0),
-    }
-  }),
+  props.overall && props.areas
+    ? [
+        { label: 'Overall', levels: props.overall },
+        ...props.areas.map((a) => ({ label: AREA_LABELS[a.area], levels: a.levels })),
+      ].map((row) => {
+        const total = LEVELS.reduce((sum, level) => sum + row.levels[level], 0)
+        return {
+          ...row,
+          total,
+          parts: LEVELS.map((level) => ({
+            level,
+            count: row.levels[level],
+            share: shareOf(row.levels[level], total),
+          })).filter((part) => part.count > 0),
+        }
+      })
+    : null,
 )
+const placeholderRows = ['Overall', ...AREA_CODES.map((area) => AREA_LABELS[area])]
 </script>
 
 <template>
   <div>
-    <ul class="space-y-5" aria-hidden="true">
+    <ul v-if="!rows" class="space-y-5" aria-hidden="true">
+      <li v-for="label in placeholderRows" :key="label">
+        <div class="flex items-baseline justify-between gap-3">
+          <span class="font-semibold" :class="{ 'text-lg': label === 'Overall' }">{{ label }}</span>
+          <span class="text-sm"><SkeletonText class="w-[5.5em]" /></span>
+        </div>
+        <div class="mt-2 h-7 rounded-[4px] bg-skeleton motion-safe:animate-skeleton" />
+      </li>
+    </ul>
+    <ul v-else class="space-y-5" aria-hidden="true">
       <li v-for="row in rows" :key="row.label">
         <div class="flex items-baseline justify-between gap-3">
           <span class="font-semibold" :class="{ 'text-lg': row.label === 'Overall' }">{{
@@ -63,7 +84,10 @@ const rows = computed(() =>
     </ul>
     <LevelKey class="mt-5 !justify-start" />
 
-    <details class="mt-4">
+    <p v-if="!rows" class="mt-4 font-semibold" aria-hidden="true">
+      <SkeletonText class="w-[8.5em]" />
+    </p>
+    <details v-else class="mt-4">
       <summary class="cursor-pointer font-semibold text-evergreen">Show as a table</summary>
       <div class="mt-3 overflow-x-auto">
         <table class="w-full text-left text-sm">

@@ -16,6 +16,7 @@ import ErrorPanel from '../../components/admin/ErrorPanel.vue'
 import FilterBar from '../../components/admin/FilterBar.vue'
 import RespondentDrawer from '../../components/admin/RespondentDrawer.vue'
 import RespondentsTable from '../../components/admin/RespondentsTable.vue'
+import RespondentsTableSkeleton from '../../components/admin/RespondentsTableSkeleton.vue'
 import StrokeIcon from '../../components/admin/StrokeIcon.vue'
 import SelectField from '../../components/form/SelectField.vue'
 import TextField from '../../components/form/TextField.vue'
@@ -122,6 +123,10 @@ function clearAll() {
 }
 
 const openId = computed(() => queryText('respondent') ?? null)
+/** The open respondent's row, when it's on this page: the drawer shapes its placeholders by it. */
+const openRow = computed(
+  () => page.value?.respondents.find((row) => row.id === openId.value) ?? null,
+)
 const open = (id: string) => router.push({ query: { ...route.query, respondent: id } })
 function closeDrawer() {
   if (openId.value) replaceQuery({ respondent: undefined })
@@ -139,7 +144,11 @@ function closeDrawer() {
 
   <FilterBar class="mt-8" :links="session.isAdmin ? (schoolLinks.links.value ?? []) : null" />
 
-  <section aria-labelledby="table-heading" class="mt-4 rounded-card border border-line bg-surface">
+  <section
+    aria-labelledby="table-heading"
+    :aria-busy="!page && !error"
+    class="mt-4 rounded-card border border-line bg-surface"
+  >
     <h2 id="table-heading" class="sr-only">Respondents</h2>
     <div
       class="grid gap-4 border-b border-line p-4 sm:grid-cols-2 sm:px-6 lg:grid-cols-[2fr_1fr_1fr]"
@@ -159,18 +168,7 @@ function closeDrawer() {
 
     <ErrorPanel v-if="error" class="m-4" :message="error" @retry="reload" />
 
-    <ul v-else-if="!page" class="divide-y divide-line" aria-busy="true">
-      <li v-for="n in 6" :key="n" class="flex items-center justify-between gap-4 p-4 sm:px-6">
-        <span class="min-w-0">
-          <span class="block font-semibold"><SkeletonText class="w-44" /></span>
-          <span class="block text-sm"><SkeletonText class="w-28" /></span>
-        </span>
-        <span class="text-sm"><SkeletonText class="w-20" /></span>
-      </li>
-      <li class="sr-only">Loading respondents</li>
-    </ul>
-
-    <div v-else-if="page.total === 0" class="p-8 text-center">
+    <div v-else-if="page?.total === 0" class="p-8 text-center">
       <p class="text-lg font-semibold">
         {{ narrowed ? 'No respondents match these filters.' : 'No one has taken part yet.' }}
       </p>
@@ -193,7 +191,16 @@ function closeDrawer() {
     </div>
 
     <template v-else>
-      <RespondentsTable :rows="page.respondents" :class="{ 'opacity-60': loading }" @open="open" />
+      <RespondentsTable
+        v-if="page"
+        :rows="page.respondents"
+        :class="{ 'opacity-60': loading }"
+        @open="open"
+      />
+      <template v-else>
+        <RespondentsTableSkeleton />
+        <p class="sr-only">Loading respondents</p>
+      </template>
       <nav
         aria-label="Pages"
         class="flex flex-wrap items-center justify-between gap-3 border-t border-line p-4 sm:px-6"
@@ -201,12 +208,13 @@ function closeDrawer() {
         <p v-if="range" class="text-quiet tabular-nums" aria-live="polite">
           {{ range.from }}–{{ range.to }} of {{ range.total }}
         </p>
+        <p v-else-if="!page" aria-hidden="true"><SkeletonText class="w-[5.5em]" /></p>
         <div class="flex gap-2">
           <button
             type="button"
             :class="SECONDARY_BUTTON"
-            :disabled="page.page <= 1 || loading"
-            @click="goToPage(page.page - 1)"
+            :disabled="!page || page.page <= 1 || loading"
+            @click="page && goToPage(page.page - 1)"
           >
             <StrokeIcon :d="ICONS.arrow" class="size-5 rotate-180" />
             Previous
@@ -214,8 +222,8 @@ function closeDrawer() {
           <button
             type="button"
             :class="SECONDARY_BUTTON"
-            :disabled="page.page >= lastPage || loading"
-            @click="goToPage(page.page + 1)"
+            :disabled="!page || page.page >= lastPage || loading"
+            @click="page && goToPage(page.page + 1)"
           >
             Next
             <StrokeIcon :d="ICONS.arrow" class="size-5" />
@@ -225,5 +233,10 @@ function closeDrawer() {
     </template>
   </section>
 
-  <RespondentDrawer :id="openId" :is-admin="session.isAdmin" @close="closeDrawer" />
+  <RespondentDrawer
+    :id="openId"
+    :preview="openRow"
+    :is-admin="session.isAdmin"
+    @close="closeDrawer"
+  />
 </template>
