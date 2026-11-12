@@ -74,23 +74,22 @@ const course = bind('course')
 const yearLevel = bind('yearLevel')
 const schoolLinkId = bind('schoolLinkId')
 
-// The date fields hold what's typed; only a whole, real date (or a cleared field) filters.
-const from = ref<string | null>(filters.value.from ?? null)
-const to = ref<string | null>(filters.value.to ?? null)
-watch(
-  () => [filters.value.from, filters.value.to],
-  ([f, t]) => {
-    if ((f ?? null) !== from.value && (from.value === null || isRealDate(from.value)))
-      from.value = f ?? null
-    if ((t ?? null) !== to.value && (to.value === null || isRealDate(to.value)))
-      to.value = t ?? null
-  },
-)
-function setDate(key: 'from' | 'to', value: string | null) {
-  if (value === null || isRealDate(value)) void set({ [key]: value })
+// The date fields hold what's typed; only a whole, real date (or a cleared field) filters. When
+// the URL's date changes (Clear all, a link), the field takes it, even over half-typed text. A
+// value the URL already has isn't written back, so that sync doesn't echo a second navigation.
+function dateField(key: 'from' | 'to') {
+  const urlValue = () => filters.value[key] ?? null
+  const field = ref<string | null>(urlValue())
+  watch(urlValue, (value) => {
+    if (value !== field.value) field.value = value
+  })
+  watch(field, (value) => {
+    if (value !== urlValue() && (value === null || isRealDate(value))) void set({ [key]: value })
+  })
+  return field
 }
-watch(from, (value) => setDate('from', value))
-watch(to, (value) => setDate('to', value))
+const from = dateField('from')
+const to = dateField('to')
 
 const DATE_MIN = '2026-01-01'
 </script>

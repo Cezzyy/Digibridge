@@ -34,7 +34,8 @@ function onDialogClick(event: MouseEvent) {
   if (event.target === dialog.value) close()
 }
 
-watch(() => route.fullPath, close)
+// The path, not the query: pages rewrite their own query (a search, a filter) while the menu is open.
+watch(() => route.path, close)
 
 // From `lg` the side menu is back and the button is hidden, so a menu still open would be stuck.
 const wide = window.matchMedia('(min-width: 64rem)')

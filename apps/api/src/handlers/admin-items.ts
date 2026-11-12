@@ -1,18 +1,17 @@
 import { answers, attempts, choices, competencyAreas, questions, respondents } from '@digibridge/db'
-import { itemFlags, type AreaCode } from '@digibridge/shared'
+import { FINISHED_ATTEMPT_STATUSES, itemFlags, type AreaCode } from '@digibridge/shared'
 import type { RouteHandler } from '@hono/zod-openapi'
 import { and, asc, count, eq, inArray } from 'drizzle-orm'
 import type { AuthEnv } from '../env'
 import { dashboardConditions } from '../lib/dashboard-filters'
+import { roundPct } from '../lib/scoring'
 import type { itemAnalysisRoute } from '../routes/admin-items'
-
-const round2 = (n: number) => Math.round(n * 100) / 100
 
 export const getItemAnalysis: RouteHandler<typeof itemAnalysisRoute, AuthEnv> = async (c) => {
   const db = c.var.db
   // Finished attempts (submitted, or closed by the timer) of respondents who match the filters.
   const finished = and(
-    inArray(attempts.status, ['submitted', 'expired']),
+    inArray(attempts.status, FINISHED_ATTEMPT_STATUSES),
     ...dashboardConditions(c.req.valid('query'), attempts.schoolLinkId),
   )
 
@@ -81,7 +80,7 @@ export const getItemAnalysis: RouteHandler<typeof itemAnalysisRoute, AuthEnv> = 
           area: item.area as AreaCode,
           seen,
           correct,
-          correctPct: seen === 0 ? null : round2((correct * 100) / seen),
+          correctPct: seen === 0 ? null : roundPct((correct * 100) / seen),
           blank: Math.max(seen - answered, 0),
           choices: counted,
           flags: itemFlags({ seen, correct, choices: counted }),

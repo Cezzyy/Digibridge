@@ -6,16 +6,13 @@ import {
   schoolLinks,
   susResponses,
 } from '@digibridge/db'
-import type { AreaCode } from '@digibridge/shared'
+import { FINISHED_ATTEMPT_STATUSES, type AreaCode } from '@digibridge/shared'
 import type { RouteHandler } from '@hono/zod-openapi'
 import { and, count, eq, inArray, sql } from 'drizzle-orm'
 import type { AuthEnv } from '../env'
 import { ageAtConsent, currentAttempts, dashboardConditions } from '../lib/dashboard-filters'
 import { buildStats } from '../lib/stats'
 import type { statsRoute } from '../routes/admin-stats'
-
-/** Submitted, or closed by the timer: both are scored. */
-const FINISHED = ['submitted', 'expired'] as const
 
 export const getStats: RouteHandler<typeof statsRoute, AuthEnv> = async (c) => {
   const { groupBy, ...filters } = c.req.valid('query')
@@ -31,7 +28,7 @@ export const getStats: RouteHandler<typeof statsRoute, AuthEnv> = async (c) => {
 
   // The finished attempts of respondents who match. One per respondent: the others are voided.
   const finishedWhere = and(
-    inArray(attempts.status, FINISHED),
+    inArray(attempts.status, FINISHED_ATTEMPT_STATUSES),
     ...dashboardConditions(filters, attempts.schoolLinkId),
   )
   const finishedAttempts = db

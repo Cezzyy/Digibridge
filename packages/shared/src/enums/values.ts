@@ -32,3 +32,9 @@ export type LessonTier = (typeof LESSON_TIERS)[number]
 export const ATTEMPT_STATUSES = ['in_progress', 'submitted', 'expired', 'voided'] as const
 export const attemptStatusSchema = z.enum(ATTEMPT_STATUSES)
 export type AttemptStatus = (typeof ATTEMPT_STATUSES)[number]
+/** Submitted, or closed by the timer: both are scored, and only these count in results and stats. */
+export const FINISHED_ATTEMPT_STATUSES = [
+  'submitted',
+  'expired',
+] as const satisfies readonly AttemptStatus[]
+export type FinishedAttemptStatus = (typeof FINISHED_ATTEMPT_STATUSES)[number]
