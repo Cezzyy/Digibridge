@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
-import { ONLINE_CONSENT_NOTICE } from '../consent'
+import { ONLINE_CONSENT_NOTICE, SCHOOL_CONSENT_NOTICE } from '../consent'
 import { SCHOOL_FIELDS } from './school'
-import { onlineRespondentSchema } from './respondent'
+import { onlineRespondentSchema, schoolRespondentSchema } from './respondent'
 
 const online = {
   fullName: ' Juan Dela Cruz ',
@@ -45,5 +45,56 @@ describe('onlineRespondentSchema', () => {
         'privacy notice has changed',
       )
     }
+  })
+})
+
+describe('schoolRespondentSchema', () => {
+  const schoolRespondent = {
+    ...online,
+    ...school,
+    studentNumber: 'c23-01-7557-man121',
+    consentVersion: SCHOOL_CONSENT_NOTICE.version,
+  }
+
+  it('accepts the school profile, the identity choice and the school notice (LNK-03)', () => {
+    expect(schoolRespondentSchema.parse(schoolRespondent)).toEqual({
+      ...schoolRespondent,
+      fullName: 'Juan Dela Cruz',
+      studentNumber: 'C23-01-7557-MAN121',
+    })
+  })
+
+  it.each(SCHOOL_FIELDS)('requires %s', (field) => {
+    const body: Record<string, unknown> = { ...schoolRespondent }
+    delete body[field]
+    expect(schoolRespondentSchema.safeParse(body).success).toBe(false)
+  })
+
+  it('still checks the year level against the course', () => {
+    const result = schoolRespondentSchema.safeParse({
+      ...schoolRespondent,
+      course: 'WADT',
+      yearLevel: 4,
+    })
+    expect(result.error?.issues[0]).toMatchObject({ path: ['yearLevel'] })
+  })
+
+  it('asks about the student number too in the identity choice', () => {
+    const { showIdentity: _, ...withoutChoice } = schoolRespondent
+    expect(schoolRespondentSchema.safeParse(withoutChoice).error?.issues[0]?.message).toBe(
+      'Choose whether the DigiBridge team may see your name and student number.',
+    )
+  })
+
+  it('refuses consent to the online notice', () => {
+    const result = schoolRespondentSchema.safeParse({
+      ...schoolRespondent,
+      consentVersion: ONLINE_CONSENT_NOTICE.version,
+    })
+    expect(result.error?.issues[0]?.message).toContain('privacy notice has changed')
+  })
+
+  it('refuses fields neither profile has', () => {
+    expect(schoolRespondentSchema.safeParse({ ...schoolRespondent, code: 'X' }).success).toBe(false)
   })
 })

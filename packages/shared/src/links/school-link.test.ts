@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import {
+  linkLockIssues,
   LINK_MAX_DAYS,
   LINK_MAX_RESPONSES,
   LINK_MESSAGES,
@@ -105,5 +106,24 @@ describe('schoolLinkSchema', () => {
     expect(messageFor({ ...link, code: 'ABC' })).toBe(
       'The link includes a field this form doesn’t have.',
     )
+  })
+})
+
+describe('linkLockIssues', () => {
+  const profile = { course: 'BSIT', yearLevel: 2 }
+
+  it('lets any profile through a link without a lock', () => {
+    expect(linkLockIssues({ course: null, yearLevel: null }, profile)).toEqual([])
+  })
+
+  it('lets a profile through that matches the lock', () => {
+    expect(linkLockIssues({ course: 'BSIT', yearLevel: 2 }, profile)).toEqual([])
+  })
+
+  it('points at each field that doesn’t match', () => {
+    expect(linkLockIssues({ course: 'BSCS', yearLevel: 3 }, profile)).toEqual([
+      { path: ['course'], message: 'This link is only for BSCS students.' },
+      { path: ['yearLevel'], message: 'This link is only for 3rd year students.' },
+    ])
   })
 })
