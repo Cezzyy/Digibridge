@@ -11,8 +11,13 @@ import {
   susAnswersSchema,
 } from '@digibridge/shared'
 import { createRoute, z } from '@hono/zod-openapi'
-import { auth, requireRole } from '../middleware'
+import { respondent } from '../middleware'
 import { errorResponse } from '../openapi'
+
+// Every route here is the respondent's own: online with a Google sign-in, or through a school link
+// with the token its browser keeps (the `respondent` middleware).
+const RESPONDENT_SECURITY: Record<string, string[]>[] = [{ Bearer: [] }, { RespondentToken: [] }]
+const UNAUTHORIZED = 'Not signed in, the sign-in has expired, or the respondent token isn’t valid'
 
 /** An attempt's id, state and clock. The items come from GET /attempts/:id. */
 export const AttemptSummarySchema = z
@@ -32,10 +37,9 @@ export const startAttemptRoute = createRoute({
   tags: ['Assessment'],
   summary: 'Start the attempt, or return the one in progress',
   description:
-    'Picks 4 basic, 4 intermediate and 2 advanced active items per area, shuffles the items together and each item’s choices, and sets `expires_at` (ASM-01, ASM-02). Calling it again returns the attempt in progress. One attempt per respondent; a voided one frees the slot (PRO-07). Respondents only: staff preview the flow without saving.',
-  // School-link students will come in too, with a respondent token (Stage 2).
-  middleware: [auth, requireRole('respondent')] as const,
-  security: [{ Bearer: [] }],
+    'Picks 4 basic, 4 intermediate and 2 advanced active items per area, shuffles the items together and each item’s choices, and sets `expires_at` (ASM-01, ASM-02). Calling it again returns the attempt in progress. One attempt per respondent; a voided one frees the slot (PRO-07). A school-link student’s attempt records the link they joined through (LNK-05), and can start even if the link has closed since. Respondents only: staff preview the flow without saving.',
+  middleware: [respondent] as const,
+  security: RESPONDENT_SECURITY,
   responses: {
     200: {
       description: 'The attempt already in progress',
@@ -45,7 +49,7 @@ export const startAttemptRoute = createRoute({
       description: 'A new attempt was started',
       content: { 'application/json': { schema: AttemptSummarySchema } },
     },
-    401: errorResponse('Not signed in, or the sign-in has expired'),
+    401: errorResponse(UNAUTHORIZED),
     403: errorResponse('Signed in as staff'),
     409: errorResponse(
       'No profile yet, the assessment was already taken, or there are too few active items',
@@ -86,15 +90,15 @@ export const getAttemptRoute = createRoute({
   tags: ['Assessment'],
   summary: 'The attempt’s items, saved answers and clock',
   description: `Items and choices in this attempt’s shuffled order, without the right answers, plus the answers saved so far, \`expires_at\` and the server time for the countdown (ASM-02, ASM-07, ASM-09). ${SELF_ONLY}`,
-  middleware: [auth, requireRole('respondent')] as const,
-  security: [{ Bearer: [] }],
+  middleware: [respondent] as const,
+  security: RESPONDENT_SECURITY,
   request: { params: AttemptParamsSchema },
   responses: {
     200: {
       description: 'The attempt',
       content: { 'application/json': { schema: AttemptSchema } },
     },
-    401: errorResponse('Not signed in, or the sign-in has expired'),
+    401: errorResponse(UNAUTHORIZED),
     403: errorResponse('Signed in as staff'),
     404: errorResponse('No such attempt for this respondent'),
   },
@@ -121,8 +125,8 @@ export const saveAnswerRoute = createRoute({
   tags: ['Assessment'],
   summary: 'Save or change one answer',
   description: `Saves the choice for one item, replacing any earlier one (ASM-04, ASM-05). The item must be in the attempt and the choice must be one of its own. Refused once the attempt is closed, or more than ${ANSWER_GRACE_SECONDS} seconds after \`expires_at\` (ASM-09). ${SELF_ONLY}`,
-  middleware: [auth, requireRole('respondent')] as const,
-  security: [{ Bearer: [] }],
+  middleware: [respondent] as const,
+  security: RESPONDENT_SECURITY,
   request: {
     params: AnswerParamsSchema,
     body: { required: true, content: { 'application/json': { schema: SaveAnswerBodySchema } } },
@@ -133,7 +137,7 @@ export const saveAnswerRoute = createRoute({
       content: { 'application/json': { schema: SavedAnswerReplySchema } },
     },
     400: errorResponse('The item isn’t in the attempt, or the choice isn’t one of its own'),
-    401: errorResponse('Not signed in, or the sign-in has expired'),
+    401: errorResponse(UNAUTHORIZED),
     403: errorResponse('Signed in as staff'),
     404: errorResponse('No such attempt for this respondent'),
     409: errorResponse('The attempt is closed, or its time is up'),
@@ -154,15 +158,15 @@ export const submitAttemptRoute = createRoute({
   tags: ['Assessment'],
   summary: 'Score and close the attempt',
   description: `Scores the saved answers (unanswered items earn 0), writes each answer’s points, one result per area and the overall score and level, all in one transaction (PRD scoring rules). Sent after \`expires_at\` plus the grace period, the attempt closes as \`expired\`. Safe to call twice: a closed attempt is returned as it is. ${SELF_ONLY}`,
-  middleware: [auth, requireRole('respondent')] as const,
-  security: [{ Bearer: [] }],
+  middleware: [respondent] as const,
+  security: RESPONDENT_SECURITY,
   request: { params: AttemptParamsSchema },
   responses: {
     200: {
       description: 'The closed attempt',
       content: { 'application/json': { schema: SubmittedAttemptSchema } },
     },
-    401: errorResponse('Not signed in, or the sign-in has expired'),
+    401: errorResponse(UNAUTHORIZED),
     403: errorResponse('Signed in as staff'),
     404: errorResponse('No such attempt for this respondent'),
     409: errorResponse('The attempt was voided'),
@@ -211,15 +215,15 @@ export const getResultRoute = createRoute({
   tags: ['Results'],
   summary: 'The closed attempt’s scores, levels and lessons',
   description: `The overall score and level, and each area’s score, level and recommended lessons (RES-01, RES-02). Scores only: which items were right or wrong is never sent (RES-05). ${SELF_ONLY}`,
-  middleware: [auth, requireRole('respondent')] as const,
-  security: [{ Bearer: [] }],
+  middleware: [respondent] as const,
+  security: RESPONDENT_SECURITY,
   request: { params: AttemptParamsSchema },
   responses: {
     200: {
       description: 'The result',
       content: { 'application/json': { schema: AttemptResultSchema } },
     },
-    401: errorResponse('Not signed in, or the sign-in has expired'),
+    401: errorResponse(UNAUTHORIZED),
     403: errorResponse('Signed in as staff'),
     404: errorResponse('No such attempt for this respondent'),
     409: errorResponse('The attempt is still in progress, or was voided'),
@@ -246,8 +250,8 @@ export const saveSusRoute = createRoute({
   tags: ['Results'],
   summary: 'Save the usability survey',
   description: `Saves the ${SUS_STATEMENT_COUNT} System Usability Scale answers, in statement order and each from ${SUS_ANSWER_MIN} (Strongly disagree) to ${SUS_ANSWER_MAX} (Strongly agree), for a submitted or expired attempt, and returns the SUS score, 0 to 100, worked out on the server (SUS-01, SUS-04). One survey per attempt. ${SELF_ONLY}`,
-  middleware: [auth, requireRole('respondent')] as const,
-  security: [{ Bearer: [] }],
+  middleware: [respondent] as const,
+  security: RESPONDENT_SECURITY,
   request: {
     params: AttemptParamsSchema,
     body: { required: true, content: { 'application/json': { schema: SaveSusBodySchema } } },
@@ -258,7 +262,7 @@ export const saveSusRoute = createRoute({
       content: { 'application/json': { schema: SusResultSchema } },
     },
     400: errorResponse('Not 10 answers, or an answer outside 1 to 5'),
-    401: errorResponse('Not signed in, or the sign-in has expired'),
+    401: errorResponse(UNAUTHORIZED),
     403: errorResponse('Signed in as staff'),
     404: errorResponse('No such attempt for this respondent'),
     409: errorResponse(

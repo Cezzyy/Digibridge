@@ -14,6 +14,7 @@ import { getItemAnalysis } from './handlers/admin-items'
 import { getStats } from './handlers/admin-stats'
 import { getHealth } from './handlers/health'
 import { getLesson, listLessons } from './handlers/lessons'
+import { getLink, joinLink } from './handlers/links'
 import { getMe } from './handlers/me'
 import { createRespondent } from './handlers/respondents'
 import {
@@ -38,6 +39,7 @@ import {
 } from './routes/attempts'
 import { healthRoute } from './routes/health'
 import { getLessonRoute, listLessonsRoute } from './routes/lessons'
+import { getLinkRoute, joinLinkRoute } from './routes/links'
 import { meRoute } from './routes/me'
 import { createRespondentRoute } from './routes/respondents'
 
@@ -49,6 +51,8 @@ const v1Routes = v1
   .openapi(healthRoute, getHealth)
   .openapi(meRoute, getMe)
   .openapi(createRespondentRoute, createRespondent)
+  .openapi(getLinkRoute, getLink)
+  .openapi(joinLinkRoute, joinLink)
   .openapi(startAttemptRoute, startAttempt)
   .openapi(getAttemptRoute, getAttempt)
   .openapi(saveAnswerRoute, saveAnswer)

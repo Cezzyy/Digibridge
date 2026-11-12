@@ -1,8 +1,10 @@
+import type { Profile } from '@digibridge/db'
 import type { Role } from '@digibridge/shared'
+import type { Context } from 'hono'
 import { createMiddleware } from 'hono/factory'
 import { z } from '@hono/zod-openapi'
 import { createRemoteJWKSet, errors, jwtVerify, type JWTVerifyGetKey } from 'jose'
-import type { AuthEnv } from '../env'
+import type { AppEnv, AuthEnv } from '../env'
 import { loadProfile, type TokenUser } from '../lib/profile'
 import { ApiError } from './error'
 
@@ -75,16 +77,21 @@ async function verifyToken(token: string, supabaseUrl: string): Promise<TokenUse
 }
 
 /**
- * Requires `Authorization: Bearer <Supabase access token>`, verifies it and sets
- * c.var.profile, creating the profile on the user's first call (AUTH-01, AUTH-02).
+ * The signed-in user's profile from `Authorization: Bearer <Supabase access token>`, created on
+ * their first call (AUTH-01, AUTH-02). Throws 401 without a valid token.
  */
-export const auth = createMiddleware<AuthEnv>(async (c, next) => {
+export async function authenticate<E extends AppEnv>(c: Context<E>): Promise<Profile> {
   const header = c.req.header('Authorization')
   const token = header?.match(/^Bearer (\S+)$/i)?.[1]
   if (!token) throw new ApiError('unauthorized')
 
   const user = await verifyToken(token, c.env.SUPABASE_URL)
-  c.set('profile', await loadProfile(c.var.db, user, c.env.ADMIN_EMAILS))
+  return loadProfile(c.get('db'), user, c.env.ADMIN_EMAILS)
+}
+
+/** Requires a Google sign-in (`authenticate`) and sets c.var.profile. */
+export const auth = createMiddleware<AuthEnv>(async (c, next) => {
+  c.set('profile', await authenticate(c))
   await next()
 })
 

@@ -1,3 +1,4 @@
+import { RESPONDENT_TOKEN_HEADER } from '@digibridge/shared'
 import type { OpenAPIHono } from '@hono/zod-openapi'
 import { Scalar } from '@scalar/hono-api-reference'
 import type { Env, Schema } from 'hono'
@@ -12,6 +13,13 @@ export function addApiDocs<E extends Env, S extends Schema>(app: OpenAPIHono<E, 
     scheme: 'bearer',
     bearerFormat: 'JWT',
     description: 'Supabase access token from Google sign-in',
+  })
+  // Respondent routes take this instead, from a school-link student: `[{ Bearer: [] }, { RespondentToken: [] }]`.
+  app.openAPIRegistry.registerComponent('securitySchemes', 'RespondentToken', {
+    type: 'apiKey',
+    in: 'header',
+    name: RESPONDENT_TOKEN_HEADER,
+    description: 'The token POST /links/{code}/respondents gave a school-link student',
   })
   app.doc31('/openapi.json', {
     openapi: '3.1.0',
