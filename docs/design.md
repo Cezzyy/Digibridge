@@ -25,8 +25,8 @@
 
 | Token | Hex | Level | Text on it |
 | --- | --- | --- | --- |
-| `level-1` | #D6EBDF | Beginner | `ink` |
-| `level-2` | #8CC5A6 | Basic | `ink` |
+| `level-1` | #D6EBDF | Beginner | `on-level` (#12241C in both themes) |
+| `level-2` | #8CC5A6 | Basic | `on-level` |
 | `level-3` | #2F7D58 | Intermediate | white |
 | `level-4` | #1E5B44 | Advanced | white |
 
