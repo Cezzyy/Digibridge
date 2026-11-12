@@ -36,5 +36,14 @@ export const ICONS = {
   plus: 'M12 5v14M5 12h14',
   refresh: ['M20 11A8 8 0 0 0 5.3 7', 'M4 4v4h4', 'M4 13a8 8 0 0 0 14.7 4', 'M20 20v-4h-4'],
   arrow: ['M5 12h14', 'm13 6 6 6-6 6'],
+  items: [
+    'M10 6h10',
+    'M10 12h10',
+    'M10 18h10',
+    'm3.5 6 1.5 1.5L7.5 5',
+    'm3.5 12 1.5 1.5 2.5-2.5',
+    'm3.5 18 1.5 1.5 2.5-2.5',
+  ],
+  search: ['M11 18a7 7 0 1 0 0-14 7 7 0 0 0 0 14z', 'm20 20-4-4'],
   person: ['M12 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8z', 'M5 20a7 7 0 0 1 14 0'],
 } as const satisfies Record<string, string | readonly string[]>
