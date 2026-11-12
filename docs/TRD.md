@@ -6,7 +6,7 @@ Oct 30, 2026 · @Cornflakesxz
 
 ```mermaid
 flowchart LR
-  B["Browser<br/>Vue app on a phone, tablet or laptop<br/>online or kiosk"]
+  B["Browser<br/>Vue app on a phone, tablet or laptop<br/>online or school link"]
   subgraph CF["Cloudflare"]
     P["Pages<br/>Vue app, static files"]
     W["API Worker: Hono + OpenAPI<br/>auth check, roles, scoring<br/>cron closes expired attempts"]
@@ -19,14 +19,14 @@ flowchart LR
   end
   P -- "loads app" --> B
   B -- "Google sign-in, returns token" --> A
-  B -- "API calls + Bearer token" --> W
+  B -- "API calls + Bearer token<br/>or respondent token" --> W
   W -- "verify token (JWKS)" --> A
   W -- "uploads, serves images" --> R
   W --> H
   H -- "SQL" --> DB
 ```
 
-The browser talks to Supabase only to sign in. Everything else goes through the API Worker, which checks the token, applies role rules and is the only part that reads or writes Postgres.
+The browser talks to Supabase only to sign in. Everything else goes through the API Worker, which checks the token (a Supabase one, or a school-link student's respondent token), applies role rules and is the only part that reads or writes Postgres.
 
 ## Tech stack
 
@@ -37,7 +37,7 @@ TypeScript end to end: a Vue SPA on Cloudflare Pages calls a Hono API on Cloudfl
 | Monorepo | Turborepo with pnpm workspaces | One repo, shared types between web and API |
 | Checks | GitHub Actions CI with `pnpm audit`, gitleaks and actionlint; Husky pre-commit hook running lint-staged | Every push to `main` or `develop` and every pull request runs the ship check, a dependency audit and a secret scan; ESLint and Prettier fix staged files before each commit |
 | Frontend | Vue 3 with the Composition API in `<script setup>`, Vite, TypeScript | Team already knows Vue; logic reused through composables |
-| Routing and state | Vue Router, Pinia | Route guards per role; small stores for session, kiosk and attempt |
+| Routing and state | Vue Router, Pinia | Route guards per role; small stores for session, consent, school link and attempt |
 | Styling | Tailwind CSS v4 via `@tailwindcss/vite`, no component library | Full control; design straight in code |
 | Charts | Chart.js with vue-chartjs | Radar chart for results, bar charts for the dashboard |
 | Markdown | markdown-it with DOMPurify | Lesson bodies stored as Markdown, rendered safely |
@@ -63,10 +63,10 @@ digibridge/
 ├─ apps/
 │  ├─ web/                    Vue 3 (Composition API, <script setup>) + Vite → Cloudflare Pages
 │  │  ├─ src/
-│  │  │  ├─ pages/           one folder per route group: start, assessment, results, lessons, kiosk, admin
+│  │  │  ├─ pages/           one folder per route group: start, assessment, results, lessons, school, admin
 │  │  │  ├─ components/      QuestionCard, CountdownTimer, QuestionGrid, RadarChart, SusForm, ResultsQr, StatCard, DataTable
-│  │  │  ├─ composables/     useAuth, useAttempt, useCountdown, useKiosk, useApi
-│  │  │  ├─ stores/          session.ts, consent.ts, kiosk.ts, attempt.ts
+│  │  │  ├─ composables/     useRespondentFlow, useCountdown, data loaders and form savers
+│  │  │  ├─ stores/          session.ts, consent.ts, schoolLink.ts, attempt.ts
 │  │  │  ├─ lib/             api.ts (hc client), supabase.ts, markdown.ts
 │  │  │  ├─ router.ts        routes + role guards
 │  │  │  └─ main.ts
@@ -74,9 +74,9 @@ digibridge/
 │  └─ api/                    Hono + OpenAPI → Cloudflare Workers
 │     ├─ src/
 │     │  ├─ config/db/       the API's database connection: Hyperdrive binding, postgres.js client, drizzle() instance
-│     │  ├─ routes/          route definitions per feature: me, respondents, attempts, results, lessons, kiosk, admin
+│     │  ├─ routes/          route definitions per feature: me, respondents, links, attempts, results, lessons, admin
 │     │  ├─ handlers/        the logic behind each route
-│     │  ├─ middleware/      auth, requireRole, kiosk, cors, error handler
+│     │  ├─ middleware/      auth, requireRole, respondent, cors, error handler
 │     │  ├─ lib/             scoring.ts, sus.ts, shuffle.ts, stats.ts, csv.ts, helpers
 │     │  ├─ openapi/         OpenAPI setup and API docs page
 │     │  ├─ app.ts           builds the Hono app, mounts routes, exports AppType
@@ -107,12 +107,12 @@ Scoring constants live in `packages/shared` so the API, the tests and any displa
 
 ## Data model
 
-11 tables in the `public` schema. Online and kiosk respondents share one table, but they're keyed differently: an online respondent by their Google account (`profile_id`), a kiosk respondent by student number. School details (`student_number`, `course`, `year_level`) are filled only for kiosk respondents and are null online, which a check constraint enforces.
+11 tables in the `public` schema. Online and school-link respondents share one table, but they're keyed differently: an online respondent by their Google account (`profile_id`), a school-link respondent by student number, and their browser by the hash of its respondent token. School details (`student_number`, `course`, `year_level`), the token hash and the school link are filled only for school-link respondents and are null online, which a check constraint enforces.
 
 **Enums**
 
 - `role`: respondent, facilitator, admin
-- `mode`: online, kiosk
+- `mode`: online, school
 - `sex`: male, female, prefer\_not\_to\_say
 - `difficulty`: basic, intermediate, advanced
 - `level`: beginner, basic, intermediate, advanced
@@ -124,12 +124,12 @@ Scoring constants live in `packages/shared` so the API, the tests and any displa
 | Table | Key columns | Constraints and notes |
 | --- | --- | --- |
 | `profiles` | `id` (uuid, = `auth.users.id`), `email`, `full_name`, `avatar_url`, `role`, `created_at`, `last_sign_in_at` | Created on first API call after Google sign-in. `role` defaults to respondent. |
-| `respondents` | `id`, `profile_id` (null for kiosk), `student_number`, `full_name`, `course`, `year_level`, `birth_date` (date), `sex`, `devices` (text\[\]), `internet_access` (text\[\]), `show_identity` (boolean), `mode`, `consent_version`, `consented_at`, `created_at` | `student_number`, `course` and `year_level` are nullable. Check `respondents_school_fields_by_mode`: kiosk rows have all three and no `profile_id`; online rows have none of the three. Check `respondents_birth_date_range`: age on the day of consent in Philippine time (`PROFILE_TIME_ZONE`) from `AGE_MIN` to `AGE_MAX`; the dashboard's age groups come from `birth_date` the same way (`ageOn` in `packages/shared`). The (`course`, `year_level`) index covers kiosk rows only (`where course is not null`). `student_number` unique when not null, stored uppercase. `profile_id` unique when not null, so one respondent per Google account. `show_identity` false hides name and student number from all team views and the CSV. Consent is saved together with the profile, so declining stores nothing. |
-| `kiosk_sessions` | `id`, `facilitator_id`, `device_label`, `pin_hash`, `started_at`, `ended_at` | One open session per device. PIN stored hashed. `facilitator_id` set to null if the facilitator's account is deleted. |
+| `respondents` | `id`, `profile_id` (null for school links), `student_number`, `full_name`, `course`, `year_level`, `birth_date` (date), `sex`, `devices` (text\[\]), `internet_access` (text\[\]), `show_identity` (boolean), `access_token_hash`, `school_link_id`, `mode`, `consent_version`, `consented_at`, `created_at` | `student_number`, `course`, `year_level`, `access_token_hash` and `school_link_id` are nullable. Check `respondents_school_fields_by_mode`: school rows have all five and no `profile_id`; online rows have none of the five. `access_token_hash` (SHA-256 of the respondent token) unique when not null. `school_link_id` is the link the student joined through; it counts toward the link's limit and the dashboard's link filter (indexed). Check `respondents_birth_date_range`: age on the day of consent in Philippine time (`PROFILE_TIME_ZONE`) from `AGE_MIN` to `AGE_MAX`; the dashboard's age groups come from `birth_date` the same way (`ageOn` in `packages/shared`). The (`course`, `year_level`) index covers school rows only (`where course is not null`). `student_number` unique when not null, stored uppercase. `profile_id` unique when not null, so one respondent per Google account. `show_identity` false hides name and student number from all team views and the CSV. Consent is saved together with the profile, so declining stores nothing. |
+| `school_links` | `id`, `code`, `school`, `label`, `created_by`, `course`, `year_level`, `max_responses`, `expires_at`, `closed_at`, `created_at` | Replaced `kiosk_sessions`. `code` (10 characters from `LINK_CODE_ALPHABET`) unique, for `/s/<code>`. `course` and `year_level` null for any; `max_responses` null for no limit. Status (open, closed, expired, full) is worked out when read by `linkStatus`; responses count the respondents who joined through it. `created_by` set to null if the admin's account is deleted. |
 | `competency_areas` | `id`, `code`, `name`, `description`, `sort_order` | Seeded with 3 rows: `info_literacy`, `communication`, `safety`. |
 | `questions` | `id`, `area_id`, `difficulty`, `stem`, `image_url`, `is_scenario`, `explanation`, `is_active`, `created_by`, `created_at`, `updated_at` | Never hard-deleted once answered; set `is_active` false instead. |
 | `choices` | `id`, `question_id`, `label`, `is_correct`, `position` | Exactly 4 per question. Partial unique index on `question_id` where `is_correct` keeps 1 correct choice. |
-| `attempts` | `id`, `respondent_id`, `kiosk_session_id` (null online), `status`, `started_at`, `expires_at`, `submitted_at`, `question_order` (uuid\[\]), `choice_order` (jsonb), `total_points`, `overall_pct`, `overall_level`, `results_token`, `void_reason`, `voided_by` | Partial unique index on `respondent_id` where `status <> 'voided'` enforces one attempt. `expires_at` = `started_at` + 25 min. `results_token` (random, unique) is set at submit for the QR link. |
+| `attempts` | `id`, `respondent_id`, `school_link_id` (null online), `status`, `started_at`, `expires_at`, `submitted_at`, `question_order` (uuid\[\]), `choice_order` (jsonb), `total_points`, `overall_pct`, `overall_level`, `results_token`, `void_reason`, `voided_by` | Partial unique index on `respondent_id` where `status <> 'voided'` enforces one attempt. `expires_at` = `started_at` + 25 min. `results_token` (random, unique) is set at submit for the QR link. |
 | `answers` | `attempt_id`, `question_id`, `choice_id`, `points`, `answered_at` | Primary key (`attempt_id`, `question_id`), so a changed answer overwrites. Foreign key (`question_id`, `choice_id`) to `choices`, so the choice belongs to the question. `points` filled at scoring. |
 | `area_results` | `attempt_id`, `area_id`, `points`, `max_points`, `pct`, `level` | Primary key (`attempt_id`, `area_id`). Written once at submit. |
 | `sus_responses` | `attempt_id`, `q1` to `q10` (smallint 1 to 5), `score` (numeric 0 to 100), `submitted_at` | Primary key `attempt_id`, so one SUS response per attempt. Only for submitted or expired attempts. |
@@ -142,19 +142,19 @@ Both modes:
 - `devices`: smartphone, laptop, desktop, tablet, none
 - `internet_access`: home\_wifi, mobile\_data, school\_wifi, piso\_wifi, none
 
-Kiosk mode only (the school details):
+School links only (the school details):
 
 - `student_number`: trimmed and uppercased, must match `^[A-Z]\d{2}-\d{2}-\d{4}-[A-Z]{3}\d{3}$` (e.g. C23-01-7557-MAN121)
 - `course`: BSIT, BSCS, BSBA, BSA, BSHM (regular, year 1 to 4); HRT, WADT (TESDA scholars, year 1 to 3)
 - `year_level`: 1 to 4, and at most 3 for HRT and WADT, checked in the Zod schema and again in the API
 
-`packages/shared` has two profile schemas: a general one for online, which rejects the school fields, and a kiosk one that extends it with the three school fields, all required. The school lists are ACLC's; keeping them in their own module means another school's lists could be added later without touching the online profile.
+`packages/shared` has two profile schemas: a general one for online, which rejects the school fields, and a school one that extends it with the three school fields, all required (`onlineRespondentSchema` and `schoolRespondentSchema` add the identity choice and the notice version). The school lists are ACLC's; keeping them in their own module means another school's lists could be added later without touching the online profile.
 
 **Indexes for the dashboard:** `attempts(status, submitted_at)`, `respondents(course, year_level)`, `answers(question_id)` for item analysis.
 
-## Auth, roles and kiosk mode
+## Auth, roles and school links
 
-Every API request carries a Supabase access token. Kiosk requests carry the facilitator's token plus a kiosk session ID, so a student on a kiosk never holds a token of their own.
+Every API request from a signed-in user carries a Supabase access token. School-link students have no Google account: saving their profile through a link gives their browser a respondent token, which it sends instead on their own routes.
 
 **Sign-in (online respondents, facilitators, admins)**
 
@@ -164,14 +164,14 @@ Every API request carries a Supabase access token. Kiosk requests carry the faci
 4. On first sign-in, if the email is in `ADMIN_EMAILS` and Google marks it verified, the role is set to admin. Everyone else starts as respondent. Later sign-ins don't change the role.
 5. `requireRole('admin')` and `requireRole('facilitator', 'admin')` guard routes. The Vue router mirrors these guards for display only; the API is the real check.
 
-**Kiosk mode**
+**School links**
 
-1. A signed-in facilitator opens `/kiosk`, enters a device label ("Tablet 1") and a 4-digit PIN. `POST /api/v1/kiosk/sessions` stores the session with the PIN hashed.
-2. The `kiosk` Pinia store keeps `kioskSessionId` in `localStorage`, and the router locks the device to `/kiosk/*` routes.
-3. Kiosk calls send the facilitator's token plus an `X-Kiosk-Session` header. The `kiosk` middleware checks the session is open and belongs to that facilitator.
-4. A kiosk respondent row has `mode = kiosk`, no `profile_id`, and the school details (student number, course, year level), which only the kiosk profile form asks for. Their attempt stores `kiosk_session_id`.
-5. Done, after results and the SUS survey, clears the attempt store and returns to `/kiosk`. Nothing about the student stays in the browser.
-6. Exit calls `POST /api/v1/kiosk/sessions/:id/end` with the PIN. A wrong PIN 5 times in a row locks exit for 1 minute.
+1. An admin makes a link on `/admin/links` (`POST /api/v1/admin/links`) and sends `/s/<code>` to the students the team chose.
+2. A student opens it. `GET /api/v1/links/:code` gives the link's name and course and year-level lock while it's open; 404 for an unknown code, 410 `gone` when it's closed, expired or full.
+3. After the school notice and profile, `POST /api/v1/links/:code/respondents` saves a `mode = school` respondent with the school details and `school_link_id`, under a `for update` lock on the link so a limit of 40 lets in 40. It returns a respondent token once: 32 random bytes, base64url. Only its SHA-256 hash is saved, in `access_token_hash`.
+4. The `schoolLink` Pinia store keeps the code and token in `localStorage`. On `/s/:code/*` pages the API client sends `X-Respondent-Token` instead of the Google token; `GET /api/v1/links/:code` with it returns the student and their attempt even after the link closed, so a refresh or a later visit carries on.
+5. The `respondent` middleware on the attempt routes takes `X-Respondent-Token` (it wins when both are sent) or a Google sign-in with the respondent role, and sets `c.var.respondentKey`. Handlers find the respondent by profile or by token hash in the same query, so it costs no extra round trip. The attempt stores the respondent's `school_link_id`. A student who joined can start and finish even after the link closes.
+6. Done, after results (it opens the SUS survey first if it isn't answered), clears the token and the attempt from the browser. "Not you?" in the top bar does the same, for a shared phone or laptop.
 
 **What each role can call**
 
@@ -179,20 +179,21 @@ Every API request carries a Supabase access token. Kiosk requests carry the faci
 | --- | --- | --- | --- |
 | `/api/v1/me`, own respondent and attempt | Yes | Yes | Yes |
 | `/api/v1/lessons` (public read) | Yes | Yes | Yes |
-| `/api/v1/kiosk/*` | No | Yes | Yes |
+| `/api/v1/links/:code`, `/api/v1/links/:code/respondents` (no sign-in) | Yes | Yes | Yes |
+| `/api/v1/admin/links` | No | No | Yes |
 | `/api/v1/admin/stats`, `/api/v1/admin/respondents` (read) | No | Yes, identity only if allowed | Yes |
 | `/api/v1/admin/export`, questions, lessons, users, void attempt | No | No | Yes |
 
 ## API
 
-All routes live under `/api/v1` (only the OpenAPI spec and docs page sit at `/api`), take and return JSON validated by Zod, and send errors as `{ error: { code, message } }`. "Self" means the signed-in respondent, or the kiosk respondent of the current kiosk session.
+All routes live under `/api/v1` (only the OpenAPI spec and docs page sit at `/api`), take and return JSON validated by Zod, and send errors as `{ error: { code, message } }`. "Self" means the signed-in respondent, or the school-link respondent whose token is sent as `X-Respondent-Token`.
 
 **Respondent flow**
 
 | Method | Path | Auth | Purpose |
 | --- | --- | --- | --- |
 | GET | `/api/v1/me` | Signed in | Profile, role, own respondent record and attempt status |
-| POST | `/api/v1/respondents` | Respondent (online), facilitator (kiosk) | Save consent, profile and identity choice. Online: respondent role only (staff try the flow as a preview that saves nothing, 403 here), general profile only, 400 if school fields are sent, 409 if the account already has a respondent. Kiosk (`X-Kiosk-Session`): school fields required, 409 if the student number is already used. |
+| POST | `/api/v1/respondents` | Respondent (online) | Save consent, profile and identity choice. Respondent role only (staff try the flow as a preview that saves nothing, 403 here), general profile only, 400 if school fields are sent, 409 if the account already has a respondent. |
 | POST | `/api/v1/attempts` | Self | Start the attempt: pick items, shuffle, set `expires_at`. Returns the existing attempt if one is in progress. |
 | GET | `/api/v1/attempts/:id` | Self | Items in shuffled order (no correct answers), saved answers, `expires_at`, server time |
 | PUT | `/api/v1/attempts/:id/answers/:questionId` | Self | Save or change one answer. Rejected after `expires_at` + 30 s. |
@@ -203,15 +204,16 @@ All routes live under `/api/v1` (only the OpenAPI spec and docs page sit at `/ap
 | GET | `/api/v1/lessons` | Public | Published lessons, filterable by area and tier |
 | GET | `/api/v1/lessons/:slug` | Public | One lesson |
 
-**Kiosk**
+**School links**
 
 | Method | Path | Auth | Purpose |
 | --- | --- | --- | --- |
-| POST | `/api/v1/kiosk/sessions` | Facilitator, admin | Open a kiosk session with device label and PIN |
-| GET | `/api/v1/kiosk/sessions/:id` | Owner | Check the session is still open |
-| POST | `/api/v1/kiosk/sessions/:id/end` | Owner + PIN | Close the session |
+| GET | `/api/v1/links/:code` | Public, optional respondent token | The link's school, name, course and year-level lock. 404 unknown code, 410 `gone` closed, expired or full. With the token of a student who joined it: their respondent and attempt, whatever the link's status; 401 for a token that isn't for this link |
+| POST | `/api/v1/links/:code/respondents` | Public | Save consent to the school notice, the school profile and identity choice; returns the respondent token once. 400 for a course or year level outside the link's lock, 409 for a used student number, 410 `gone` if the link isn't open |
+| GET, POST | `/api/v1/admin/links` | Admin | List links (status, responses) and make one |
+| POST | `/api/v1/admin/links/:id/close` | Admin | Close a link |
 
-Kiosk respondents use the same respondent-flow routes with the `X-Kiosk-Session` header.
+School-link respondents use the same respondent-flow routes (`/api/v1/attempts/*`) with the `X-Respondent-Token` header.
 
 **Admin**
 
@@ -307,7 +309,7 @@ Odd-numbered statements (index 0, 2, 4, ...) score answer minus 1, even-numbered
 
 ## Frontend
 
-One Vue app serves respondents, kiosk devices and admins, split by route guards.
+One Vue app serves respondents (online and through school links) and admins, split by route guards.
 
 **Route guards** (`router.ts`, `meta.requires`)
 
@@ -317,19 +319,19 @@ One Vue app serves respondents, kiosk devices and admins, split by route guards.
 | `guest` | `/`, `/sign-in` | Signed out only, else to `/home` |
 | `signedIn` | `/home`, `/start/*`, `/assessment`, `/results` | Supabase session required, else to `/sign-in` |
 | `step` | `/home`, `/start/*`, `/assessment`, `/results` | Sends the user to the right step from `/api/v1/me` (no profile → consent; attempt submitted → results) |
-
-The profile page is one component with a `mode` prop: online shows the general fields only; under `/kiosk/*` it adds student number, course and year level.
-| `kioskLock` | Every route | If a kiosk session is open on this device, anything outside `/kiosk/*` redirects to `/kiosk` |
+| `school` | `/s/:code/*` | No sign-in. Loads `GET /api/v1/links/:code` (with the stored token), shows `ErrorScreen` for an unknown, closed, expired or full link, and runs the same steps from the link's state. A browser that joined one link is sent back to it |
 | `staff` | `/admin`, `/admin/respondents` | Role facilitator or admin |
-| `admin` | `/admin/questions`, `/admin/lessons`, `/admin/users` | Role admin |
+| `admin` | `/admin/questions`, `/admin/lessons`, `/admin/users`, `/admin/links` | Role admin |
+
+The consent, profile, home, assessment and results pages serve both modes, through `useRespondentFlow` (which respondent and attempt, which notice, where each step lives). Through a school link the profile adds student number, course and year level, fixed when the link sets them.
 
 **Stores**
 
 | Store | Holds | Persisted |
 | --- | --- | --- |
 | `session` | Supabase session, `/api/v1/me` result, role | Supabase handles it |
-| `consent` | Which account agreed to which notice version, until the profile saves it | Memory only, so declining or a refresh saves nothing |
-| `kiosk` | `kioskSessionId`, device label | `localStorage`, cleared on exit |
+| `consent` | Which account (or school link) agreed to which notice version, until the profile saves it | Memory only, so declining or a refresh saves nothing |
+| `schoolLink` | The link open now, the student's code and respondent token, their respondent and attempt | The code and token in `localStorage`, cleared by Done or "Not you?" |
 | `attempt` | Attempt ID, items, answers, `expiresAt`, server time offset, current index | Memory only; refetched on reload |
 
 **Key components**
@@ -355,15 +357,15 @@ The browser never talks to the database directly, and only the fields the study 
 - **Correct answers never leave the server** during an attempt. `GET /api/v1/attempts/:id` returns choices without `is_correct`, and results show levels and scores, not per-item marks (RES-05).
 - **Every input is validated** with the shared Zod schemas. Markdown is rendered with markdown-it and cleaned with DOMPurify.
 - **CORS** allows only the Pages domain (and `localhost` in development).
-- **Kiosk PIN** is hashed with SHA-256 plus a per-session salt and rate limited (5 tries, then 1 minute).
+- **Respondent tokens** are 32 random bytes; only their SHA-256 hash is stored, so the database can't be used to take over a student's attempt. A lost token can't be recovered: the same student number is refused, and the team helps.
 - **Uploads** accept only PNG, JPEG and WebP up to 2 MB.
 - **Data Privacy Act of 2012:**
-  - Consent notice versioned (`consent_version`) and stored with a timestamp. Online and kiosk show different notice text: the online notice is general (what DigiBridge does with your answers, no mention of the study or a school), and the kiosk notice explains the research and the school details.
+  - Consent notice versioned (`consent_version`) and stored with a timestamp. Online and school links show different notice text: the online notice is general (no mention of a school), and the school notice adds the school details, the key the browser keeps and its own retention.
   - Online collects no school details at all; the API refuses them.
   - Name and student number are shown to the team only if the respondent allowed it (show\_identity). Otherwise they read Hidden everywhere, including the CSV.
   - CSV export is admin only.
   - Respondent deletion on request (USR-03).
-  - All respondent data deleted at the end of the semester (December 2026).
+  - Online respondent data deleted at the end of the semester (December 2026); school-link data after 30 days (`SCHOOL_DATA_KEPT_DAYS`).
 - **Secrets** (`DATABASE_URL`, Supabase keys) live in Wrangler secrets and local env files, never in the repo.
 
 ## Environments and deployment
@@ -437,12 +439,12 @@ One case per Must requirement, written as ID, steps, expected result, pass or fa
 
 | Case | What to check |
 | --- | --- |
-| One attempt | Same Google account twice online: the second goes to results. Same student number in two kiosk sessions: the second is blocked |
-| School details | The online profile has no student number, course or year level fields; posting them to the API gives 400. The kiosk profile can't be saved without them |
+| One attempt | Same Google account twice online: the second goes to results. Same student number through two school links: the second is blocked |
+| School details | The online profile has no student number, course or year level fields; posting them to the API gives 400. The school-link profile can't be saved without them |
 | Resume | Answer 10 items, refresh, close and reopen: answers and timer intact |
 | Timeout | Wait out the timer (set to 2 minutes on a test build): auto-submits; a closed tab is closed by the cron within 5 minutes |
-| Kiosk handover | Finish as student A, press Done, start student B: nothing from A visible |
-| Kiosk lock | In kiosk mode, type `/admin` in the address bar: redirected to `/kiosk` |
+| Shared device | Finish as student A through a link, press Done, open the link as student B: nothing from A visible |
+| Closed link | Close or let a link expire: a new student gets the plain message; a student who already joined can still finish |
 | Role checks | Respondent calls an admin endpoint: 403. A respondent who chose to hide their identity shows as Hidden on the dashboard and in the CSV |
 | Scoring | Answer a known pattern, compare against a hand-worked score |
 | Devices | Full run on a low-end Android phone on mobile data, an iPhone, and a laptop |
@@ -455,10 +457,10 @@ Bugs go in GitHub Issues with the requirement ID, steps, expected and actual res
 | Risk | Effect | Fallback |
 | --- | --- | --- |
 | Hyperdrive or Drizzle setup with Supabase takes longer than planned | Day 1 lost on plumbing | Use the Supabase transaction pooler connection string directly with postgres.js, add Hyperdrive later |
-| Weak signal during in-person sessions | Saves fail, students wait | Autosave retries; bring a pocket Wi-Fi or phone hotspot for kiosk devices |
+| Weak signal during in-person sessions | Saves fail, students wait | Autosave retries; bring a pocket Wi-Fi or phone hotspot for in-person sessions |
 | Google sign-in blocked in Messenger's in-app browser | Online respondents can't sign in | Show an "Open in Chrome or Safari" notice when the in-app browser is detected |
 | Content arrives late (Nov 6 to 8) | Real assessment not ready | Build and test on dummy items; CSV import makes loading real content a 10-minute job |
 | Cloudflare free-tier limits | Requests blocked | 30 to 100 respondents is far below the free limits; watch usage in the dashboard |
-| Someone takes it twice with a fake student number (kiosk) | Duplicate data | Student number format check; facilitators confirm IDs in person; admin can void |
+| Someone takes it twice with a fake student number (school link) | Duplicate data | Student number format check; links go only to chosen students, can be locked to a course and year level and given a limit; admin can void |
 | Someone takes it twice online with a second Google account | Duplicate online data | Online data isn't the study's ACLC sample; the dashboard can filter by mode; admin can void |
 | One developer | Cez sick or busy | Keep the repo, `.env.example` and this TRD current so Morales can take over fixes |
