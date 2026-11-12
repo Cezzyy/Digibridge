@@ -3,6 +3,7 @@ import { AGE_MAX, AGE_MIN } from '../profile/birth-date'
 import { AGE_GROUP_RANGES, AGE_GROUPS, ageGroupFor } from './age-groups'
 import { dashboardFiltersSchema, hasSchoolOnlyFilter } from './filters'
 import { respondentListQuerySchema } from './respondents'
+import { statsQuerySchema } from './stats'
 
 describe('age groups', () => {
   it('cover AGE_MIN to AGE_MAX with no gaps or overlaps', () => {
@@ -67,5 +68,19 @@ describe('respondentListQuerySchema', () => {
 
   it.each([['0'], ['1.5'], ['two']])('refuses page %s', (page) => {
     expect(respondentListQuerySchema.safeParse({ page }).success).toBe(false)
+  })
+})
+
+describe('statsQuerySchema', () => {
+  it('groups by mode unless told otherwise', () => {
+    expect(statsQuerySchema.parse({})).toEqual({ groupBy: 'mode' })
+    expect(statsQuerySchema.parse({ groupBy: 'course', sex: 'female' })).toEqual({
+      groupBy: 'course',
+      sex: 'female',
+    })
+  })
+
+  it('refuses an unknown grouping', () => {
+    expect(statsQuerySchema.safeParse({ groupBy: 'name' }).success).toBe(false)
   })
 })
