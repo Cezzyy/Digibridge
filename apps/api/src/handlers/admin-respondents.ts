@@ -11,8 +11,10 @@ import {
 } from '@digibridge/db'
 import {
   ageGroupFor,
+  FINISHED_ATTEMPT_STATUSES,
   RESPONDENTS_PAGE_SIZE,
   type AreaCode,
+  type Level,
   type RespondentSort,
   type RespondentStatus,
 } from '@digibridge/shared'
@@ -37,6 +39,17 @@ const statusOf = (current: CurrentAttempts) =>
     when ${current.status} = 'voided' then 'voided'
     else 'finished' end`
 
+/** The attempt's score and level, or null unless it's finished: a voided attempt is left out. */
+const finishedScore = (current: CurrentAttempts) => {
+  const finished = inArray(current.status, FINISHED_ATTEMPT_STATUSES)
+  return {
+    pct: sql<number | null>`case when ${finished} then ${current.overallPct} end`.mapWith(
+      current.overallPct,
+    ),
+    level: sql<Level | null>`case when ${finished} then ${current.overallLevel} end`,
+  }
+}
+
 /** Hidden names sort last, as if blank, so their place in the list gives nothing away (PRO-05). */
 const orderFor = (sort: RespondentSort, current: CurrentAttempts): SQL[] => {
   const newest = [desc(respondents.consentedAt), desc(respondents.id)]
@@ -51,9 +64,9 @@ const orderFor = (sort: RespondentSort, current: CurrentAttempts): SQL[] => {
         ...newest,
       ]
     case 'score_high':
-      return [sql`${current.overallPct} desc nulls last`, ...newest]
+      return [sql`${finishedScore(current).pct} desc nulls last`, ...newest]
     case 'score_low':
-      return [sql`${current.overallPct} asc nulls last`, ...newest]
+      return [sql`${finishedScore(current).pct} asc nulls last`, ...newest]
   }
 }
 
@@ -80,8 +93,8 @@ function selectRespondents(db: Db, current: CurrentAttempts) {
       linkId: schoolLinks.id,
       linkLabel: schoolLinks.label,
       attemptId: current.id,
-      overallPct: current.overallPct,
-      overallLevel: current.overallLevel,
+      overallPct: finishedScore(current).pct,
+      overallLevel: finishedScore(current).level,
       submittedAt: current.submittedAt,
     })
     .from(respondents)

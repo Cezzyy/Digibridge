@@ -2,6 +2,7 @@ import {
   ANSWER_GRACE_SECONDS,
   areaCodeSchema,
   attemptStatusSchema,
+  FINISHED_ATTEMPT_STATUSES,
   lessonTierSchema,
   levelSchema,
   SUS_ANSWER_MAX,
@@ -142,7 +143,7 @@ export const saveAnswerRoute = createRoute({
 export const SubmittedAttemptSchema = z
   .object({
     id: z.uuid(),
-    status: z.enum(['submitted', 'expired']),
+    status: z.enum(FINISHED_ATTEMPT_STATUSES),
     submittedAt: z.iso.datetime(),
   })
   .openapi('SubmittedAttempt')
@@ -191,7 +192,7 @@ const LessonPickSchema = z.object({
 export const AttemptResultSchema = z
   .object({
     id: z.uuid(),
-    status: z.enum(['submitted', 'expired']),
+    status: z.enum(FINISHED_ATTEMPT_STATUSES),
     submittedAt: z.iso.datetime(),
     overall: ScoreSchema,
     // In the areas' order.

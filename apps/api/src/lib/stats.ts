@@ -24,6 +24,7 @@ import {
   type StatsGroup,
   type YearLevel,
 } from '@digibridge/shared'
+import { roundPct } from './scoring'
 
 // The analysis page's numbers (DSH-01 to DSH-04, SUS-05), worked out from the rows the stats
 // handler reads. Pure, so it's tested on its own. Percentages are rounded to 2 decimals.
@@ -57,10 +58,8 @@ export type StatsInput = {
   sus: SusRow[]
 }
 
-const round2 = (n: number) => Math.round(n * 100) / 100
-
 const mean = (values: number[]) =>
-  values.length === 0 ? null : round2(values.reduce((sum, v) => sum + v, 0) / values.length)
+  values.length === 0 ? null : roundPct(values.reduce((sum, v) => sum + v, 0) / values.length)
 
 export function median(values: number[]) {
   if (values.length === 0) return null
@@ -185,7 +184,7 @@ export function buildStats(input: StatsInput, groupBy: StatsGroup) {
     respondents: input.respondents,
     finished: finished.length,
     completionRate:
-      input.respondents === 0 ? null : round2((finished.length / input.respondents) * 100),
+      input.respondents === 0 ? null : roundPct((finished.length / input.respondents) * 100),
     averageOverallPct: mean(finished.map((row) => row.overallPct)),
     medianTimeSeconds: median(finished.map((row) => row.timeTakenSeconds)),
     overallLevels: levelCounts(finished.map((row) => row.overallLevel)),

@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import {
+  RESPONDENT_SEARCH_MAX_LENGTH,
   RESPONDENT_SORT_LABELS,
   RESPONDENT_SORTS,
   RESPONDENT_STATUS_LABELS,
@@ -115,6 +116,11 @@ const lastPage = computed(() =>
   page.value ? Math.max(1, Math.ceil(page.value.total / page.value.pageSize)) : 1,
 )
 const goToPage = (n: number) => replaceQuery({ page: n > 1 ? String(n) : undefined })
+// A page past the end (an old link, or rows that went since) moves to the last page.
+watch(page, (p) => {
+  if (p && p.total > 0 && p.respondents.length === 0 && p.page > 1)
+    goToPage(Math.ceil(p.total / p.pageSize))
+})
 
 const narrowed = computed(() => activeCount.value > 0 || !!status.value || !!q.value)
 function clearAll() {
@@ -128,8 +134,13 @@ const openRow = computed(
   () => page.value?.respondents.find((row) => row.id === openId.value) ?? null,
 )
 const open = (id: string) => router.push({ query: { ...route.query, respondent: id } })
+// Opening pushes, so closing steps back when the entry before is this list without the drawer:
+// replacing would leave the list in history twice, and Back would seem to do nothing.
 function closeDrawer() {
-  if (openId.value) replaceQuery({ respondent: undefined })
+  if (!openId.value) return
+  const list = router.resolve({ query: { ...route.query, respondent: undefined } }).fullPath
+  if (router.options.history.state.back === list) router.back()
+  else replaceQuery({ respondent: undefined })
 }
 </script>
 
@@ -158,7 +169,7 @@ function closeDrawer() {
         label="Search"
         hint="A shown name or student number"
         inputmode="search"
-        :maxlength="100"
+        :maxlength="RESPONDENT_SEARCH_MAX_LENGTH"
       >
         <template #icon><path v-for="d in ICONS.search" :key="d" :d="d" /></template>
       </TextField>

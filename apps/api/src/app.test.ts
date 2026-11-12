@@ -2204,6 +2204,25 @@ describe('admin respondents', () => {
       expect(second.body).toMatchObject({ respondents: [], total: 3, page: 2 })
     })
 
+    it('leaves out a voided score, in the row and the sort', async () => {
+      const link = await linkFor('BSIT 2A')
+      const scored = await addSchoolRespondent(
+        {},
+        { status: 'submitted', linkId: link.id, pct: 50 },
+      )
+      const voided = await addSchoolRespondent({}, { status: 'voided', linkId: link.id, pct: 95 })
+      const admin = await signedIn('admin')
+
+      const best = await list('?sort=score_high', admin.headers)
+      expect(best.body.respondents.map((r) => r.id)).toEqual([scored.id, voided.id])
+      expect(best.body.respondents[0]).toMatchObject({ overallPct: 50, overallLevel: 'basic' })
+      expect(best.body.respondents[1]).toMatchObject({
+        status: 'voided',
+        overallPct: null,
+        overallLevel: null,
+      })
+    })
+
     it('refuses respondents and bad filters', async () => {
       const user = await signedIn()
       expect((await list('', user.headers)).status).toBe(403)

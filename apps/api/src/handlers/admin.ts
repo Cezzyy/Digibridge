@@ -1,5 +1,5 @@
 import { attempts, profiles, respondents, schoolLinks } from '@digibridge/db'
-import { linkExpiresAt, linkStatus } from '@digibridge/shared'
+import { FINISHED_ATTEMPT_STATUSES, linkExpiresAt, linkStatus } from '@digibridge/shared'
 import type { RouteHandler } from '@hono/zod-openapi'
 import {
   and,
@@ -65,7 +65,7 @@ export const getOverview: RouteHandler<typeof overviewRoute, AuthEnv> = async (c
       .select({
         inProgress: count(sql`case when ${attempts.status} = 'in_progress' then 1 end`),
         finished: count(
-          sql`case when ${inArray(attempts.status, ['submitted', 'expired'])} then 1 end`,
+          sql`case when ${inArray(attempts.status, FINISHED_ATTEMPT_STATUSES)} then 1 end`,
         ),
       })
       .from(attempts),
