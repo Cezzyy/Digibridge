@@ -3,7 +3,7 @@ import { createRoute, z } from '@hono/zod-openapi'
 import { auth, requireRole } from '../middleware'
 import { errorResponse } from '../openapi'
 
-const SIGNED_IN_ERRORS = {
+export const SIGNED_IN_ERRORS = {
   401: errorResponse('Not signed in, or the sign-in has expired'),
 }
 
