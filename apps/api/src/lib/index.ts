@@ -1,2 +1,2 @@
-// Helpers: scoring, sus, shuffle, stats, csv.
+// Helpers: scoring, sus, shuffle, dashboard filters, stats, csv.
 export {}
