@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, defineAsyncComponent } from 'vue'
 import { useRoute } from 'vue-router'
+import { useRespondentFlow } from '../composables/useRespondentFlow'
 import { useSessionStore } from '../stores/session'
 import AccountControls from './AccountControls.vue'
 import AppMenu from './AppMenu.vue'
@@ -15,11 +16,19 @@ import BrandMark from './BrandMark.vue'
 // and the bar keeps only the logo. In the admin area (`meta.adminMenu`) the button shows below
 // `lg` instead and opens AdminMenu, with the admin pages; it loads with the admin area, so
 // students never download it.
+//
+// On school-link pages there's no Google account: the logo goes to the student's step, the bar
+// has Lessons and the student's own controls ("Not you?"), and no menu.
 const AdminMenu = defineAsyncComponent(() => import('./admin/AdminMenu.vue'))
 
 const session = useSessionStore()
+const flow = useRespondentFlow()
 const route = useRoute()
 const adminMenu = computed(() => !!route.meta.adminMenu && session.isStaff)
+const logoTo = computed(() => {
+  if (flow.isSchool.value) return flow.page(flow.respondent.value ? 'home' : 'consent')
+  return session.isSignedIn ? session.startPage : { name: 'landing' }
+})
 </script>
 
 <template>
@@ -29,11 +38,11 @@ const adminMenu = computed(() => !!route.meta.adminMenu && session.isStaff)
         <div v-if="adminMenu" class="lg:hidden">
           <AdminMenu />
         </div>
-        <div v-else class="sm:hidden">
+        <div v-else-if="!flow.isSchool.value" class="sm:hidden">
           <AppMenu />
         </div>
         <RouterLink
-          :to="session.isSignedIn ? session.startPage : { name: 'landing' }"
+          :to="logoTo"
           class="flex min-h-11 items-center gap-2.5 font-display text-xl font-bold text-evergreen"
         >
           <BrandMark class="size-8" />
@@ -43,10 +52,10 @@ const adminMenu = computed(() => !!route.meta.adminMenu && session.isStaff)
 
       <div
         class="flex min-w-0 items-center gap-4"
-        :class="adminMenu ? 'max-lg:hidden' : 'max-sm:hidden'"
+        :class="adminMenu ? 'max-lg:hidden' : flow.isSchool.value ? '' : 'max-sm:hidden'"
       >
         <RouterLink
-          v-if="session.isStaff"
+          v-if="session.isStaff && !flow.isSchool.value"
           :to="{ name: 'admin' }"
           class="hidden min-h-11 shrink-0 items-center rounded-control px-3 font-semibold text-quiet hover:text-ink sm:flex"
         >
@@ -59,7 +68,7 @@ const adminMenu = computed(() => !!route.meta.adminMenu && session.isStaff)
           Lessons
         </RouterLink>
 
-        <AccountControls v-if="session.isSignedIn" />
+        <AccountControls v-if="session.isSignedIn || flow.isSchool.value" />
 
         <RouterLink
           v-else-if="!session.loading"

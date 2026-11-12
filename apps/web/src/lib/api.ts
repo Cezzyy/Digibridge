@@ -1,4 +1,4 @@
-import type { ErrorCode } from '@digibridge/shared'
+import { RESPONDENT_TOKEN_HEADER, type ErrorCode } from '@digibridge/shared'
 import type { AppType } from 'api/src/app'
 import { hc, type ClientResponse } from 'hono/client'
 import { supabase } from './supabase'
@@ -13,11 +13,23 @@ function fetchWithTimeout(input: RequestInfo | URL, init?: RequestInit) {
   return fetch(input, { ...init, signal })
 }
 
+// The school-link student's respondent token while a school-link page is open (set by
+// stores/schoolLink.ts, which the router keeps in step with the page). Calls then send it in
+// place of the Google sign-in, so a browser that is also signed in with Google stays apart.
+let respondentToken: string | null = null
+
+/** Sends `X-Respondent-Token` instead of the Google token on every call, or stops with null. */
+export function setRespondentToken(token: string | null) {
+  respondentToken = token
+}
+
 // Typed client for /api/v1, built from the API's route types. Each call sends the
-// signed-in user's token; getSession refreshes it first if it has expired.
+// signed-in user's token; getSession refreshes it first if it has expired. On school-link pages
+// it sends the respondent token instead.
 export const api = hc<AppType>(import.meta.env.VITE_API_URL, {
   fetch: fetchWithTimeout,
   headers: async (): Promise<Record<string, string>> => {
+    if (respondentToken !== null) return { [RESPONDENT_TOKEN_HEADER]: respondentToken }
     const { data } = await supabase.auth.getSession()
     const token = data.session?.access_token
     return token ? { Authorization: `Bearer ${token}` } : {}

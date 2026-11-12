@@ -11,30 +11,31 @@ import SubmitDialog from '../../components/assessment/SubmitDialog.vue'
 import ErrorScreen from '../../components/ErrorScreen.vue'
 import { RULE_ICONS } from '../../components/home/home-icons'
 import { useCountdown } from '../../composables/useCountdown'
+import { useRespondentFlow } from '../../composables/useRespondentFlow'
 import { ApiRequestError, messageOf } from '../../lib/api'
 import { PRIMARY_BUTTON, SECONDARY_BUTTON } from '../../lib/buttons'
 import { useAttemptStore } from '../../stores/attempt'
-import { useSessionStore } from '../../stores/session'
 
 // The assessment (/assessment): one question at a time with Back and Next, the question grid to
 // jump around, the timer from the server's clock, and Submit (ASM-01 to ASM-09). The `step`
 // guard lets in only a respondent with an attempt in progress. Each answer saves as it's picked;
 // a reload gets the same items, answers and time back. At 0 the answers are sent by themselves,
-// and once the attempt is closed the page goes on to the results.
-const session = useSessionStore()
+// and once the attempt is closed the page goes on to the results. The same page runs through a
+// school link (/s/:code/assessment), where the student's state comes from the link.
+const flow = useRespondentFlow()
 const store = useAttemptStore()
 const router = useRouter()
 
 const loadError = ref<string | null>(null)
-const attemptId = computed(() => session.me?.attempt?.id ?? null)
+const attemptId = computed(() => flow.attempt.value?.id ?? null)
 const ready = computed(() => store.attempt !== null && store.attempt.id === attemptId.value)
 
-const goHome = () => router.replace({ name: 'home' })
-const showResults = () => router.replace({ name: 'results' })
+const goHome = () => router.replace(flow.page('home'))
+const showResults = () => router.replace(flow.page('results'))
 
-/** Goes home after fetching /me again, when the attempt here is no longer the student's one. */
+/** Goes home after asking again, when the attempt here is no longer the student's one. */
 async function leave() {
-  await session.loadMe()
+  await flow.reload()
   await goHome()
 }
 
@@ -44,16 +45,16 @@ async function load() {
   if (!id) return goHome()
   try {
     const data = await store.load(id)
-    // Voided: /me leaves it out, so ask /me again rather than storing it (home would read it
-    // as finished). The student can start again.
+    // Voided: /me and the link leave it out, so ask again rather than storing it (home would
+    // read it as finished). The student can start again.
     if (data.status === 'voided') return leave()
     if (data.status !== 'in_progress') {
-      session.setAttempt({ id: data.id, status: data.status })
+      flow.setAttempt({ id: data.id, status: data.status })
       await showResults()
     }
   } catch (err) {
     if (err instanceof ApiRequestError && (err.code === 'not_found' || err.code === 'forbidden')) {
-      // The account changed: let /me and home sort it out.
+      // The account changed: let /me (or the link) and home sort it out.
       return leave()
     }
     loadError.value = messageOf(err)
@@ -132,7 +133,7 @@ function openDialog() {
     :message="loadError"
     :actions="[
       { label: 'Try again', onClick: load },
-      { label: 'Back to home', to: { name: 'home' } },
+      { label: 'Back to home', to: flow.page('home') },
     ]"
   />
 
@@ -144,7 +145,7 @@ function openDialog() {
         class="grid h-header grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-3 px-4 sm:px-8 lg:px-10"
       >
         <RouterLink
-          :to="{ name: 'home' }"
+          :to="flow.page('home')"
           class="flex min-h-11 items-center gap-2.5 justify-self-start font-display text-xl font-bold text-evergreen"
         >
           <BrandMark class="size-8" />

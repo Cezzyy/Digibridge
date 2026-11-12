@@ -17,12 +17,13 @@ import SignInPage from './pages/SignInPage.vue'
 import ConsentPage from './pages/start/ConsentPage.vue'
 import ProfilePage from './pages/start/ProfilePage.vue'
 import { useConsentStore } from './stores/consent'
+import { linkConsentKey, useSchoolLinkStore } from './stores/schoolLink'
 import { useSessionStore } from './stores/session'
 
 // Who may open a page. No `requires` means anyone; `guest` means only signed-out users.
 // These guards only decide what to show; the API checks the role again on every call (AUTH-04).
-// The `kioskLock` guard from the TRD comes with the kiosk pages. The TRD's `public` (the lessons)
-// is the same as no `requires`.
+// The TRD's `public` (the lessons) is the same as no `requires`. School-link pages (`school`)
+// need no sign-in: the student's place is the respondent token their browser keeps.
 export type Requirement = 'guest' | 'signedIn' | 'staff' | 'admin'
 
 /** A page of the respondent flow, which the `step` guard keeps in order. */
@@ -39,6 +40,8 @@ declare module 'vue-router' {
     followsSystemTheme?: boolean
     /** Below `lg`, AppHeader's menu has the admin pages (AdminMenu) instead of AppMenu. */
     adminMenu?: boolean
+    /** A school-link page (/s/:code/…): the respondent flow without Google (LNK-02). */
+    school?: boolean
   }
 }
 
@@ -149,6 +152,46 @@ export const router = createRouter({
         },
       ],
     },
+    // School links (LNK-02 to LNK-06): the same pages as online, in school mode
+    // (useRespondentFlow), at /s/<code>. Students open the link without signing in; the notice
+    // comes first, then the profile with the school details. Done at the end clears the student
+    // from the browser and shows the last page, which needs neither the link nor a token.
+    {
+      path: '/s/:code',
+      name: 'school-consent',
+      component: ConsentPage,
+      meta: { school: true, step: 'consent' },
+    },
+    {
+      path: '/s/:code/profile',
+      name: 'school-profile',
+      component: ProfilePage,
+      meta: { school: true, step: 'profile' },
+    },
+    {
+      path: '/s/:code/home',
+      name: 'school-home',
+      component: HomePage,
+      meta: { school: true, step: 'home' },
+    },
+    {
+      path: '/s/:code/assessment',
+      name: 'school-assessment',
+      component: AssessmentPage,
+      meta: { school: true, step: 'assessment', hideHeader: true },
+    },
+    {
+      path: '/s/:code/results',
+      name: 'school-results',
+      component: () => import('./pages/results/ResultsPage.vue'),
+      meta: { school: true, step: 'results' },
+    },
+    {
+      path: '/s/:code/done',
+      name: 'school-done',
+      component: () => import('./pages/school/DonePage.vue'),
+      meta: { hideHeader: true },
+    },
     {
       path: '/:pathMatch(.*)*',
       name: 'not-found',
@@ -216,9 +259,66 @@ function checkStep(step: Step) {
   }
 }
 
+// The same flow through a school link, from the link's state (GET /links/:code) instead of /me:
+// the notice and profile until the student joins, then home, the assessment and results. A
+// student who joined can always come back, even once the link closed (LNK-04).
+function checkSchoolStep(step: Step | undefined) {
+  const school = useSchoolLinkStore()
+  const code = school.code ?? ''
+  const at = (name: string) => ({ name, params: { code } })
+  const joined = school.respondent !== null
+  const status = school.attempt?.status
+  const finished = status === 'submitted' || status === 'expired'
+  switch (step) {
+    case 'consent':
+      return !joined || at('school-home')
+    case 'profile':
+      if (joined) return at('school-home')
+      return useConsentStore().versionFor(linkConsentKey(code)) !== null || at('school-consent')
+    case 'home':
+      if (!joined) return at('school-consent')
+      return !finished || at('school-results')
+    case 'assessment':
+      return status === 'in_progress' || at('school-home')
+    case 'results':
+      return finished || at('school-home')
+    default:
+      return true
+  }
+}
+
+async function enterSchoolLink(to: RouteLocationNormalized) {
+  const school = useSchoolLinkStore()
+  const code = String(to.params.code)
+  // Codes are upper case; one typed in lower case opens the same link.
+  if (code !== code.toUpperCase()) {
+    return {
+      name: to.name,
+      params: { ...to.params, code: code.toUpperCase() },
+      query: to.query,
+      hash: to.hash,
+      replace: true,
+    }
+  }
+  // A browser that joined one link carries on there: a student takes the assessment once.
+  const joined = school.joinedCode
+  if (joined && joined !== code) {
+    return { name: 'school-consent', params: { code: joined }, replace: true }
+  }
+  school.enter(code)
+  await school.open(code)
+  // App.vue shows the error screen over the page for a link that can't be opened (LNK-02).
+  if (school.failure) return true
+  return checkSchoolStep(to.meta.step)
+}
+
 router.beforeEach(async (to, from) => {
   const clean = withoutCallbackParams(to, from)
   if (clean) return clean
+
+  // The API client sends the respondent token on school-link pages only.
+  if (to.meta.school) return enterSchoolLink(to)
+  useSchoolLinkStore().leave()
 
   const requires = to.meta.requires
   if (!requires) return true

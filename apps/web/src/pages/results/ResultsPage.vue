@@ -2,6 +2,7 @@
 import { AREA_CODES, AREA_LABELS, LESSON_TIER_LABELS, type Level } from '@digibridge/shared'
 import { computed, ref } from 'vue'
 import { useRouter } from 'vue-router'
+import FinishDialog from '../../components/results/FinishDialog.vue'
 import LessonCard from '../../components/results/LessonCard.vue'
 import LevelBadge from '../../components/results/LevelBadge.vue'
 import RadarChart from '../../components/results/RadarChart.vue'
@@ -10,35 +11,69 @@ import ScoreBar from '../../components/results/ScoreBar.vue'
 import SkeletonText from '../../components/results/SkeletonText.vue'
 import StartLayout from '../../components/start/StartLayout.vue'
 import StartSteps from '../../components/start/StartSteps.vue'
+import LinkTag from '../../components/start/LinkTag.vue'
 import SusForm from '../../components/SusForm.vue'
+import { useRespondentFlow } from '../../composables/useRespondentFlow'
 import { useResult, type AreaResult } from '../../composables/useResult'
 import { PRIMARY_BUTTON } from '../../lib/buttons'
 import { wholePct } from '../../lib/levels'
+import { useAttemptStore } from '../../stores/attempt'
+import { useSchoolLinkStore } from '../../stores/schoolLink'
 import { useSessionStore } from '../../stores/session'
 
 // The last step: the overall level, a radar chart of the 3 areas, and each area's score, level
 // and lessons (RES-01, RES-02). Scores only, never which answers were right (RES-05). The `step`
 // guard lets in only a respondent whose attempt is submitted or expired; online they can come
 // back to it anytime (RES-03). The usability survey is an optional card at the end (SUS-02).
+// Through a school link the page ends with Done, which opens the survey first if it's still
+// unanswered (SUS-03), then clears the student from this browser (LNK-06).
 // Loaded lazily by the router, so Chart.js isn't in the first load.
 const session = useSessionStore()
+const school = useSchoolLinkStore()
+const flow = useRespondentFlow()
+const attempt = useAttemptStore()
 const router = useRouter()
 const { result, error, load } = useResult()
 
 async function fetchResult() {
-  // Voided by the team or no longer this account's: /me is fresh again, and home sorts it out.
-  if ((await load()) === 'moved') await router.replace({ name: 'home' })
+  // Voided by the team or no longer this student's: their state is fresh again, and home sorts
+  // it out.
+  if ((await load()) === 'moved') await router.replace(flow.page('home'))
 }
 void fetchResult()
 
 // The usability survey sits under the results until it's answered (SUS-02). Skip hides it for
 // this visit only, so it's offered again next time. The card's attempt, or null while it's hidden.
 const susSkipped = ref(false)
+/** Sent from the card or from Done's dialog during this visit. */
+const susSent = ref(false)
+const ratedInDialog = ref(false)
 const susAttemptId = computed(() =>
-  result.value && !result.value.susAnswered && !susSkipped.value ? result.value.id : null,
+  result.value && !result.value.susAnswered && !susSkipped.value && !ratedInDialog.value
+    ? result.value.id
+    : null,
 )
 
-const name = computed(() => session.me?.respondent?.fullName ?? session.me?.profile.fullName)
+// ---- Done, through a school link ----
+
+const finishing = ref(false)
+/** The survey Done offers first: only while it's unanswered and the student hasn't skipped it. */
+const finishSusAttemptId = computed(() => (susSent.value ? null : susAttemptId.value))
+
+function onRatedInDialog() {
+  susSent.value = true
+  ratedInDialog.value = true
+}
+
+async function finish() {
+  const code = school.code
+  finishing.value = false
+  school.forget()
+  attempt.reset()
+  if (code) await router.replace({ name: 'school-done', params: { code } })
+}
+
+const name = computed(() => flow.respondent.value?.fullName ?? session.me?.profile.fullName)
 
 // What a level means, in a line before the area's lessons.
 const LEVEL_NOTE: Record<Level, string> = {
@@ -112,6 +147,7 @@ const finishedOn = computed(() =>
   <StartLayout>
     <template #rail>
       <StartSteps current="results" class="mb-6 lg:order-1 lg:mt-10 lg:mb-0" />
+      <LinkTag />
 
       <h1
         class="text-[clamp(2rem,1.5rem+1.6vw,3.25rem)] leading-[1.02] font-extrabold tracking-[-0.02em] text-balance motion-safe:animate-rise"
@@ -356,8 +392,45 @@ const finishedOn = computed(() =>
         v-if="susAttemptId"
         :attempt-id="susAttemptId"
         class="motion-safe:animate-rise"
+        @saved="susSent = true"
         @skip="susSkipped = true"
       />
     </div>
+
+    <template v-if="flow.isSchool.value && result" #actions>
+      <div class="flex flex-col gap-4 md:flex-row md:items-center md:justify-between md:gap-8">
+        <p class="flex items-center gap-3 leading-snug">
+          <span
+            aria-hidden="true"
+            class="grid size-8 shrink-0 place-items-center rounded-full bg-marigold-soft"
+          >
+            <span class="size-2.5 rounded-full bg-marigold" />
+          </span>
+          <span>
+            When you’re finished, choose <strong>Done</strong>. It clears your details from this
+            device.
+          </span>
+        </p>
+        <button type="button" :class="[PRIMARY_BUTTON, 'shrink-0']" @click="finishing = true">
+          Done
+          <svg
+            viewBox="0 0 16 16"
+            aria-hidden="true"
+            class="size-4 fill-none stroke-current stroke-[2.5]"
+          >
+            <path d="M3.5 8.5l3 3 6-7" stroke-linecap="round" stroke-linejoin="round" />
+          </svg>
+        </button>
+      </div>
+    </template>
   </StartLayout>
+
+  <FinishDialog
+    v-if="flow.isSchool.value"
+    :open="finishing"
+    :sus-attempt-id="finishSusAttemptId"
+    @rated="onRatedInDialog"
+    @close="finishing = false"
+    @finish="finish"
+  />
 </template>

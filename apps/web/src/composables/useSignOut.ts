@@ -1,10 +1,14 @@
 import { ref } from 'vue'
 import { useRouter } from 'vue-router'
+import { useAttemptStore } from '../stores/attempt'
+import { useSchoolLinkStore } from '../stores/schoolLink'
 import { useSessionStore } from '../stores/session'
 
 // Sign out asks first, so a stray tap on a Sign out button doesn't end the session (AUTH-03).
 // Every Sign out button calls `askSignOut`; the one `SignOutDialog` in App.vue asks and signs out.
 // The state is shared, so a button inside the side menu opens the same dialog, on top of the menu.
+// On a school-link page the button is "Not you?": confirming clears the student from this
+// browser and opens the link again for the next one.
 
 const asking = ref(false)
 const signingOut = ref(false)
@@ -17,6 +21,8 @@ export function askSignOut() {
 /** For `SignOutDialog` only: the dialog's state, and signing out once confirmed. */
 export function useSignOut() {
   const session = useSessionStore()
+  const school = useSchoolLinkStore()
+  const attempt = useAttemptStore()
   const router = useRouter()
 
   function cancel() {
@@ -26,8 +32,15 @@ export function useSignOut() {
   async function confirm() {
     signingOut.value = true
     try {
-      await session.signOut()
-      await router.push({ name: 'landing' })
+      const code = school.code
+      if (code) {
+        school.forget()
+        attempt.reset()
+        await router.push({ name: 'school-consent', params: { code } })
+      } else {
+        await session.signOut()
+        await router.push({ name: 'landing' })
+      }
     } finally {
       signingOut.value = false
       asking.value = false

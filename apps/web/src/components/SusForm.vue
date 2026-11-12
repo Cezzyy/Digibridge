@@ -13,7 +13,7 @@ import { PRIMARY_BUTTON, SECONDARY_BUTTON } from '../lib/buttons'
 // 1 (Strongly disagree) to 5 (Strongly agree), then Send and Skip. Answers are sent together;
 // once saved, the card thanks the student in place and emits `saved`. Skip only emits `skip`:
 // the page decides what that hides. Online it's an optional card under the results (SUS-02);
-// kiosk mode will open it after results (SUS-03).
+// through a school link, Done opens it first in FinishDialog (SUS-03).
 
 const props = defineProps<{ attemptId: string }>()
 const emit = defineEmits<{ saved: []; skip: [] }>()

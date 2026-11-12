@@ -16,14 +16,17 @@ import InfoRow from '../components/home/InfoRow.vue'
 import { ROW_ICONS, RULE_ICONS } from '../components/home/home-icons'
 import { AREA_DETAILS } from '../components/landing/areas'
 import { STEPS } from '../components/landing/steps'
+import LinkTag from '../components/start/LinkTag.vue'
 import StartLayout from '../components/start/StartLayout.vue'
 import StartSteps from '../components/start/StartSteps.vue'
+import { useRespondentFlow } from '../composables/useRespondentFlow'
 import { useStartAttempt } from '../composables/useStartAttempt'
 import { PRIMARY_BUTTON } from '../lib/buttons'
 import { LEVEL_BANDS, LEVEL_TONE, levelRange } from '../lib/levels'
+import { useSchoolLinkStore } from '../stores/schoolLink'
 import { useSessionStore } from '../stores/session'
 
-// Where signed-in users land. Respondents without a profile never see it: the `step` guard sends
+// Where signed-in users land, and school-link students once they've saved their profile. Respondents without a profile never see it: the `step` guard sends
 // them to the privacy notice, and those who have finished go to their results. Respondents see
 // their next step: the assessment's rules and Start, then, once started, the way back to it.
 // Staff land on /admin and come here for a preview of the student steps, which saves nothing.
@@ -31,33 +34,39 @@ import { useSessionStore } from '../stores/session'
 // Start begins the attempt (the 25-minute timer starts on the server) and opens the assessment;
 // Continue goes back to the one in progress.
 const session = useSessionStore()
+const school = useSchoolLinkStore()
+const flow = useRespondentFlow()
 const router = useRouter()
 const { start, starting, error: startError } = useStartAttempt()
 
 async function begin() {
-  // A 409 (no profile, already taken, not ready) reloads /me, so the page follows it.
-  if (await start()) await router.push({ name: 'assessment' })
+  // A 409 (no profile, already taken, not ready) reloads /me or the link, so the page follows it.
+  if (await start()) await router.push(flow.page('assessment'))
 }
 
 // The step guard sends finished respondents to /results; this follows /me when it changes while
 // home is open, e.g. when Start finds the assessment already taken. Until /results opens (its
 // code may still be downloading), Start stays disabled, so it can't be tapped again.
 watch(
-  () => session.attemptFinished,
-  (done) => done && void router.replace({ name: 'results' }),
+  () => flow.finished.value,
+  (done) => done && void router.replace(flow.page('results')),
+)
+
+// Online the page needs /me; through a link, the student's place in it.
+const ready = computed(() =>
+  flow.isSchool.value ? flow.respondent.value !== null : !!(session.me && session.role),
 )
 
 type View = 'start' | 'in-progress' | 'staff'
 const view = computed<View>(() => {
-  const me = session.me
-  if (!me?.respondent) return 'staff'
-  // /me leaves out a voided attempt, so a respondent whose attempt was voided can start again.
-  return me.attempt?.status === 'in_progress' ? 'in-progress' : 'start'
+  if (!flow.respondent.value) return 'staff'
+  // A voided attempt is left out, so a respondent whose attempt was voided can start again.
+  return flow.attempt.value?.status === 'in_progress' ? 'in-progress' : 'start'
 })
 
 const name = computed(
   () =>
-    session.me?.respondent?.fullName ?? session.me?.profile.fullName ?? session.me?.profile.email,
+    flow.respondent.value?.fullName ?? session.me?.profile.fullName ?? session.me?.profile.email,
 )
 
 const HEADINGS: Record<View, { title: string; lead: string }> = {
@@ -131,7 +140,7 @@ const studentSteps = STEPS.slice(1)
 </script>
 
 <template>
-  <StartLayout v-if="session.me && session.role" stick-on-phones fit-screen>
+  <StartLayout v-if="ready" stick-on-phones fit-screen>
     <template #rail>
       <!-- Phones show the step bar above the heading; desktops list the steps under it. -->
       <StartSteps
@@ -140,11 +149,12 @@ const studentSteps = STEPS.slice(1)
         class="mb-6 lg:order-1 lg:mt-10 lg:mb-0"
       />
       <p
-        v-else
+        v-else-if="session.role"
         class="mb-6 inline-flex self-start rounded-full bg-white/10 px-3 py-1 text-sm font-semibold ring-1 ring-white/20 ring-inset"
       >
         {{ ROLE_LABELS[session.role] }}
       </p>
+      <LinkTag />
 
       <h1
         class="text-[clamp(2rem,1.5rem+1.6vw,3.25rem)] leading-[1.02] font-extrabold tracking-[-0.02em] text-balance motion-safe:animate-rise"
@@ -198,7 +208,12 @@ const studentSteps = STEPS.slice(1)
             <path d="M12 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8Z" />
             <path d="M4 21a8 8 0 0 1 16 0" />
           </svg>
-          <span class="min-w-0 break-words">Signed in as {{ session.me.profile.email }}</span>
+          <span v-if="school.active && school.link" class="min-w-0 break-words">
+            Joined through {{ school.link.label }}, {{ school.link.school }}
+          </span>
+          <span v-else-if="session.me" class="min-w-0 break-words">
+            Signed in as {{ session.me.profile.email }}
+          </span>
         </p>
       </div>
     </template>
@@ -427,12 +442,10 @@ const studentSteps = STEPS.slice(1)
             v-if="view === 'start'"
             type="button"
             :class="PRIMARY_BUTTON"
-            :disabled="starting || session.attemptFinished"
+            :disabled="starting || flow.finished.value"
             @click="begin"
           >
-            {{
-              starting ? 'Starting…' : session.attemptFinished ? 'Opening your results…' : 'Start'
-            }}
+            {{ starting ? 'Starting…' : flow.finished.value ? 'Opening your results…' : 'Start' }}
             <svg
               viewBox="0 0 16 16"
               aria-hidden="true"
@@ -441,7 +454,7 @@ const studentSteps = STEPS.slice(1)
               <path d="M6 3.5 10.5 8 6 12.5" stroke-linecap="round" stroke-linejoin="round" />
             </svg>
           </button>
-          <RouterLink v-else :to="{ name: 'assessment' }" :class="PRIMARY_BUTTON">
+          <RouterLink v-else :to="flow.page('assessment')" :class="PRIMARY_BUTTON">
             Continue
             <svg
               viewBox="0 0 16 16"

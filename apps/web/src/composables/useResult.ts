@@ -1,31 +1,31 @@
 import type { InferResponseType } from 'hono/client'
 import { ref } from 'vue'
 import { api, ApiRequestError, call, messageOf } from '../lib/api'
-import { useSessionStore } from '../stores/session'
+import { useRespondentFlow } from './useRespondentFlow'
 
 export type AttemptResult = InferResponseType<(typeof api.attempts)[':id']['result']['$get'], 200>
 export type AreaResult = AttemptResult['areas'][number]
 export type LessonPick = AreaResult['lessons'][number]
 
 /**
- * The signed-in respondent's result: scores, levels and lessons (RES-01, RES-02). `load`
- * resolves to `moved` when the attempt is no longer theirs to show (voided by the team, or the
- * account changed); /me is loaded again then, so the page can follow it. If /me fails, it
- * resolves to `failed` and the session's error screen shows. Other failures set `error` in words
- * for students.
+ * The respondent's result, online or through a school link: scores, levels and lessons (RES-01,
+ * RES-02). `load` resolves to `moved` when the attempt is no longer theirs to show (voided by the
+ * team, or the account changed); their state (/me, or the link) is loaded again then, so the
+ * page can follow it. If that fails, it resolves to `failed` and App.vue's error screen shows.
+ * Other failures set `error` in words for students.
  */
 export function useResult() {
-  const session = useSessionStore()
+  const flow = useRespondentFlow()
   const result = ref<AttemptResult | null>(null)
   const error = ref<string | null>(null)
 
-  // When /me failed, App.vue shows the error screen over this page, so stay: following an empty
-  // `me` home would end on the sign-in page, and moving pages closes the error screen.
-  const movedUnlessFailed = () => (session.failure ? 'failed' : 'moved')
+  // When reloading failed, App.vue shows the error screen over this page, so stay: following an
+  // empty state home would end on the sign-in page, and moving pages closes the error screen.
+  const movedUnlessFailed = () => (flow.failed.value ? 'failed' : 'moved')
 
   async function load(): Promise<'ok' | 'moved' | 'failed'> {
     error.value = null
-    const id = session.me?.attempt?.id
+    const id = flow.attempt.value?.id
     if (!id) return movedUnlessFailed()
     try {
       result.value = await call(api.attempts[':id'].result.$get({ param: { id } }))
@@ -35,7 +35,7 @@ export function useResult() {
         err instanceof ApiRequestError &&
         ['conflict', 'not_found', 'forbidden'].includes(err.code)
       ) {
-        await session.loadMe()
+        await flow.reload()
         return movedUnlessFailed()
       }
       error.value = messageOf(err)
