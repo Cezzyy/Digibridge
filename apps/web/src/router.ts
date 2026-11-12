@@ -134,6 +134,12 @@ export const router = createRouter({
           component: () => import('./pages/admin/AnalysisPage.vue'),
         },
         {
+          path: 'items',
+          name: 'admin-items',
+          component: () => import('./pages/admin/ItemsPage.vue'),
+          meta: { requires: 'admin' },
+        },
+        {
           path: 'links',
           name: 'admin-links',
           component: () => import('./pages/admin/LinksPage.vue'),
