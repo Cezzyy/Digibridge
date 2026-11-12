@@ -13,15 +13,15 @@ DigiBridge is a web app that measures the digital literacy of ACLC College of Ma
 - Runs a 30-item, scenario-based assessment across Information and data literacy, Communication and collaboration, and Online safety.
 - Works two ways:
   - **Online (public):** anyone opens the site and signs in with Google. They answer general questions only (name, date of birth, sex, devices, internet access). No school details are asked.
-  - **Kiosk mode (school):** a facilitator hands a tablet or laptop to a student in person. This is the only mode that asks for school details: student number, course and year level. The study's ACLC data comes from kiosk mode.
+  - **School links:** an admin makes a link for a class, and the team sends it only to the students they choose. Students open it on their own phone or laptop without signing in. This is the only mode that asks for school details: student number, course and year level. The study's ACLC data comes from school links.
 - Scores each area into one of 4 levels and recommends lessons that live inside the app.
-- Gives admins and facilitators a dashboard broken down by age, sex and device or internet access for everyone, and by course and year level for kiosk respondents. This is the digital inclusion view the paper needs.
+- Gives admins and facilitators a dashboard broken down by age, sex and device or internet access for everyone, and by course and year level for school-link respondents. This is the digital inclusion view the paper needs.
 
 **Built by:** Cez (sole developer), with Morales on QA and the rest of Group 2 on content, interviews and the pilot test.
 
-**Two modes, one rule.** Everything tied to a school (student number, course, year level, the one-attempt-per-student-number check) lives in kiosk mode. Online mode is general and open to anyone, with one attempt per Google account. This keeps the public site usable by people outside ACLC and keeps the school details where a facilitator can check them in person.
+**Two modes, one rule.** Everything tied to a school (student number, course, year level, the one-attempt-per-student-number check) lives in school links. Online mode is general and open to anyone, with one attempt per Google account. This keeps the public site usable by people outside ACLC and keeps the school details with the links the team sends to chosen students.
 
-**After the study.** Cez may later grow DigiBridge into a product where schools and other institutions pay to run kiosk mode for their own students. That is out of scope for this phase. The only thing this phase does for it is keep school details in kiosk mode and in `packages/shared`, so other schools could get their own lists later without changing the online side.
+**After the study.** Cez may later grow DigiBridge into a product where schools and other institutions pay to run school links for their own students. That is out of scope for this phase. The only thing this phase does for it is keep school details in school links and in `packages/shared`, so other schools could get their own lists later without changing the online side.
 
 ## Goals and success metrics
 
@@ -35,7 +35,7 @@ The prototype succeeds if real students can finish the assessment without help a
 | Fits a short in-person session | Median time to finish the assessment | 20 minutes or less |
 | Instant feedback | Results and lessons shown after submit | Under 2 seconds |
 | Reliable data | Attempts lost or double-counted | 0 |
-| Answers the research question | Dashboard breakdowns available | By age, sex, device and internet access for all respondents; by course and year level for kiosk respondents |
+| Answers the research question | Dashboard breakdowns available | By age, sex, device and internet access for all respondents; by course and year level for school-link respondents |
 
 ## Scope
 
@@ -45,8 +45,8 @@ The prototype covers one assessment per student, instant results with lessons, a
 
 - Google sign-in for online respondents, facilitators and admins
 - Online mode open to anyone, with a general profile and no school details
-- Kiosk mode for in-person school sessions on a shared tablet or laptop (no Google account needed by the student), the only place student number, course and year level are asked
-- Data privacy consent and a respondent profile before the assessment, with a choice to hide name (and, in kiosk mode, student number) from the team
+- School links that admins make per class and the team sends to chosen students, opened on the student's own phone or laptop with no Google account, the only place student number, course and year level are asked
+- Data privacy consent and a respondent profile before the assessment, with a choice to hide name (and, through a school link, student number) from the team
 - 30-item timed assessment with shuffling, autosave and back navigation
 - Weighted scoring into 4 levels per area, plus an overall level
 - Results page with a radar chart, recommended lessons and a QR code to reopen results
@@ -58,7 +58,7 @@ The prototype covers one assessment per student, instant results with lessons, a
 **Out of scope**
 
 - The other 2 DigComp areas: digital content creation and problem solving
-- Retakes (one attempt per Google account online, one per student number in kiosk mode)
+- Retakes (one attempt per Google account online, one per student number across all school links)
 - School details (student number, course, year level) in online mode
 - More than one school: other schools' student number formats and course lists, accounts per school, and paid plans for institutions (a possible product after the study)
 - Cebuano and Filipino translations
@@ -69,22 +69,22 @@ The prototype covers one assessment per student, instant results with lessons, a
 
 ## Users and roles
 
-Three roles sign in with Google; kiosk respondents never sign in themselves.
+Three roles sign in with Google; school-link respondents never sign in.
 
 | User | Signs in? | Can do | Who |
 | --- | --- | --- | --- |
 | Respondent, online | Yes, Google | Consent, fill the general profile (no school details), take the assessment once per Google account, see own results and lessons | Anyone who opens the public site |
-| Respondent, kiosk | No | Consent, fill the general profile plus student number, course and year level, take the assessment once per student number, on the facilitator's device; session clears after results | ACLC students approached in person |
-| Facilitator | Yes, Google | Start and end kiosk sessions on their device; view the dashboard and respondents (read only) | Group 2 members running sessions |
-| Admin | Yes, Google | Everything: dashboard, CSV export, manage questions, lessons and users, assign roles | Cez (and anyone Cez promotes) |
+| Respondent, school link | No | Open the link on their own device, consent, fill the general profile plus student number, course and year level, take the assessment once per student number, see results and lessons; Done clears them from the browser | ACLC students the team sends a link to |
+| Facilitator | Yes, Google | View the dashboard and respondents (read only) | Group 2 members running sessions |
+| Admin | Yes, Google | Everything: dashboard, school links, CSV export, manage questions, lessons and users, assign roles | Cez (and anyone Cez promotes) |
 
 A new Google account starts as a respondent. Only an admin can promote someone to facilitator or admin.
 
 ## User flow
 
-&#91;embedded content: Respondent flow · online and kiosk entry\]
+&#91;embedded content: Respondent flow · online and school link entry\]
 
-Both entry paths join at consent, then split at the profile: online asks only the general fields, kiosk adds the school fields. Declining ends the flow before any assessment data exists. Online, an account that already has an attempt goes to its results. In kiosk mode, a student number that's already used is stopped, and the device loops back for the next student.
+Both entry paths join at consent, then split at the profile: online asks only the general fields, a school link adds the school fields. Declining ends the flow before any assessment data exists. Online, an account that already has an attempt goes to its results. Through a school link, the student's browser keeps their place, so a refresh or a later visit carries on; a student number that's already used is stopped; and Done after results clears the student from the browser. A closed, expired or full link turns new students away.
 
 ## Functional requirements
 
@@ -99,35 +99,37 @@ Every requirement has an ID that Morales's test cases point to. Must = needed fo
 | AUTH-03 | Users can sign out from any page. | Must |
 | AUTH-04 | Pages and API routes are blocked for roles that shouldn't reach them. | Must |
 
-### Kiosk mode
+### School links
+
+School links replaced kiosk mode (KIO-01 to KIO-06): no shared device, no exit PIN, no device lock.
 
 | ID | Requirement | Priority |
 | --- | --- | --- |
-| KIO-01 | A signed-in facilitator or admin starts a kiosk session on their device and sets a 4-digit exit PIN. | Must |
-| KIO-02 | In kiosk mode the device shows only the respondent flow: no menu, no dashboard, no sign-out. | Must |
-| KIO-03 | Kiosk respondents identify with name and student number, without a Google account, and also give their course and year level (PRO-02 to PRO-04). Kiosk mode is the only place these school details are asked. | Must |
-| KIO-04 | After results, a Done button clears the respondent's data from the device and returns to the kiosk start screen for the next student. | Must |
-| KIO-05 | Leaving kiosk mode needs the exit PIN. | Must |
-| KIO-06 | Each kiosk attempt records the facilitator and kiosk session that ran it. | Should |
+| LNK-01 | An admin creates a school link with the school it's for, a label (such as "BSIT 2A"), an expiry, and optionally a course, a year level and a response limit, and can close it at any time. | Must |
+| LNK-02 | Anyone with the link can open it without signing in. A closed, expired or full link shows a plain message and lets no new student in. A student counts against the limit once their profile is saved, and can then finish even if the link closes. | Must |
+| LNK-03 | School-link students give the general profile plus student number, course and year level, all required and checked (PRO-02 to PRO-04); a link made for one course or year level fills it in. One attempt per student number across all links. School links are the only place these school details are asked. | Must |
+| LNK-04 | A school-link student who refreshes or comes back later on the same browser picks up where they left off. | Must |
+| LNK-05 | Each school-link respondent and attempt records the link it came from. | Must |
+| LNK-06 | After results, Done clears the student's data from the browser, so a shared phone or laptop is safe for the next student. "Not you?" in the top bar does the same for someone who finds another student's place open. | Must |
 
 ### Consent and profile
 
 | ID | Requirement | Priority |
 | --- | --- | --- |
-| CON-01 | Before anything else, respondents see a consent notice under the Data Privacy Act of 2012: purpose, data collected, who sees it, that data is kept until the end of the semester (December 2026) and then deleted, and the DigiBridge team as contact (the kiosk notice may name the group leader, Cez). They must agree to continue. | Must |
+| CON-01 | Before anything else, respondents see a consent notice under the Data Privacy Act of 2012: purpose, data collected, who sees it, how long data is kept before it's deleted (online: until the end of the semester, December 2026; school links: 30 days), and the DigiBridge team as contact. They must agree to continue. | Must |
 | CON-02 | The app stores the consent with its timestamp and notice version. Declining ends the flow without saving anything. | Must |
 | PRO-01 | General profile, asked in both modes: full name, date of birth (age from 10 to 99, worked out from it in Philippine time), sex, devices they own, and how they usually get internet. | Must |
-| PRO-05 | Before starting, respondents choose whether the team may see who they are: their name, and in kiosk mode also their student number. If they say no, these show as Hidden on the dashboard and in the CSV, and only the other profile answers are shown. | Must |
+| PRO-05 | Before starting, respondents choose whether the team may see who they are: their name, and through a school link also their student number. If they say no, these show as Hidden on the dashboard and in the CSV, and only the other profile answers are shown. | Must |
 | PRO-06 | Online respondents are never asked for a student number, course or year level, and the API refuses them if sent. | Must |
 | PRO-07 | Online, one respondent and one attempt per Google account. An account that already has an attempt goes to its results instead of a new profile. | Must |
 
-**School details (kiosk mode only)**
+**School details (school links only)**
 
-In kiosk mode the profile also asks for student number, course and year level, and all three are required there (KIO-03).
+Through a school link the profile also asks for student number, course and year level, and all three are required there (LNK-03).
 
 | ID | Requirement | Priority |
 | --- | --- | --- |
-| PRO-02 | Student number must match the ACLC format, for example C23-01-7557-MAN121: 1 letter and 2 digits, 2 digits, 4 digits, then 3 letters and 3 digits, separated by dashes. It is saved in uppercase and is unique among kiosk respondents. | Must |
+| PRO-02 | Student number must match the ACLC format, for example C23-01-7557-MAN121: 1 letter and 2 digits, 2 digits, 4 digits, then 3 letters and 3 digits, separated by dashes. It is saved in uppercase and is unique among school-link respondents. | Must |
 | PRO-03 | A student number that's already used is stopped with a clear message. | Must |
 | PRO-04 | Course choices: BSIT, BSCS, BSBA, BSA and BSHM (1st to 4th year), and TESDA scholars in HRT and WADT (1st to 3rd year). The year-level options change with the course picked. | Must |
 
@@ -152,7 +154,7 @@ In kiosk mode the profile also asks for student number, course and year level, a
 | RES-01 | Results appear right after submit: overall level, level and score per area, and a radar chart of the 3 areas. | Must |
 | RES-02 | Each area shows recommended lessons matched to the respondent's level in that area. | Must |
 | RES-03 | Online respondents can return to their results at any time. | Must |
-| RES-04 | The results page shows a QR code to a private results link, so kiosk respondents can reopen their results and lessons on their own phone. Online respondents can show it too. | Should |
+| RES-04 | The results page shows a QR code to a private results link, so school-link respondents can reopen their results and lessons after Done or on another device. Online respondents can show it too. | Should |
 | RES-05 | Results do not reveal which items were right or wrong, so answers don't spread between students. | Must |
 | LES-01 | A lessons library holds 9 lessons: 3 areas × 3 lesson levels. | Must |
 | LES-02 | A lesson has a title, area, level, body text, optional image, optional video link and optional outside resources. | Must |
@@ -164,7 +166,7 @@ In kiosk mode the profile also asks for student number, course and year level, a
 | --- | --- | --- |
 | SUS-01 | After results, respondents can answer the 10 System Usability Scale statements, each rated 1 (Strongly disagree) to 5 (Strongly agree). | Must |
 | SUS-02 | Online, the survey is optional: a Rate DigiBridge card under the results, with a Skip option. | Must |
-| SUS-03 | In kiosk mode, the survey opens by itself after results and before Done. The facilitator encourages it, but the student can still skip. | Must |
+| SUS-03 | Through a school link, Done opens the survey before it clears the student, if it isn't answered yet. The team encourages it, but the student can still skip. | Must |
 | SUS-04 | The app computes the SUS score (0 to 100) and stores it with the attempt. One SUS response per attempt. | Must |
 | SUS-05 | The dashboard shows the mean SUS score, the number of responses and how scores spread; the CSV includes each SUS score. | Must |
 
@@ -174,10 +176,10 @@ In kiosk mode the profile also asks for student number, course and year level, a
 | --- | --- | --- |
 | DSH-01 | Summary cards: respondents, completion rate, average overall score, average score per area, median time taken, mean SUS score. | Must |
 | DSH-02 | Chart of how many respondents reached each level, per area. | Must |
-| DSH-03 | Filters for sex, age group, devices owned, internet access, mode (online or kiosk) and date range, plus course and year level. Course and year level exist only for kiosk respondents, so picking either one shows kiosk respondents only. All charts and cards follow the filters. | Must |
-| DSH-04 | Comparison chart of average score by a chosen grouping, such as by internet access or by mode. Grouping by course or year level uses kiosk respondents only, and the chart says so. | Must |
-| DSH-05 | Respondents table with search and sort, and a detail view of one respondent's profile and area scores. Name and student number appear only for respondents who allowed it (PRO-05). Online respondents have no student number, course or year level, so those cells are empty. | Must |
-| DSH-06 | Export the filtered respondents with profile, area scores, levels and SUS score as CSV, keeping hidden identities hidden. Student number, course and year level are empty for online respondents. Admin only. | Must |
+| DSH-03 | Filters for sex, age group, devices owned, internet access, mode (online or school link), school link and date range, plus course and year level. Course, year level and link exist only for school-link respondents, so picking any of them shows school-link respondents only. All charts and cards follow the filters. | Must |
+| DSH-04 | Comparison chart of average score by a chosen grouping, such as by internet access or by mode. Grouping by course, year level or school link uses school-link respondents only, and the chart says so. | Must |
+| DSH-05 | Respondents table with search and sort, and a detail view of one respondent's profile and area scores. Name and student number appear only for respondents who allowed it (PRO-05). Online respondents have no student number, course, year level or school link, so those cells are empty. | Must |
+| DSH-06 | Export the filtered respondents with profile, area scores, levels and SUS score as CSV, keeping hidden identities hidden, with each respondent's school link. Student number, course, year level and link are empty for online respondents. Admin only. | Must |
 | DSH-07 | Facilitators can view the dashboard and respondents but cannot export or change anything. | Should |
 | DSH-08 | Item analysis: percent of respondents who got each item right, to spot items that are too easy, too hard or confusing. | Should |
 
@@ -235,14 +237,14 @@ Example: a student gets all 4 basic, 2 intermediate and 1 advanced item right in
 
 **Attempt rules**
 
-- One attempt per Google account online (PRO-07), and one attempt per student number in kiosk mode (PRO-03). The two aren't linked: online has no student number to match against.
+- One attempt per Google account online (PRO-07), and one attempt per student number across all school links (PRO-03). The two aren't linked: online has no student number to match against.
 - 25 minutes from the moment the attempt starts. At 0 it submits with whatever is saved.
 - Answers can be changed until submit or time out.
 - An admin can void an attempt that failed for technical reasons, with a reason recorded. A voided attempt is left out of all stats, and the student can start again.
 
 ## Screens
 
-17 screens in three groups: respondent, kiosk and admin.
+Screens in three groups: respondent, school link and admin.
 
 | Screen | Route | Who | What's on it |
 | --- | --- | --- | --- |
@@ -256,15 +258,16 @@ Example: a student gets all 4 basic, 2 intermediate and 1 advanced item right in
 | Usability survey | /feedback | Respondent | 10 SUS statements on a 1 to 5 scale, Submit and Skip |
 | Lessons library | /lessons | Everyone | Lessons grouped by area and level |
 | Lesson | /lessons/:slug | Everyone | Lesson body, image or video, resources |
-| Kiosk start | /kiosk | Kiosk device | "Tap to begin" for the next student, hidden Exit (PIN) |
-| Kiosk flow | /kiosk/consent → /kiosk/feedback | Kiosk respondent | Consent, profile with the school details (student number, course, year level), instructions, assessment, results with QR code, then the SUS survey and Done |
+| School link | /s/:code → /s/:code/results | School-link respondent | The school notice, profile with the school details (student number, course, year level), home with the rules, assessment, results with the Rate DigiBridge card and Done (which opens the survey first if it isn't answered); a closed, expired or full link shows a plain message instead |
+| Done | /s/:code/done | School-link respondent | Thanks, the browser is cleared, link to the lessons |
+| School links | /admin/links | Admin | Make a link, copy it, see its status and how many joined, close it |
 | Dashboard | /admin | Admin, facilitator | Summary cards incl. mean SUS, level chart, comparison chart, filters |
 | Respondents | /admin/respondents | Admin, facilitator | Table with search, sort and filters; detail drawer; Export CSV (admin) |
 | Questions | /admin/questions | Admin | List per area, editor, CSV import, item analysis |
 | Lessons editor | /admin/lessons | Admin | List and Markdown editor with preview |
 | Users | /admin/users | Admin | Accounts and roles |
 
-All screens work at phone width (360 px) and up. The assessment and kiosk screens use large tap targets for tablets.
+All screens work at phone width (360 px) and up. The assessment and school-link screens use large tap targets, since students use their own phones.
 
 ## Non-functional requirements
 
@@ -277,7 +280,7 @@ The app must work on a cheap phone over mobile data and keep student data privat
 | Reliability | No answer is lost on refresh, lost signal or closed tab. The app stays up through the pilot (Nov 11 to 12) and the defense. |
 | Capacity | 30 respondents taking the assessment at the same time without slowdown. |
 | Accessibility | Body text at least 16 px, color contrast at WCAG AA, every control usable by keyboard, choices are real radio buttons. |
-| Privacy | Follows the Data Privacy Act of 2012: consent first, only the fields the study needs, respondent data visible only to the team, deletion on request, all respondent data deleted at the end of the semester (December 2026). |
+| Privacy | Follows the Data Privacy Act of 2012: consent first, only the fields the study needs, respondent data visible only to the team, deletion on request, online respondent data deleted at the end of the semester (December 2026) and school-link data after 30 days. |
 | Security | HTTPS only. Every API route checks the role. The database can't be reached directly from the browser. |
 | Language | English for this version, written plainly for students. |
 
@@ -289,14 +292,14 @@ The system is built over Oct 31 to Nov 3, filled with real content by Nov 8, and
 | --- | --- | --- |
 | Nov 1 | Repo, Supabase project, Google sign-in working | Cez signs in on the deployed site |
 | Nov 2 | Schema, migrations and dummy seed data | 5 dummy items per area load in the assessment |
-| Nov 3 | All features working end to end with dummy content | A test respondent goes online and kiosk, consent to results; dashboard shows them |
+| Nov 3 | All features working end to end with dummy content | A test respondent goes online and through a school link, consent to results; dashboard shows them |
 | Nov 3 | Morales's test cases written | One test case per Must requirement |
 | Nov 6 | Real questions written | 30 items in the shared sheet |
 | Nov 7 | Questions reviewed, lessons written | Gonzaga signs off; 9 lessons ready |
 | Nov 8 | Real content loaded | CSV import done; dummy content deactivated |
 | Nov 10 | QA pass on every feature | No open Must bugs |
 | Nov 11 | Feature freeze, full test, test data cleared | Database holds only real content, no test respondents |
-| Nov 11 to 12 | Pilot test with 30 or more ACLC students, in kiosk mode | 30 completed kiosk attempts and SUS forms |
+| Nov 11 to 12 | Pilot test with 30 or more ACLC students, through school links | 30 completed school-link attempts and SUS forms |
 | Nov 14 | Bug fixes deployed and retested | Morales signs off |
 | Nov 15 | Rehearsal with live demo | Full run-through without errors |
 | 1st week of Dec | Defense |  |
@@ -305,10 +308,11 @@ The system is built over Oct 31 to Nov 3, filled with real content by Nov 8, and
 
 The open questions are settled; each answer is built into the requirements above.
 
-- **School details only in kiosk mode** (Nov 7): student number, course and year level are asked only in kiosk mode. Online mode is public and general, with one attempt per Google account (PRO-06, PRO-07, KIO-03). The study's ACLC sample comes from kiosk sessions.
-- **Student number format:** like C23-01-7557-MAN121, kiosk mode only (PRO-02).
-- **Courses and year levels:** BSIT, BSCS, BSBA, BSA and BSHM for 1st to 4th year; TESDA scholars in HRT and WADT for 1st to 3rd year, kiosk mode only (PRO-04).
-- **Consent contact and retention:** the online notice names the DigiBridge team as contact, not a person. Data is kept until the end of the semester (December 2026), since it's needed for the defense and finals, then deleted (CON-01).
-- **SUS survey:** inside the app after results. Optional online, prompted in kiosk mode (SUS-01 to SUS-05). This replaces the separate Google Form.
+- **School details only through school links** (Nov 7, links from Nov 11): student number, course and year level are asked only through school links. Online mode is public and general, with one attempt per Google account (PRO-06, PRO-07, LNK-03). The study's ACLC sample comes through school links, which need no Google sign-in and so open from Messenger.
+- **School links replace kiosk mode** (Nov 11): students use their own devices, so there's no shared tablet, exit PIN or device lock. A student counts against a link's limit once their profile is saved, and can finish after the link closes (LNK-02). A student number already used is stopped with a message to ask the team; there's no way to recover a lost place on another browser in this phase (PRO-03).
+- **Student number format:** like C23-01-7557-MAN121, school links only (PRO-02).
+- **Courses and year levels:** BSIT, BSCS, BSBA, BSA and BSHM for 1st to 4th year; TESDA scholars in HRT and WADT for 1st to 3rd year, school links only (PRO-04).
+- **Consent contact and retention:** both notices name the DigiBridge team as contact, not a person. Online data is kept until the end of the semester (December 2026), since it's needed for the defense and finals; school-link data is kept for 30 days. Then it's deleted (CON-01).
+- **SUS survey:** inside the app after results. Optional online, offered again by Done through a school link (SUS-01 to SUS-05). This replaces the separate Google Form.
 - **QR code to results:** included (RES-04).
-- **Showing identity:** each respondent chooses before the assessment whether the team sees their name and, in kiosk mode, their student number (PRO-05).
+- **Showing identity:** each respondent chooses before the assessment whether the team sees their name and, through a school link, their student number (PRO-05).
