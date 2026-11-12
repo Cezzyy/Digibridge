@@ -1,21 +1,11 @@
 import { attempts, respondents } from '@digibridge/db'
 import { AGE_GROUP_RANGES, PROFILE_TIME_ZONE, type DashboardFilters } from '@digibridge/shared'
-import {
-  arrayContains,
-  between,
-  desc,
-  eq,
-  gte,
-  lte,
-  sql,
-  type SQL,
-  type SQLWrapper,
-} from 'drizzle-orm'
+import { arrayContains, between, desc, eq, gte, lte, sql, type SQL } from 'drizzle-orm'
 import type { Db } from '../config/db'
 
 // The dashboard filters (DSH-03) as SQL, for the respondents table, the analysis page and item
-// analysis. Every condition is on `respondents`, except the school link, which is on the
-// attempt each caller joins.
+// analysis. Every condition is on `respondents`, the school link too: the one the student joined
+// through, so it's known from the profile on.
 
 const timeZone = sql.raw(`'${PROFILE_TIME_ZONE}'`)
 
@@ -28,8 +18,8 @@ export const consentDay = sql<string>`(${respondents.consentedAt} at time zone $
  */
 export const ageAtConsent = sql<number>`extract(year from age(${consentDay}, ${respondents.birthDate}))::int`
 
-/** The filters that are set, as conditions to AND together. `schoolLinkId` is the attempt's. */
-export function dashboardConditions(filters: DashboardFilters, schoolLinkId: SQLWrapper) {
+/** The filters that are set, as conditions to AND together. */
+export function dashboardConditions(filters: DashboardFilters) {
   const conditions: SQL[] = []
   if (filters.sex) conditions.push(eq(respondents.sex, filters.sex))
   if (filters.ageGroup) {
@@ -42,7 +32,7 @@ export function dashboardConditions(filters: DashboardFilters, schoolLinkId: SQL
   }
   if (filters.mode) conditions.push(eq(respondents.mode, filters.mode))
   // School respondents only: online rows have no link, course or year level, so they drop out.
-  if (filters.schoolLinkId) conditions.push(sql`${schoolLinkId} = ${filters.schoolLinkId}`)
+  if (filters.schoolLinkId) conditions.push(eq(respondents.schoolLinkId, filters.schoolLinkId))
   if (filters.course) conditions.push(eq(respondents.course, filters.course))
   if (filters.yearLevel !== undefined) conditions.push(eq(respondents.yearLevel, filters.yearLevel))
   if (filters.from) conditions.push(gte(consentDay, filters.from))
@@ -56,10 +46,7 @@ export function dashboardConditions(filters: DashboardFilters, schoolLinkId: SQL
  */
 export const currentAttemptOrder = [sql`${attempts.status} = 'voided'`, desc(attempts.startedAt)]
 
-/**
- * Each respondent's attempt (`currentAttemptOrder`). Left join it on `respondent_id` to filter
- * respondents by their attempt's link.
- */
+/** Each respondent's attempt (`currentAttemptOrder`), to left join on `respondent_id`. */
 export const currentAttempts = (db: Db) =>
   db
     .selectDistinctOn([attempts.respondentId])

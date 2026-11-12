@@ -74,7 +74,7 @@ const orderFor = (sort: RespondentSort, current: CurrentAttempts): SQL[] => {
 /** `%text%` for ILIKE, with the search's own `%`, `_` and `\` matched as themselves. */
 const containing = (text: string) => `%${text.replace(/[\\%_]/g, '\\$&')}%`
 
-/** Respondents with their attempt and its link, as table rows. */
+/** Respondents with their attempt and the link they joined through, as table rows. */
 function selectRespondents(db: Db, current: CurrentAttempts) {
   return db
     .select({
@@ -100,7 +100,7 @@ function selectRespondents(db: Db, current: CurrentAttempts) {
     })
     .from(respondents)
     .leftJoin(current, eq(current.respondentId, respondents.id))
-    .leftJoin(schoolLinks, eq(schoolLinks.id, current.schoolLinkId))
+    .leftJoin(schoolLinks, eq(schoolLinks.id, respondents.schoolLinkId))
 }
 
 type Row = Awaited<ReturnType<typeof selectRespondents>>[number]
@@ -122,7 +122,7 @@ export const listRespondents: RouteHandler<typeof listRespondentsRoute, AuthEnv>
   const db = c.var.db
   const current = currentAttempts(db)
 
-  const conditions = dashboardConditions(filters, current.schoolLinkId)
+  const conditions = dashboardConditions(filters)
   if (status) conditions.push(sql`${statusOf(current)} = ${status}`)
   if (q) {
     // Only shown identities can be found by name or student number (PRO-05).

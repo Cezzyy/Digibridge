@@ -224,7 +224,7 @@ function submit() {
     <FormSection
       :number="3"
       title="How long it’s open"
-      description="When the link stops letting new students start."
+      description="When the link stops letting new students join."
       :done="done.open"
     >
       <DateField
@@ -240,7 +240,7 @@ function submit() {
       <TextField
         v-model="form.maxResponses"
         label="Response limit"
-        :hint="`Optional. The most students who can start from it, up to ${LINK_MAX_RESPONSES}. Leave it empty for no limit.`"
+        :hint="`Optional. The most students who can join through it, up to ${LINK_MAX_RESPONSES}. Leave it empty for no limit.`"
         :error="errors.maxResponses"
         inputmode="numeric"
         autocomplete="off"

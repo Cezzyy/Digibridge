@@ -55,7 +55,7 @@ export const SchoolLinkSchema = z
     createdAt: z.iso.datetime(),
     // The admin's name, or their email if Google gave no name; null once their account is gone.
     createdBy: z.string().nullable(),
-    // Attempts started through the link, not counting voided ones.
+    // Students who saved their profile through the link (LNK-02).
     responses: z.int(),
     status: linkStatusSchema,
   })

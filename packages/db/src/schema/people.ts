@@ -38,8 +38,8 @@ export const profiles = pgTable('profiles', {
 
 // Someone taking the assessment, online (linked to a profile) or through a school link (no
 // profile). Online rows are keyed by profile, school rows by student number. School details
-// (student number, course, year level) and the respondent token are school only; the mode check
-// enforces it.
+// (student number, course, year level), the respondent token and the link they joined through
+// are school only; the mode check enforces it.
 export const respondents = pgTable(
   'respondents',
   {
@@ -67,6 +67,9 @@ export const respondents = pgTable(
     showIdentity: boolean('show_identity').notNull().default(false),
     // SHA-256 of the token a school-link student's browser keeps in place of a Google sign-in.
     accessTokenHash: text('access_token_hash').unique(),
+    // The school link the student joined through (LNK-05): they count against its limit from the
+    // moment the profile is saved, and their attempt records it too.
+    schoolLinkId: uuid('school_link_id').references((): AnyPgColumn => schoolLinks.id),
     mode: modeEnum('mode').notNull(),
     consentVersion: text('consent_version').notNull(),
     consentedAt: timestamp('consented_at', { withTimezone: true }).notNull(),
@@ -89,10 +92,13 @@ export const respondents = pgTable(
     check(
       'respondents_school_fields_by_mode',
       sql`(${t.mode} = ${modeLiteral('school')} and ${t.studentNumber} is not null and ${t.course} is not null
-          and ${t.yearLevel} is not null and ${t.profileId} is null and ${t.accessTokenHash} is not null)
+          and ${t.yearLevel} is not null and ${t.profileId} is null and ${t.accessTokenHash} is not null
+          and ${t.schoolLinkId} is not null)
         or (${t.mode} = ${modeLiteral('online')} and ${t.studentNumber} is null and ${t.course} is null
-          and ${t.yearLevel} is null and ${t.accessTokenHash} is null)`,
+          and ${t.yearLevel} is null and ${t.accessTokenHash} is null and ${t.schoolLinkId} is null)`,
     ),
+    // Each link's response count (its respondents), and the dashboard's school link filter.
+    index('respondents_school_link_id_idx').on(t.schoolLinkId),
     // School rows only: online rows have no course. A query on course = X still uses it.
     index('respondents_course_year_level_idx')
       .on(t.course, t.yearLevel)

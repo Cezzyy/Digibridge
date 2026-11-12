@@ -34,7 +34,7 @@ export function lockText(course: string | null, yearLevel: number | null) {
   return 'Any course and year level'
 }
 
-/** How many students have started, against the limit if there is one. */
+/** How many students have joined, against the limit if there is one. */
 export function responsesText(responses: number, maxResponses: number | null) {
   if (maxResponses !== null) return `${responses} of ${maxResponses} students`
   return `${responses} ${responses === 1 ? 'student' : 'students'}, no limit`

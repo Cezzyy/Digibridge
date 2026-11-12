@@ -1,13 +1,14 @@
 // Test setup for app.test.ts: an in-memory Postgres with the real migrations, and
 // Supabase-style access tokens signed with a test key.
 // Don't import app here: app.test.ts's mock of config/db imports this file.
-import { choices, competencyAreas, profiles, questions, schema } from '@digibridge/db'
+import { choices, competencyAreas, profiles, questions, schema, schoolLinks } from '@digibridge/db'
 import {
   AREA_CODES,
   AREA_LABELS,
   CHOICES_PER_QUESTION,
   DIFFICULTIES,
   ITEMS_PER_DIFFICULTY,
+  LINK_CODE_LENGTH,
   type Role,
 } from '@digibridge/shared'
 import { PGlite } from '@electric-sql/pglite'
@@ -44,9 +45,12 @@ export async function setUpDatabase() {
   await migrate(testDb, { migrationsFolder: MIGRATIONS })
 }
 
-/** Removes every account and everything that hangs off one (profiles, respondents, attempts). */
+/**
+ * Removes every account and everything that hangs off one (profiles, respondents, attempts), and
+ * the school links.
+ */
 export async function clearAccounts() {
-  await testDb.execute(sql`truncate auth.users, respondents cascade`)
+  await testDb.execute(sql`truncate auth.users, respondents, school_links cascade`)
 }
 
 /** The row Supabase creates in auth.users at Google sign-in, before our API sees the user. */
@@ -87,6 +91,21 @@ export async function addQuestionBank() {
     }
   }
   return { active, inactive }
+}
+
+/** A school link, open for a day unless `values` says otherwise. clearAccounts removes it. */
+export async function addSchoolLink(values: Partial<typeof schoolLinks.$inferInsert> = {}) {
+  const [row] = await testDb
+    .insert(schoolLinks)
+    .values({
+      code: crypto.randomUUID().replaceAll('-', '').slice(0, LINK_CODE_LENGTH).toUpperCase(),
+      school: 'ACLC College of Mandaue',
+      label: 'BSIT 2A',
+      expiresAt: new Date(Date.now() + 86_400_000),
+      ...values,
+    })
+    .returning()
+  return row!
 }
 
 /** Removes the areas, questions and choices that addQuestionBank added. */

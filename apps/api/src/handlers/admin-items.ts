@@ -12,7 +12,7 @@ export const getItemAnalysis: RouteHandler<typeof itemAnalysisRoute, AuthEnv> = 
   // Finished attempts (submitted, or closed by the timer) of respondents who match the filters.
   const finished = and(
     inArray(attempts.status, FINISHED_ATTEMPT_STATUSES),
-    ...dashboardConditions(c.req.valid('query'), attempts.schoolLinkId),
+    ...dashboardConditions(c.req.valid('query')),
   )
 
   const [items, itemChoices, shown, picks] = await Promise.all([

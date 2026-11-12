@@ -36,7 +36,7 @@ const HIDDEN_BUTTON = 'border-transparent! text-transparent!'
           <span :class="ICON_TILE" />
           <p class="text-sm font-semibold"><SkeletonText class="w-20" /></p>
           <p><SkeletonText :class="width" /></p>
-          <!-- Started's bar row. -->
+          <!-- Joined's bar row. -->
           <p v-if="i === 2" class="mt-2 h-1.5 rounded-full" :class="BLOCK" />
         </div>
       </div>
