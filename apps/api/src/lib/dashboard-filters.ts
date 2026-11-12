@@ -1,6 +1,17 @@
-import { respondents } from '@digibridge/db'
+import { attempts, respondents } from '@digibridge/db'
 import { AGE_GROUP_RANGES, PROFILE_TIME_ZONE, type DashboardFilters } from '@digibridge/shared'
-import { arrayContains, between, eq, gte, lte, sql, type SQL, type SQLWrapper } from 'drizzle-orm'
+import {
+  arrayContains,
+  between,
+  desc,
+  eq,
+  gte,
+  lte,
+  sql,
+  type SQL,
+  type SQLWrapper,
+} from 'drizzle-orm'
+import type { Db } from '../config/db'
 
 // The dashboard filters (DSH-03) as SQL, for the respondents table, the analysis page and item
 // analysis. Every condition is on `respondents`, except the school link, which is on the
@@ -38,3 +49,16 @@ export function dashboardConditions(filters: DashboardFilters, schoolLinkId: SQL
   if (filters.to) conditions.push(lte(consentDay, filters.to))
   return conditions
 }
+
+/**
+ * Each respondent's attempt: the one that isn't voided (there's at most one), or else the latest
+ * voided one. Left join it on `respondent_id` to filter respondents by their attempt's link.
+ */
+export const currentAttempts = (db: Db) =>
+  db
+    .selectDistinctOn([attempts.respondentId])
+    .from(attempts)
+    .orderBy(attempts.respondentId, sql`${attempts.status} = 'voided'`, desc(attempts.startedAt))
+    .as('current_attempt')
+
+export type CurrentAttempts = ReturnType<typeof currentAttempts>
