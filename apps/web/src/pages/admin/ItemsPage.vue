@@ -11,7 +11,7 @@ import { computed, onMounted, ref, watch } from 'vue'
 import ErrorPanel from '../../components/admin/ErrorPanel.vue'
 import FilterBar from '../../components/admin/FilterBar.vue'
 import ItemCard from '../../components/admin/ItemCard.vue'
-import SkeletonText from '../../components/results/SkeletonText.vue'
+import ItemCardSkeleton from '../../components/admin/ItemCardSkeleton.vue'
 import { useDashboardFilters } from '../../composables/useDashboardFilters'
 import { useItemAnalysis } from '../../composables/useItemAnalysis'
 import { useSchoolLinks } from '../../composables/useSchoolLinks'
@@ -94,11 +94,7 @@ const shown = computed(() =>
   <ErrorPanel v-if="error" class="mt-4" :message="error" @retry="load(filters)" />
 
   <ul v-else-if="!shown" class="mt-4 grid gap-4 lg:grid-cols-2" aria-busy="true">
-    <li v-for="n in 4" :key="n" class="rounded-card border border-line bg-surface p-5">
-      <p class="text-sm"><SkeletonText class="w-24" /></p>
-      <p class="mt-2"><SkeletonText class="w-full" /></p>
-      <p><SkeletonText class="w-2/3" /></p>
-    </li>
+    <li v-for="n in 6" :key="n"><ItemCardSkeleton :variant="n" class="h-full" /></li>
     <li class="sr-only">Loading items</li>
   </ul>
 

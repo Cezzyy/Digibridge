@@ -13,6 +13,7 @@ import { computed, ref } from 'vue'
 import type { AdminStats } from '../../composables/useAdminStats'
 import { LEVEL_BANDS } from '../../lib/levels'
 import SelectField from '../form/SelectField.vue'
+import SkeletonText from '../results/SkeletonText.vue'
 import { ICONS } from './admin-icons'
 import { pctText } from './stats-text'
 import StrokeIcon from './StrokeIcon.vue'
@@ -21,7 +22,9 @@ import StrokeIcon from './StrokeIcon.vue'
 // with faint ticks where each level starts, the average at the bar's end and how many finished.
 // One measure at a time (overall or one area), so it's one series in one color. Groupings only
 // school respondents have say so, and so do the ones where a respondent can be in several groups.
-const props = defineProps<{ comparison: AdminStats['comparison'] }>()
+// Null while the numbers load: the controls, note and scale are drawn, with placeholder bars
+// (two for mode, online and school, else three).
+const props = defineProps<{ comparison: AdminStats['comparison'] | null }>()
 const groupBy = defineModel<StatsGroup>('groupBy', { required: true })
 
 type Measure = 'overall' | AreaCode
@@ -33,14 +36,20 @@ const measureOptions: { value: Measure; label: string }[] = [
   ...AREA_CODES.map((area) => ({ value: area, label: AREA_LABELS[area] })),
 ]
 
-const bars = computed(() =>
-  props.comparison.groups.map((group) => ({
-    ...group,
-    pct:
-      measure.value === 'overall'
-        ? group.averageOverallPct
-        : (group.areas.find((a) => a.area === measure.value)?.averagePct ?? null),
-  })),
+const bars = computed(
+  () =>
+    props.comparison?.groups.map((group) => ({
+      ...group,
+      pct:
+        measure.value === 'overall'
+          ? group.averageOverallPct
+          : (group.areas.find((a) => a.area === measure.value)?.averagePct ?? null),
+    })) ?? null,
+)
+const placeholderBars = computed(() =>
+  (groupBy.value === 'mode' ? ['w-[4em]', 'w-[7em]'] : ['w-[6em]', 'w-[8em]', 'w-[5em]']).map(
+    (label, i) => ({ label, fill: ['62%', '48%', '55%'][i] }),
+  ),
 )
 const schoolOnly = computed(() =>
   (SCHOOL_ONLY_GROUPS as readonly StatsGroup[]).includes(groupBy.value),
@@ -69,11 +78,38 @@ const TICKS = LEVEL_BANDS.slice(1).map((band) => band.from)
       </template>
     </p>
 
-    <p v-if="bars.length === 0" class="mt-6 rounded-card bg-mist-soft p-5 text-quiet">
+    <p v-if="bars?.length === 0" class="mt-6 rounded-card bg-mist-soft p-5 text-quiet">
       No finished attempts to compare yet.
     </p>
     <template v-else>
-      <ul class="mt-6 space-y-4" aria-hidden="true">
+      <ul v-if="!bars" class="mt-6 space-y-4" aria-hidden="true">
+        <li
+          v-for="bar in placeholderBars"
+          :key="bar.label"
+          class="grid gap-x-4 gap-y-1.5 sm:grid-cols-[minmax(0,12rem)_1fr]"
+        >
+          <span class="min-w-0">
+            <span class="block font-semibold"><SkeletonText :class="bar.label" /></span>
+            <span class="block text-sm"><SkeletonText class="w-[5.5em]" /></span>
+          </span>
+          <span class="flex items-center gap-3">
+            <span class="relative h-6 flex-1 rounded-[4px] bg-track">
+              <span
+                class="absolute inset-y-0 left-0 rounded-[4px] bg-line-strong/20 motion-safe:animate-skeleton"
+                :style="{ width: bar.fill }"
+              />
+              <span
+                v-for="tick in TICKS"
+                :key="tick"
+                class="absolute inset-y-0 w-px bg-line-strong/40"
+                :style="{ left: `${tick}%` }"
+              />
+            </span>
+            <span class="w-[6ch] text-right font-semibold"><SkeletonText class="w-[3.5ch]" /></span>
+          </span>
+        </li>
+      </ul>
+      <ul v-else class="mt-6 space-y-4" aria-hidden="true">
         <li
           v-for="bar in bars"
           :key="bar.key"
@@ -114,7 +150,10 @@ const TICKS = LEVEL_BANDS.slice(1).map((band) => band.from)
         Advanced start.
       </p>
 
-      <details class="mt-4">
+      <p v-if="!comparison" class="mt-4 font-semibold" aria-hidden="true">
+        <SkeletonText class="w-[8.5em]" />
+      </p>
+      <details v-else class="mt-4">
         <summary class="cursor-pointer font-semibold text-evergreen">Show as a table</summary>
         <div class="mt-3 overflow-x-auto">
           <table class="w-full text-left text-sm">
