@@ -7,10 +7,11 @@ import { filterQuery, filtersFrom } from '../../composables/useDashboardFilters'
 import { useSessionStore } from '../../stores/session'
 
 // The frame of every /admin page, under AppHeader: a menu on the left from `lg`, which stays put
-// while the page scrolls, and a row of tabs under the header on smaller screens. Links shows
-// for admins only (LNK-01); the router keeps facilitators out of it too. Student preview opens
-// /home, where staff can try the student steps without saving anything. The pages that take
-// the dashboard filters get the ones set now, so they carry over (DSH-03).
+// while the page scrolls, and a row of tabs under the header on smaller screens. School links
+// (LNK-01) and Item analysis, which shows the right answers (DSH-08), show for admins only; the
+// router keeps facilitators out of both too. Student preview opens /home, where staff can try the
+// student steps without saving anything. The pages that take the dashboard filters get the ones
+// set now, so they carry over (DSH-03).
 const session = useSessionStore()
 const route = useRoute()
 const filters = computed(() => filterQuery(filtersFrom(route.query)))
@@ -35,6 +36,11 @@ const items = computed<NavItem[]>(() => [
   },
   ...(session.isAdmin
     ? [
+        {
+          label: 'Item analysis',
+          to: { name: 'admin-items', query: filters.value },
+          icon: ICONS.items,
+        },
         {
           label: 'School links',
           to: { name: 'admin-links' },
