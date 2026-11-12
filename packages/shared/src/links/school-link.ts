@@ -32,7 +32,7 @@ export const LINK_STATUS_LABELS = {
   full: 'Full',
 } as const satisfies Record<LinkStatus, string>
 
-/** What decides a link's status. `responses` counts its attempts that weren't voided. */
+/** What decides a link's status. `responses` counts the students who joined through it. */
 export type LinkState = {
   closedAt: Date | null
   expiresAt: Date

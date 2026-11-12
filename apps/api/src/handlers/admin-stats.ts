@@ -10,7 +10,7 @@ import { FINISHED_ATTEMPT_STATUSES, type AreaCode } from '@digibridge/shared'
 import type { RouteHandler } from '@hono/zod-openapi'
 import { and, count, eq, inArray, sql } from 'drizzle-orm'
 import type { AuthEnv } from '../env'
-import { ageAtConsent, currentAttempts, dashboardConditions } from '../lib/dashboard-filters'
+import { ageAtConsent, dashboardConditions } from '../lib/dashboard-filters'
 import { buildStats } from '../lib/stats'
 import type { statsRoute } from '../routes/admin-stats'
 
@@ -18,18 +18,16 @@ export const getStats: RouteHandler<typeof statsRoute, AuthEnv> = async (c) => {
   const { groupBy, ...filters } = c.req.valid('query')
   const db = c.var.db
 
-  // Respondents who match, finished or not, filtered by their current attempt's link.
-  const current = currentAttempts(db)
+  // Respondents who match, finished or not.
   const counting = db
     .select({ total: count() })
     .from(respondents)
-    .leftJoin(current, eq(current.respondentId, respondents.id))
-    .where(and(...dashboardConditions(filters, current.schoolLinkId)))
+    .where(and(...dashboardConditions(filters)))
 
   // The finished attempts of respondents who match. One per respondent: the others are voided.
   const finishedWhere = and(
     inArray(attempts.status, FINISHED_ATTEMPT_STATUSES),
-    ...dashboardConditions(filters, attempts.schoolLinkId),
+    ...dashboardConditions(filters),
   )
   const finishedAttempts = db
     .select({ id: attempts.id })
@@ -57,7 +55,7 @@ export const getStats: RouteHandler<typeof statsRoute, AuthEnv> = async (c) => {
       })
       .from(attempts)
       .innerJoin(respondents, eq(respondents.id, attempts.respondentId))
-      .leftJoin(schoolLinks, eq(schoolLinks.id, attempts.schoolLinkId))
+      .leftJoin(schoolLinks, eq(schoolLinks.id, respondents.schoolLinkId))
       .where(finishedWhere),
     db
       .select({

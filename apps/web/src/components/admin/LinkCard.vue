@@ -8,7 +8,7 @@ import LinkStatusBadge from './LinkStatusBadge.vue'
 import StrokeIcon from './StrokeIcon.vue'
 
 // One school link on the links page: its name, school, who made it and when, its status, its
-// last day, who can use it and how many have started (with a bar when there's a limit), then
+// last day, who can use it and how many have joined (with a bar when there's a limit), then
 // its address with Copy and Close. Closed and expired links keep their details but lose the
 // address bar. LinkCardSkeleton draws the same layout while the list loads: change both together.
 const props = defineProps<{ link: SchoolLinkRow; isNew?: boolean }>()
@@ -98,7 +98,7 @@ const ICON_TILE =
             <span aria-hidden="true" :class="ICON_TILE">
               <StrokeIcon :d="ICONS.started" class="size-5" />
             </span>
-            Started
+            Joined
           </dt>
           <dd class="truncate">{{ responsesText(link.responses, link.maxResponses) }}</dd>
           <!-- The bar's row is kept with no limit too, so every card (and the skeleton) lines up. -->

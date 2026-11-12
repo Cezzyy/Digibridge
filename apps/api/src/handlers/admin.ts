@@ -10,7 +10,6 @@ import {
   gt,
   inArray,
   isNull,
-  ne,
   sql,
   type SQL,
 } from 'drizzle-orm'
@@ -25,9 +24,11 @@ import type {
   overviewRoute,
 } from '../routes/admin'
 
-/** A link's response count: its attempts that weren't voided. */
-const responsesOf = (db: Db) =>
-  db.$count(attempts, and(eq(attempts.schoolLinkId, schoolLinks.id), ne(attempts.status, 'voided')))
+/**
+ * A link's response count: the students who joined through it. A student counts from the moment
+ * their profile is saved, so a voided attempt still does: they can start again.
+ */
+const responsesOf = (db: Db) => db.$count(respondents, eq(respondents.schoolLinkId, schoolLinks.id))
 
 /** School links with their creator's name and response count, newest first. */
 async function selectLinks(db: Db, where?: SQL) {

@@ -19,7 +19,7 @@ import { useSchoolLinks, type SchoolLinkRow } from '../../composables/useSchoolL
 import { PRIMARY_BUTTON } from '../../lib/buttons'
 
 // School links (LNK-01), admin only: make a link for a class, copy it to send to the students,
-// see each link's school, expiry, status and how many have started, and close it. With no links
+// see each link's school, expiry, status and how many have joined, and close it. With no links
 // yet, the form is already open. While the list loads, the filter and three LinkCardSkeletons
 // stand in for it, in the same places.
 const { links, loadError, load, creating, createError, create, closingId, closeError, close } =
@@ -54,7 +54,7 @@ const counts = computed(() => {
 })
 const shown = computed(() => links.value?.filter((link) => inFilter(link.status, filter.value)))
 
-// Closing asks first: students who haven't started can't use the link after that.
+// Closing asks first: new students can't join through the link after that.
 const closing = ref<SchoolLinkRow | null>(null)
 async function confirmClose() {
   if (closing.value && (await close(closing.value.id))) closing.value = null
@@ -179,7 +179,7 @@ function stopClosing() {
   <ConfirmDialog
     :open="closing !== null"
     :title="`Close ${closing?.label ?? 'this link'}?`"
-    message="Students who haven’t started yet won’t be able to use it. Anyone already taking the assessment can still finish. You can’t open it again, but you can make a new link."
+    message="New students won’t be able to join through it. Students who already saved their profile can still take the assessment and finish it. You can’t open it again, but you can make a new link."
     confirm-label="Close link"
     busy-label="Closing…"
     :busy="closingId !== null"

@@ -69,6 +69,7 @@ import {
   signedIn,
   testDb,
   tokenFor,
+  addSchoolLink,
 } from './test-helpers'
 
 // Every request gets the in-memory test database instead of Hyperdrive.
@@ -1727,40 +1728,53 @@ const insertError = async (values: typeof respondents.$inferInsert) => {
 }
 
 describe('respondents_school_fields_by_mode', () => {
-  it('takes a school row with school details and a token, and an online row without', async () => {
+  it('takes a school row with school details, a token and a link, and an online row without', async () => {
     const user = await signedIn()
-    expect(await insertError({ ...base, ...school, mode: 'school' })).toBeUndefined()
+    const link = await addSchoolLink()
+    expect(
+      await insertError({ ...base, ...school, schoolLinkId: link.id, mode: 'school' }),
+    ).toBeUndefined()
     expect(await insertError({ ...base, mode: 'online', profileId: user.id })).toBeUndefined()
   })
 
   it.each([
-    ['without a student number', { ...school, studentNumber: null }],
-    ['without a course', { ...school, course: null }],
-    ['without a year level', { ...school, yearLevel: null }],
-    ['without a token', { ...school, accessTokenHash: null }],
+    ['without a student number', { studentNumber: null }],
+    ['without a course', { course: null }],
+    ['without a year level', { yearLevel: null }],
+    ['without a token', { accessTokenHash: null }],
+    ['without a link', { schoolLinkId: null }],
   ])('refuses a school row %s', async (_, fields) => {
-    expect(await insertError({ ...base, ...fields, mode: 'school' })).toBe(
-      'respondents_school_fields_by_mode',
-    )
+    const link = await addSchoolLink()
+    expect(
+      await insertError({ ...base, ...school, schoolLinkId: link.id, ...fields, mode: 'school' }),
+    ).toBe('respondents_school_fields_by_mode')
   })
 
   it('refuses a school row linked to a profile', async () => {
     const user = await signedIn()
-    expect(await insertError({ ...base, ...school, mode: 'school', profileId: user.id })).toBe(
-      'respondents_school_fields_by_mode',
-    )
+    const link = await addSchoolLink()
+    expect(
+      await insertError({
+        ...base,
+        ...school,
+        schoolLinkId: link.id,
+        mode: 'school',
+        profileId: user.id,
+      }),
+    ).toBe('respondents_school_fields_by_mode')
   })
 
   it.each([
-    ['a student number', { studentNumber: school.studentNumber }],
-    ['a course', { course: school.course }],
-    ['a year level', { yearLevel: school.yearLevel }],
-    ['a token', { accessTokenHash: school.accessTokenHash }],
+    ['a student number', () => ({ studentNumber: school.studentNumber })],
+    ['a course', () => ({ course: school.course })],
+    ['a year level', () => ({ yearLevel: school.yearLevel })],
+    ['a token', () => ({ accessTokenHash: school.accessTokenHash })],
+    ['a link', async () => ({ schoolLinkId: (await addSchoolLink()).id })],
   ])('refuses an online row with %s', async (_, fields) => {
     const user = await signedIn()
-    expect(await insertError({ ...base, ...fields, mode: 'online', profileId: user.id })).toBe(
-      'respondents_school_fields_by_mode',
-    )
+    expect(
+      await insertError({ ...base, ...(await fields()), mode: 'online', profileId: user.id }),
+    ).toBe('respondents_school_fields_by_mode')
   })
 })
 
@@ -1812,19 +1826,7 @@ describe('admin', () => {
       env,
     )
 
-  const addLink = async (values: Partial<typeof schoolLinks.$inferInsert> = {}) => {
-    const [row] = await testDb
-      .insert(schoolLinks)
-      .values({
-        code: crypto.randomUUID().slice(0, LINK_CODE_LENGTH).toUpperCase(),
-        school: 'ACLC College of Mandaue',
-        label: 'BSIT 2A',
-        expiresAt: new Date(Date.now() + 86_400_000),
-        ...values,
-      })
-      .returning()
-    return row!
-  }
+  const addLink = addSchoolLink
 
   // A respondent with one attempt, online (with an account) or through a school link.
   let studentCount = 0
@@ -1838,6 +1840,7 @@ describe('admin', () => {
           ...school,
           studentNumber: `C23-01-${String(1000 + ++studentCount)}-MAN121`,
           accessTokenHash: crypto.randomUUID(),
+          schoolLinkId,
           mode: 'school' as const,
         }
       : { ...base, mode: 'online' as const, profileId: (await signedIn()).id }
@@ -1955,10 +1958,10 @@ describe('admin', () => {
         closedAt: new Date(),
         createdAt: new Date(Date.now() - 2 * day),
       })
-      const open = await addLink({ label: 'open', maxResponses: 2 })
+      const open = await addLink({ label: 'open', maxResponses: 3 })
       await addStudent('submitted', full.id)
       await addStudent('in_progress', open.id)
-      // Voided attempts don't count toward the limit.
+      // A student counts from the profile on, so a voided attempt still does.
       await addStudent('voided', open.id)
 
       const admin = await signedIn('admin')
@@ -1966,7 +1969,7 @@ describe('admin', () => {
       expect(res.status).toBe(200)
       const body = (await res.json()) as { label: string; status: string; responses: number }[]
       expect(body.map(({ label, status, responses }) => ({ label, status, responses }))).toEqual([
-        { label: 'open', status: 'open', responses: 1 },
+        { label: 'open', status: 'open', responses: 2 },
         { label: 'closed', status: 'closed', responses: 0 },
         { label: 'expired', status: 'expired', responses: 0 },
         { label: 'full', status: 'full', responses: 1 },
@@ -2034,20 +2037,12 @@ describe('admin respondents', () => {
     return { status: res.status, body: (await res.json()) as Listed }
   }
 
-  const linkFor = async (label: string) => {
-    const [row] = await testDb
-      .insert(schoolLinks)
-      .values({
-        code: crypto.randomUUID().slice(0, LINK_CODE_LENGTH).toUpperCase(),
-        school: 'ACLC College of Mandaue',
-        label,
-        expiresAt: new Date(Date.now() + 86_400_000),
-      })
-      .returning()
-    return row!
-  }
+  const linkFor = (label: string) => addSchoolLink({ label })
 
-  /** A school respondent, straight into the database, with an attempt in the given state. */
+  /**
+   * A school respondent, straight into the database, with an attempt in the given state. They
+   * joined through the attempt's link, or else a link of their own.
+   */
   let studentNumber = 2000
   const addSchoolRespondent = async (
     values: Partial<typeof respondents.$inferInsert>,
@@ -2066,6 +2061,7 @@ describe('admin respondents', () => {
         accessTokenHash: crypto.randomUUID(),
         mode: 'school',
         ...values,
+        schoolLinkId: values.schoolLinkId ?? attempt?.linkId ?? (await linkFor('Not started')).id,
       })
       .returning()
     let attemptId: string | null = null
@@ -2098,10 +2094,12 @@ describe('admin respondents', () => {
         { fullName: 'Maria Santos', consentedAt: new Date('2026-11-10T02:00:00Z') },
         { status: 'submitted', linkId: link.id, pct: 55.5 },
       )
+      // Joined through the link but not started yet: the link shows all the same.
       const shown = await addSchoolRespondent({
         fullName: 'Pedro Reyes',
         showIdentity: true,
         consentedAt: new Date('2026-11-11T02:00:00Z'),
+        schoolLinkId: link.id,
       })
 
       const staff = await signedIn('facilitator')
@@ -2114,7 +2112,7 @@ describe('admin respondents', () => {
         studentNumber: shown.studentNumber,
         identityHidden: false,
         status: 'not_started',
-        schoolLink: null,
+        schoolLink: { id: link.id, label: 'BSIT 2A' },
         attemptId: null,
       })
       expect(body.respondents[1]).toMatchObject({
