@@ -7,6 +7,12 @@ compatibility_flags = ["nodejs_compat"]
 [dev]
 port = 8787
 
+# Run the Worker in the database's region (Supabase, AWS ap-south-1) rather than at the edge
+# nearest the student: a request then crosses the distance once, instead of once per query.
+[placement]
+mode = "targeted"
+region = "aws:ap-south-1"
+
 # Public settings. .dev.vars overrides these in `wrangler dev`; secrets are set with `wrangler secret put`.
 [vars]
 SUPABASE_URL = "https://pvjykztyqpuywsccvlqg.supabase.co"

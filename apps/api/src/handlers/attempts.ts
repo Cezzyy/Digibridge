@@ -10,13 +10,15 @@ import {
   susResponses,
 } from '@digibridge/db'
 import {
+  ANSWER_GRACE_SECONDS,
   ATTEMPT_DURATION_MINUTES,
+  FINISHED_ATTEMPT_STATUSES,
   LESSON_TIERS_FOR_LEVEL,
   type AreaCode,
   type AttemptStatus,
 } from '@digibridge/shared'
 import type { RouteHandler } from '@hono/zod-openapi'
-import { and, eq, inArray, ne } from 'drizzle-orm'
+import { and, eq, inArray, ne, sql } from 'drizzle-orm'
 import type { Db } from '../config/db'
 import type { AuthEnv } from '../env'
 import { pickItems, type PoolItem } from '../lib/pick-items'
@@ -91,20 +93,29 @@ export const startAttempt: RouteHandler<typeof startAttemptRoute, AuthEnv> = asy
       status,
     )
 
-  const [respondent] = await db
-    .select({ id: respondents.id })
-    .from(respondents)
-    .where(eq(respondents.profileId, c.var.profile.id))
+  // The respondent and their attempt in one query (at most one row, as in /me), with the item
+  // pool loaded alongside: every query is a round trip to the database, so they go out together.
+  const [[respondent], pool] = await Promise.all([
+    db
+      .select({ id: respondents.id, attempt: summaryColumns })
+      .from(respondents)
+      .leftJoin(
+        attempts,
+        and(eq(attempts.respondentId, respondents.id), ne(attempts.status, 'voided')),
+      )
+      .where(eq(respondents.profileId, c.var.profile.id)),
+    activePool(db),
+  ])
   if (!respondent) throw new ApiError('conflict', 'Fill in your profile before you start.')
 
   // An attempt in progress is returned as it is (ASM-07); a finished one can't be retaken.
-  const existing = await currentAttempt(db, respondent.id)
+  const existing = respondent.attempt
   if (existing) {
     if (existing.status !== 'in_progress') throw new ApiError('conflict', ALREADY_TAKEN)
     return reply(existing, 200)
   }
 
-  const picked = pickItems(await activePool(db))
+  const picked = pickItems(pool)
   if (!picked.ok) {
     console.error('Too few active items to start an attempt', picked.shortfalls)
     throw new ApiError('conflict', NOT_READY)
@@ -158,16 +169,11 @@ const closedAt = (attempt: { submittedAt: Date | null; expiresAt: Date }) =>
   attempt.submittedAt ?? attempt.expiresAt
 
 /**
- * The signed-in user's attempt with this ID (`isOwnAttempt`). `lock` takes a row lock inside a
- * transaction: `share` while saving an answer or the survey, `update` while submitting, so an answer
- * can't land after the attempt is scored, nor a survey after it's voided.
+ * The signed-in user's attempt with this ID (`isOwnAttempt`). `lock: 'update'` takes a row lock
+ * inside the submit's transaction, so no answer lands while it's scored (saveAnswer and saveSus
+ * take `for share` in their own single statements).
  */
-async function ownAttempt(
-  db: Db | Tx,
-  profileId: string,
-  attemptId: string,
-  lock?: 'share' | 'update',
-) {
+async function ownAttempt(db: Db | Tx, profileId: string, attemptId: string, lock?: 'update') {
   const query = db
     .select({
       id: attempts.id,
@@ -187,26 +193,39 @@ async function ownAttempt(
 
 export const getAttempt: RouteHandler<typeof getAttemptRoute, AuthEnv> = async (c) => {
   const db = c.var.db
-  const attempt = await ownAttempt(db, c.var.profile.id, c.req.valid('param').id)
+  const attemptId = c.req.valid('param').id
 
-  const rows = await db
-    .select({
-      id: questions.id,
-      area: competencyAreas.code,
-      stem: questions.stem,
-      imageUrl: questions.imageUrl,
-      isScenario: questions.isScenario,
-      choiceId: choices.id,
-      label: choices.label,
-    })
-    .from(questions)
-    .innerJoin(competencyAreas, eq(competencyAreas.id, questions.areaId))
-    .innerJoin(choices, eq(choices.questionId, questions.id))
-    .where(inArray(questions.id, attempt.questionOrder))
-  const saved = await db
-    .select({ questionId: answers.questionId, choiceId: answers.choiceId })
-    .from(answers)
-    .where(eq(answers.attemptId, attempt.id))
+  // All three at once. The items and answers are looked up by the attempt's ID alone and only
+  // sent once ownAttempt has found it to be the caller's.
+  const [attempt, rows, saved] = await Promise.all([
+    ownAttempt(db, c.var.profile.id, attemptId),
+    db
+      .select({
+        id: questions.id,
+        area: competencyAreas.code,
+        stem: questions.stem,
+        imageUrl: questions.imageUrl,
+        isScenario: questions.isScenario,
+        choiceId: choices.id,
+        label: choices.label,
+      })
+      .from(questions)
+      .innerJoin(competencyAreas, eq(competencyAreas.id, questions.areaId))
+      .innerJoin(choices, eq(choices.questionId, questions.id))
+      .where(
+        inArray(
+          questions.id,
+          db
+            .select({ id: sql`unnest(${attempts.questionOrder})` })
+            .from(attempts)
+            .where(eq(attempts.id, attemptId)),
+        ),
+      ),
+    db
+      .select({ questionId: answers.questionId, choiceId: answers.choiceId })
+      .from(answers)
+      .where(eq(answers.attemptId, attemptId)),
+  ])
 
   const labels = new Map(rows.map((row) => [row.choiceId, row.label]))
   const questionRows = new Map(rows.map((row) => [row.id, row]))
@@ -245,36 +264,63 @@ export const getAttempt: RouteHandler<typeof getAttemptRoute, AuthEnv> = async (
   )
 }
 
+/** The grace period as an SQL interval, for checks the database makes. */
+const grace = sql`make_interval(secs => ${ANSWER_GRACE_SECONDS})`
+
 export const saveAnswer: RouteHandler<typeof saveAnswerRoute, AuthEnv> = async (c) => {
+  const db = c.var.db
+  const profileId = c.var.profile.id
   const { id, questionId } = c.req.valid('param')
   const { choiceId } = c.req.valid('json')
+  const now = new Date()
+  const at = sql`${now.toISOString()}::timestamptz`
 
-  const saved = await c.var.db.transaction(async (tx) => {
-    const attempt = await ownAttempt(tx, c.var.profile.id, id, 'share')
-    const now = new Date()
+  // One statement, so one round trip and no transaction: it inserts only if the attempt is the
+  // caller's, still open, in time, and the choice is one of this question's in this attempt
+  // (choiceOrder holds exactly the attempt's items and each one's own choices). FOR SHARE holds
+  // off a submit until the answer is in, and waits for one already scoring, then sees it closed.
+  const [saved] = await db
+    .insert(answers)
+    .select(
+      db
+        .select({
+          attemptId: attempts.id,
+          questionId: sql`${questionId}::uuid`.as('question_id'),
+          choiceId: sql`${choiceId}::uuid`.as('choice_id'),
+          points: sql`null::smallint`.as('points'),
+          answeredAt: at.as('answered_at'),
+        })
+        .from(attempts)
+        .where(
+          and(
+            isOwnAttempt(db, profileId, id),
+            eq(attempts.status, 'in_progress'),
+            sql`${attempts.expiresAt} + ${grace} >= ${at}`,
+            sql`${attempts.choiceOrder} -> ${questionId}::text @> jsonb_build_array(${choiceId}::text)`,
+          ),
+        )
+        .for('share'),
+    )
+    .onConflictDoUpdate({
+      target: [answers.attemptId, answers.questionId],
+      set: { choiceId, answeredAt: now },
+    })
+    .returning({ answeredAt: answers.answeredAt })
+
+  if (!saved) {
+    // Nothing saved: read the attempt again to say why. Only on this rare path.
+    const attempt = await ownAttempt(db, profileId, id)
     if (attempt.status !== 'in_progress') {
       throw new ApiError('conflict', 'This assessment is already closed.')
     }
     if (timeIsUp(attempt.expiresAt, now)) {
       throw new ApiError('conflict', 'Time is up, so this answer wasn’t saved.')
     }
-    // choiceOrder holds exactly the attempt's items and each one's own choices.
-    const own = attempt.choiceOrder[questionId]
-    if (!own) throw new ApiError('bad_request', 'This question isn’t part of your assessment.')
-    if (!own.includes(choiceId)) {
-      throw new ApiError('bad_request', 'This answer isn’t one of the question’s choices.')
+    if (!attempt.choiceOrder[questionId]) {
+      throw new ApiError('bad_request', 'This question isn’t part of your assessment.')
     }
-
-    const [row] = await tx
-      .insert(answers)
-      .values({ attemptId: attempt.id, questionId, choiceId, answeredAt: now })
-      .onConflictDoUpdate({
-        target: [answers.attemptId, answers.questionId],
-        set: { choiceId, answeredAt: now },
-      })
-      .returning({ answeredAt: answers.answeredAt })
-    return row!
-  })
+    throw new ApiError('bad_request', 'This answer isn’t one of the question’s choices.')
+  }
 
   return c.json(
     {
@@ -315,21 +361,46 @@ export const submitAttempt: RouteHandler<typeof submitAttemptRoute, AuthEnv> = a
 
 export const getResult: RouteHandler<typeof getResultRoute, AuthEnv> = async (c) => {
   const db = c.var.db
-  const [attempt] = await db
-    .select({
-      id: attempts.id,
-      status: attempts.status,
-      expiresAt: attempts.expiresAt,
-      submittedAt: attempts.submittedAt,
-      totalPoints: attempts.totalPoints,
-      overallPct: attempts.overallPct,
-      overallLevel: attempts.overallLevel,
-      resultsToken: attempts.resultsToken,
-      susAttemptId: susResponses.attemptId,
-    })
-    .from(attempts)
-    .leftJoin(susResponses, eq(susResponses.attemptId, attempts.id))
-    .where(isOwnAttempt(db, c.var.profile.id, c.req.valid('param').id))
+  const attemptId = c.req.valid('param').id
+
+  // Each area with its published lessons, one row per lesson or one with no lesson, fetched
+  // alongside the attempt by its ID alone and only used once the attempt is found to be the
+  // caller's. At most one published lesson per area and tier (lessons_one_published_per_tier_idx).
+  const [[attempt], rows] = await Promise.all([
+    db
+      .select({
+        id: attempts.id,
+        status: attempts.status,
+        expiresAt: attempts.expiresAt,
+        submittedAt: attempts.submittedAt,
+        totalPoints: attempts.totalPoints,
+        overallPct: attempts.overallPct,
+        overallLevel: attempts.overallLevel,
+        resultsToken: attempts.resultsToken,
+        susAttemptId: susResponses.attemptId,
+      })
+      .from(attempts)
+      .leftJoin(susResponses, eq(susResponses.attemptId, attempts.id))
+      .where(isOwnAttempt(db, c.var.profile.id, attemptId)),
+    db
+      .select({
+        areaId: areaResults.areaId,
+        area: competencyAreas.code,
+        points: areaResults.points,
+        maxPoints: areaResults.maxPoints,
+        pct: areaResults.pct,
+        level: areaResults.level,
+        lessonTier: lessons.tier,
+        lessonSlug: lessons.slug,
+        lessonTitle: lessons.title,
+        lessonSummary: lessons.summary,
+      })
+      .from(areaResults)
+      .innerJoin(competencyAreas, eq(competencyAreas.id, areaResults.areaId))
+      .leftJoin(lessons, and(eq(lessons.areaId, areaResults.areaId), eq(lessons.isPublished, true)))
+      .where(eq(areaResults.attemptId, attemptId))
+      .orderBy(competencyAreas.sortOrder),
+  ])
   if (!attempt) throw new ApiError('not_found', NOT_FOUND)
   if (attempt.status === 'in_progress') {
     throw new ApiError('conflict', 'Submit the assessment to see your results.')
@@ -342,27 +413,6 @@ export const getResult: RouteHandler<typeof getResultRoute, AuthEnv> = async (c)
   if (totalPoints === null || overallPct === null || overallLevel === null) {
     throw new Error(`Attempt ${attempt.id} is closed but has no scores`)
   }
-
-  // Each area with its published lessons in the same query: one row per lesson, or one with no
-  // lesson. At most one published lesson per area and tier (lessons_one_published_per_tier_idx).
-  const rows = await db
-    .select({
-      areaId: areaResults.areaId,
-      area: competencyAreas.code,
-      points: areaResults.points,
-      maxPoints: areaResults.maxPoints,
-      pct: areaResults.pct,
-      level: areaResults.level,
-      lessonTier: lessons.tier,
-      lessonSlug: lessons.slug,
-      lessonTitle: lessons.title,
-      lessonSummary: lessons.summary,
-    })
-    .from(areaResults)
-    .innerJoin(competencyAreas, eq(competencyAreas.id, areaResults.areaId))
-    .leftJoin(lessons, and(eq(lessons.areaId, areaResults.areaId), eq(lessons.isPublished, true)))
-    .where(eq(areaResults.attemptId, attempt.id))
-    .orderBy(competencyAreas.sortOrder)
 
   type Lesson = { slug: string; title: string; summary: string }
   const byArea = new Map<string, { row: (typeof rows)[number]; lessons: Map<string, Lesson> }>()
@@ -419,47 +469,62 @@ export const getResult: RouteHandler<typeof getResultRoute, AuthEnv> = async (c)
 // ---- Usability survey ----
 
 export const saveSus: RouteHandler<typeof saveSusRoute, AuthEnv> = async (c) => {
+  const db = c.var.db
+  const profileId = c.var.profile.id
+  const attemptId = c.req.valid('param').id
   const { answers: given } = c.req.valid('json')
   // The schema checked there are exactly SUS_STATEMENT_COUNT answers, one per column.
-  const q = (n: number) => given[n - 1]!
+  const q = (n: number) => sql`${given[n - 1]!}::smallint`
 
-  const saved = await c.var.db.transaction(async (tx) => {
-    // The share lock holds off a void until the survey is in, so none lands on a voided attempt.
-    const attempt = await ownAttempt(tx, c.var.profile.id, c.req.valid('param').id, 'share')
+  // One statement: it inserts only for the caller's finished attempt. FOR SHARE holds off a void
+  // until the survey is in, so none lands on a voided attempt. The primary key allows one survey
+  // per attempt (SUS-04), so a second one, even sent at the same moment, inserts nothing.
+  const [saved] = await db
+    .insert(susResponses)
+    .select(
+      db
+        .select({
+          attemptId: attempts.id,
+          q1: q(1).as('q1'),
+          q2: q(2).as('q2'),
+          q3: q(3).as('q3'),
+          q4: q(4).as('q4'),
+          q5: q(5).as('q5'),
+          q6: q(6).as('q6'),
+          q7: q(7).as('q7'),
+          q8: q(8).as('q8'),
+          q9: q(9).as('q9'),
+          q10: q(10).as('q10'),
+          score: sql`${susScore(given)}::numeric`.as('score'),
+          submittedAt: sql`now()`.as('submitted_at'),
+        })
+        .from(attempts)
+        .where(
+          and(
+            isOwnAttempt(db, profileId, attemptId),
+            inArray(attempts.status, FINISHED_ATTEMPT_STATUSES),
+          ),
+        )
+        .for('share'),
+    )
+    .onConflictDoNothing()
+    .returning({
+      attemptId: susResponses.attemptId,
+      score: susResponses.score,
+      submittedAt: susResponses.submittedAt,
+    })
+
+  if (!saved) {
+    // Nothing saved: read the attempt again to say why. Only on this rare path.
+    const attempt = await ownAttempt(db, profileId, attemptId)
     if (attempt.status === 'in_progress') {
       throw new ApiError('conflict', 'Submit the assessment before you rate DigiBridge.')
     }
     if (attempt.status === 'voided') {
       throw new ApiError('conflict', VOIDED)
     }
-
-    // The primary key allows one survey per attempt (SUS-04), so a second one, even sent at the
-    // same moment, inserts nothing.
-    const [row] = await tx
-      .insert(susResponses)
-      .values({
-        attemptId: attempt.id,
-        q1: q(1),
-        q2: q(2),
-        q3: q(3),
-        q4: q(4),
-        q5: q(5),
-        q6: q(6),
-        q7: q(7),
-        q8: q(8),
-        q9: q(9),
-        q10: q(10),
-        score: susScore(given),
-      })
-      .onConflictDoNothing()
-      .returning({
-        attemptId: susResponses.attemptId,
-        score: susResponses.score,
-        submittedAt: susResponses.submittedAt,
-      })
-    if (!row) throw new ApiError('already_answered', 'You already rated DigiBridge. Thank you!')
-    return row
-  })
+    throw new ApiError('already_answered', 'You already rated DigiBridge. Thank you!')
+  }
 
   return c.json(
     {

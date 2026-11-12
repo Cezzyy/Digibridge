@@ -51,14 +51,20 @@ export function dashboardConditions(filters: DashboardFilters, schoolLinkId: SQL
 }
 
 /**
- * Each respondent's attempt: the one that isn't voided (there's at most one), or else the latest
- * voided one. Left join it on `respondent_id` to filter respondents by their attempt's link.
+ * Which of a respondent's attempts is theirs now: the one that isn't voided (there's at most one),
+ * or else the latest voided one. The first row in this order.
+ */
+export const currentAttemptOrder = [sql`${attempts.status} = 'voided'`, desc(attempts.startedAt)]
+
+/**
+ * Each respondent's attempt (`currentAttemptOrder`). Left join it on `respondent_id` to filter
+ * respondents by their attempt's link.
  */
 export const currentAttempts = (db: Db) =>
   db
     .selectDistinctOn([attempts.respondentId])
     .from(attempts)
-    .orderBy(attempts.respondentId, sql`${attempts.status} = 'voided'`, desc(attempts.startedAt))
+    .orderBy(attempts.respondentId, ...currentAttemptOrder)
     .as('current_attempt')
 
 export type CurrentAttempts = ReturnType<typeof currentAttempts>

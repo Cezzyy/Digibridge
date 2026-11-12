@@ -24,6 +24,7 @@ import type { Db } from '../config/db'
 import type { AuthEnv } from '../env'
 import {
   ageAtConsent,
+  currentAttemptOrder,
   currentAttempts,
   dashboardConditions,
   type CurrentAttempts,
@@ -228,17 +229,24 @@ async function answerSheet(
 
 export const getRespondent: RouteHandler<typeof getRespondentRoute, AuthEnv> = async (c) => {
   const db = c.var.db
-  const current = currentAttempts(db)
-  const [row] = await selectRespondents(db, current).where(
-    eq(respondents.id, c.req.valid('param').id),
-  )
+  const id = c.req.valid('param').id
+  // The row and the whole attempt at once: the same attempt `currentAttempts` picks, taken by
+  // the respondent's ID, so it doesn't wait on the row's attempt ID.
+  const [[row], [attempt]] = await Promise.all([
+    selectRespondents(db, currentAttempts(db)).where(eq(respondents.id, id)),
+    db
+      .select()
+      .from(attempts)
+      .where(eq(attempts.respondentId, id))
+      .orderBy(...currentAttemptOrder)
+      .limit(1),
+  ])
   if (!row) throw new ApiError('not_found', 'We couldn’t find this respondent.')
   const respondent = toRespondent(row)
-  if (!row.attemptId) return c.json({ respondent, attempt: null }, 200)
+  if (!attempt) return c.json({ respondent, attempt: null }, 200)
 
-  const attemptId = row.attemptId
-  const [[attempt], areas, [sus]] = await Promise.all([
-    db.select().from(attempts).where(eq(attempts.id, attemptId)),
+  // The per-item answers show the right choices, so only admins get them.
+  const [areas, [sus], sheet] = await Promise.all([
     db
       .select({
         area: competencyAreas.code,
@@ -249,14 +257,11 @@ export const getRespondent: RouteHandler<typeof getRespondentRoute, AuthEnv> = a
       })
       .from(areaResults)
       .innerJoin(competencyAreas, eq(competencyAreas.id, areaResults.areaId))
-      .where(eq(areaResults.attemptId, attemptId))
+      .where(eq(areaResults.attemptId, attempt.id))
       .orderBy(competencyAreas.sortOrder),
-    db.select().from(susResponses).where(eq(susResponses.attemptId, attemptId)),
+    db.select().from(susResponses).where(eq(susResponses.attemptId, attempt.id)),
+    c.var.profile.role === 'admin' ? answerSheet(db, attempt) : null,
   ])
-  if (!attempt) throw new ApiError('not_found', 'We couldn’t find this respondent.')
-
-  // The per-item answers show the right choices, so only admins get them.
-  const sheet = c.var.profile.role === 'admin' ? await answerSheet(db, attempt) : null
   const { submittedAt, startedAt } = attempt
 
   return c.json(

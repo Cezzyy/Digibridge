@@ -48,6 +48,9 @@ export const attempts = pgTable(
     uniqueIndex('attempts_one_per_respondent_idx')
       .on(t.respondentId)
       .where(sql`${t.status} <> 'voided'`),
+    // Each respondent's current attempt (any status, newest first) on the dashboard, and the
+    // foreign key's cascade when a respondent is deleted.
+    index('attempts_respondent_id_started_at_idx').on(t.respondentId, t.startedAt.desc()),
     index('attempts_status_submitted_at_idx').on(t.status, t.submittedAt),
     // Each link's response count, on the links page and when a student starts from it.
     index('attempts_school_link_id_idx').on(t.schoolLinkId),

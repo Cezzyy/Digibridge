@@ -1,0 +1,1 @@
+CREATE INDEX "attempts_respondent_id_started_at_idx" ON "attempts" USING btree ("respondent_id","started_at" DESC NULLS LAST);
