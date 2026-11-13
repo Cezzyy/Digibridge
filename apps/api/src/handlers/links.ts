@@ -10,6 +10,7 @@ import {
 import type { RouteHandler } from '@hono/zod-openapi'
 import { and, eq, ne, sql } from 'drizzle-orm'
 import type { AppEnv } from '../env'
+import { linkResponses } from '../lib/link-responses'
 import { checkAgeOnConsentDay } from '../lib/respondent'
 import { hashRespondentToken, isRespondentToken, newRespondentToken } from '../lib/respondent-token'
 import { ApiError, UNKNOWN_TOKEN_MESSAGE } from '../middleware'
@@ -21,10 +22,6 @@ const NUMBER_USED =
 
 /** Codes are upper case; one typed or pasted in lower case still opens the link. */
 const normalizeCode = (code: string) => code.trim().toUpperCase()
-
-/** How many students have joined through the link so far. */
-const responsesOf = (linkId: typeof schoolLinks.id) =>
-  sql<number>`(select count(*) from ${respondents} where ${respondents.schoolLinkId} = ${linkId})::int`
 
 export const getLink: RouteHandler<typeof getLinkRoute, AppEnv> = async (c) => {
   const code = normalizeCode(c.req.valid('param').code)
@@ -46,7 +43,7 @@ export const getLink: RouteHandler<typeof getLinkRoute, AppEnv> = async (c) => {
       maxResponses: schoolLinks.maxResponses,
       expiresAt: schoolLinks.expiresAt,
       closedAt: schoolLinks.closedAt,
-      responses: responsesOf(schoolLinks.id),
+      responses: linkResponses(c.var.db, schoolLinks.id),
       respondentId: respondents.id,
       fullName: respondents.fullName,
       attemptId: attempts.id,
@@ -124,10 +121,7 @@ export const joinLink: RouteHandler<typeof joinLinkRoute, AppEnv> = async (c) =>
     if (!link) throw new ApiError('not_found', NOT_FOUND)
 
     // Counted only when there's a limit to count against.
-    const responses =
-      link.maxResponses === null
-        ? 0
-        : await tx.$count(respondents, eq(respondents.schoolLinkId, link.id))
+    const responses = link.maxResponses === null ? 0 : await linkResponses(tx, link.id)
     const status = linkStatus({ ...link, responses }, consentedAt)
     if (status !== 'open') throw new ApiError('gone', LINK_GONE_MESSAGES[status])
 
