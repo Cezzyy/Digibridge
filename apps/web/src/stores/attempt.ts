@@ -1,8 +1,9 @@
 import type { InferResponseType } from 'hono/client'
 import { defineStore } from 'pinia'
 import { computed, ref, shallowRef } from 'vue'
-import { api, ApiRequestError, call, messageOf } from '../lib/api'
-import { useRespondentFlow } from '../composables/useRespondentFlow'
+import type { api } from '../lib/api'
+import { ApiRequestError, call, messageOf } from '../lib/api'
+import { useRespondentFlow, type HeldFlow } from '../composables/useRespondentFlow'
 
 export type Attempt = InferResponseType<(typeof api.attempts)[':id']['$get'], 200>
 export type AttemptItem = Attempt['items'][number]
@@ -38,9 +39,13 @@ const canRetry = (err: unknown) =>
  *
  * Picking a choice shows it at once and saves it in the background (ASM-04). Saves for one
  * question go one at a time, newest choice last, so a slow older save can't overwrite a newer one.
+ * The student's sign-in is taken when the attempt loads, so a save still retrying after they
+ * leave the page goes out as them.
  */
 export const useAttemptStore = defineStore('attempt', () => {
   const flow = useRespondentFlow()
+  /** Whose attempt this is: the calls and state it was loaded with. */
+  let owner: HeldFlow | null = null
 
   const attempt = shallowRef<Attempt | null>(null)
   const answers = ref<Record<string, string>>({})
@@ -84,6 +89,7 @@ export const useAttemptStore = defineStore('attempt', () => {
     submitError.value = null
     voided.value = false
     wanted.clear()
+    owner = null
   }
 
   /**
@@ -91,9 +97,11 @@ export const useAttemptStore = defineStore('attempt', () => {
    * on screen over the server's. Throws ApiRequestError.
    */
   async function load(id: string) {
-    const data = await call(api.attempts[':id'].$get({ param: { id } }))
+    const held = flow.hold()
+    const data = await call(held.client.attempts[':id'].$get({ param: { id } }))
     const sameAttempt = attempt.value?.id === id
     if (!sameAttempt) reset()
+    owner = held
 
     const nextAnswers: Record<string, string> = {}
     const nextStates: Record<string, SaveState> = {}
@@ -126,11 +134,12 @@ export const useAttemptStore = defineStore('attempt', () => {
   /** Sends one choice, retrying when that might help. True once the server has it. */
   async function send(questionId: string, choiceId: string) {
     const id = attempt.value?.id
-    if (!id) return false
+    const calls = owner?.client
+    if (!id || !calls) return false
     for (let tries = 0; ; tries++) {
       try {
         const saved = await call(
-          api.attempts[':id'].answers[':questionId'].$put({
+          calls.attempts[':id'].answers[':questionId'].$put({
             param: { id, questionId },
             json: { choiceId },
           }),
@@ -233,7 +242,8 @@ export const useAttemptStore = defineStore('attempt', () => {
 
   async function sendSubmit(run: SubmitRun): Promise<SubmittedAttempt | null> {
     const id = attempt.value?.id
-    if (!id) return null
+    const held = owner
+    if (!id || !held) return null
     submitting.value = true
     submitError.value = null
     try {
@@ -250,8 +260,8 @@ export const useAttemptStore = defineStore('attempt', () => {
         submitError.value = `${failed === 1 ? '1 answer' : `${failed} answers`} didn’t save. Check your connection, then try again.`
         return null
       }
-      const result = await call(api.attempts[':id'].submit.$post({ param: { id } }))
-      flow.setAttempt({ id: result.id, status: result.status })
+      const result = await call(held.client.attempts[':id'].submit.$post({ param: { id } }))
+      held.setAttempt({ id: result.id, status: result.status })
       return result
     } catch (err) {
       // The only 409 on submit: the team voided the attempt.

@@ -1,6 +1,7 @@
 import type { InferResponseType } from 'hono/client'
 import { ref } from 'vue'
-import { api, ApiRequestError, call, messageOf } from '../lib/api'
+import type { api } from '../lib/api'
+import { ApiRequestError, call, messageOf } from '../lib/api'
 import { useRespondentFlow } from './useRespondentFlow'
 
 export type AttemptSummary = InferResponseType<typeof api.attempts.$post, 200 | 201>
@@ -20,7 +21,7 @@ export function useStartAttempt() {
     starting.value = true
     error.value = null
     try {
-      const attempt = await call(api.attempts.$post())
+      const attempt = await call(flow.client().attempts.$post())
       flow.setAttempt({ id: attempt.id, status: attempt.status })
       return attempt
     } catch (err) {

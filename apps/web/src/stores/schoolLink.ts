@@ -1,7 +1,8 @@
 import type { InferResponseType } from 'hono/client'
 import { defineStore } from 'pinia'
 import { computed, ref } from 'vue'
-import { api, ApiRequestError, call, messageOf, setRespondentToken } from '../lib/api'
+import type { api } from '../lib/api'
+import { ApiRequestError, call, messageOf, schoolApi, type Api } from '../lib/api'
 
 export type OpenLink = InferResponseType<(typeof api.links)[':code']['$get'], 200>
 export type LinkRespondent = NonNullable<OpenLink['respondent']>
@@ -49,13 +50,14 @@ function writePlace(place: Place | null) {
 /**
  * The school link a student opened at /s/:code (LNK-02), and their place in it once they joined:
  * the respondent token in `localStorage` (LNK-04), their respondent and their attempt, as
- * GET /links/:code gives them. The router calls `enter` on every school-link page and `leave`
- * on any other, so the API client sends the token on those pages only. `forget` clears the
- * student from this browser (Done, LNK-06; or "Not you?").
+ * GET /links/:code gives them. The router calls `show` once each page has opened, so `code` (and
+ * school mode, `useRespondentFlow`) follows the page on screen, never one a guard is still
+ * deciding on. `client` gives the calls for this student. `forget` clears the student from this
+ * browser (Done, LNK-06; or "Not you?").
  */
 export const useSchoolLinkStore = defineStore('schoolLink', () => {
   const place = ref<Place | null>(readPlace())
-  /** The code of the school-link page open now, or null on any other page. */
+  /** The code of the school-link page on screen, or null on any other page. */
   const code = ref<string | null>(null)
   const link = ref<OpenLink | null>(null)
   const failure = ref<SchoolLinkFailure | null>(null)
@@ -68,16 +70,14 @@ export const useSchoolLinkStore = defineStore('schoolLink', () => {
 
   const tokenFor = (linkCode: string) => (place.value?.code === linkCode ? place.value.token : null)
 
-  /** A school-link page opens: send this link's token, if the student joined it. */
-  function enter(linkCode: string) {
+  /** A page has opened: its link's code on a school-link page, or null on any other. */
+  function show(linkCode: string | null) {
     code.value = linkCode
-    setRespondentToken(tokenFor(linkCode))
   }
 
-  /** Any other page opens: back to the Google sign-in, if there is one. */
-  function leave() {
-    code.value = null
-    setRespondentToken(null)
+  /** The API as the student on this link's page: their token, or none before they join. */
+  function client(): Api {
+    return schoolApi(code.value ? tokenFor(code.value) : null)
   }
 
   let loaded: { code: string; done: Promise<void> } | null = null
@@ -85,7 +85,8 @@ export const useSchoolLinkStore = defineStore('schoolLink', () => {
   async function fetchLink(linkCode: string): Promise<void> {
     failure.value = null
     try {
-      link.value = await call(api.links[':code'].$get({ param: { code: linkCode } }))
+      const calls = schoolApi(tokenFor(linkCode))
+      link.value = await call(calls.links[':code'].$get({ param: { code: linkCode } }))
     } catch (err) {
       link.value = null
       if (err instanceof ApiRequestError && err.code === 'unauthorized' && tokenFor(linkCode)) {
@@ -121,7 +122,6 @@ export const useSchoolLinkStore = defineStore('schoolLink', () => {
   function join(linkCode: string, token: string, joined: LinkRespondent) {
     place.value = { code: linkCode, token }
     writePlace(place.value)
-    if (code.value === linkCode) setRespondentToken(token)
     if (link.value) link.value = { ...link.value, respondent: joined, attempt: null }
   }
 
@@ -134,7 +134,6 @@ export const useSchoolLinkStore = defineStore('schoolLink', () => {
   function forget() {
     place.value = null
     writePlace(null)
-    setRespondentToken(null)
     loaded = null
     if (link.value) link.value = { ...link.value, respondent: null, attempt: null }
   }
@@ -147,8 +146,8 @@ export const useSchoolLinkStore = defineStore('schoolLink', () => {
     joinedCode,
     respondent,
     attempt,
-    enter,
-    leave,
+    show,
+    client,
     open,
     reload,
     join,

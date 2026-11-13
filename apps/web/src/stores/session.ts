@@ -3,10 +3,10 @@ import type { Session } from '@supabase/supabase-js'
 import type { InferResponseType } from 'hono/client'
 import { defineStore } from 'pinia'
 import { computed, ref, shallowRef } from 'vue'
-import { accountApi, ApiRequestError, call, messageOf, SOMETHING_WENT_WRONG } from '../lib/api'
+import { api, ApiRequestError, call, messageOf, SOMETHING_WENT_WRONG } from '../lib/api'
 import { markSignInStarted, returningFromGoogle, supabase } from '../lib/supabase'
 
-export type Me = InferResponseType<typeof accountApi.me.$get, 200>
+export type Me = InferResponseType<typeof api.me.$get, 200>
 export type RespondentSummary = NonNullable<Me['respondent']>
 
 /**
@@ -49,7 +49,7 @@ export const useSessionStore = defineStore('session', () => {
       return
     }
     try {
-      me.value = await call(accountApi.me.$get())
+      me.value = await call(api.me.$get())
       failure.value = null
     } catch (err) {
       me.value = null

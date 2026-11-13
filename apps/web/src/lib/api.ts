@@ -13,16 +13,6 @@ function fetchWithTimeout(input: RequestInfo | URL, init?: RequestInit) {
   return fetch(input, { ...init, signal })
 }
 
-// The school-link student's respondent token while a school-link page is open (set by
-// stores/schoolLink.ts, which the router keeps in step with the page). Calls then send it in
-// place of the Google sign-in, so a browser that is also signed in with Google stays apart.
-let respondentToken: string | null = null
-
-/** Sends `X-Respondent-Token` instead of the Google token on every call, or stops with null. */
-export function setRespondentToken(token: string | null) {
-  respondentToken = token
-}
-
 // The signed-in user's Google token; getSession refreshes it first if it has expired.
 async function googleHeaders(): Promise<Record<string, string>> {
   const { data } = await supabase.auth.getSession()
@@ -33,17 +23,22 @@ async function googleHeaders(): Promise<Record<string, string>> {
 const client = (headers: () => Promise<Record<string, string>>) =>
   hc<AppType>(import.meta.env.VITE_API_URL, { fetch: fetchWithTimeout, headers }).api.v1
 
-// Typed client for /api/v1, built from the API's route types. Each call sends the signed-in
-// user's token, or on school-link pages the respondent token instead.
-export const api = client(async () =>
-  respondentToken !== null ? { [RESPONDENT_TOKEN_HEADER]: respondentToken } : googleHeaders(),
-)
+/** A typed client for /api/v1, built from the API's route types. */
+export type Api = ReturnType<typeof client>
+
+/** Sends the signed-in user's Google token, if there is one. */
+export const api: Api = client(googleHeaders)
 
 /**
- * Always sends the Google sign-in, even on a school-link page: for GET /me, which is about the
- * account. With the respondent token it would get 401, and the session store would sign out.
+ * For a school-link student: sends their respondent token (`X-Respondent-Token`), or nothing
+ * before they've joined, and never the Google token, so a browser that is also signed in with
+ * Google stays apart. Each call picks its client (`useRespondentFlow().client()`), so a call
+ * keeps its sign-in even if the page changes before it's sent, as a retry can.
  */
-export const accountApi = client(googleHeaders)
+export function schoolApi(token: string | null): Api {
+  const headers: Record<string, string> = token ? { [RESPONDENT_TOKEN_HEADER]: token } : {}
+  return client(async () => headers)
+}
 
 /** An error from the API ({ error: { code, message } }), or `network` when it couldn't be reached. */
 export class ApiRequestError extends Error {

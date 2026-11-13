@@ -1,6 +1,6 @@
 import type { SchoolRespondentInput } from '@digibridge/shared'
 import { ref } from 'vue'
-import { api, call, messageOf } from '../lib/api'
+import { call, messageOf, schoolApi } from '../lib/api'
 import { useConsentStore } from '../stores/consent'
 import { useSchoolLinkStore } from '../stores/schoolLink'
 
@@ -21,7 +21,8 @@ export function useJoinLink() {
     error.value = null
     try {
       const joined = await call(
-        api.links[':code'].respondents.$post({ param: { code }, json: body }),
+        // No token yet, and never the Google one: joining is open to anyone with the link.
+        schoolApi(null).links[':code'].respondents.$post({ param: { code }, json: body }),
       )
       school.join(code, joined.token, joined.respondent)
       consent.clear()

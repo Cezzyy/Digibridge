@@ -18,7 +18,8 @@ import BrandMark from './BrandMark.vue'
 // students never download it.
 //
 // On school-link pages there's no Google account: the logo goes to the student's step, the bar
-// has Lessons and the student's own controls ("Not you?"), and no menu.
+// has Lessons (in a new tab, since the lessons are outside the link) and the student's own
+// controls ("Not you?"), and no menu.
 const AdminMenu = defineAsyncComponent(() => import('./admin/AdminMenu.vue'))
 
 const session = useSessionStore()
@@ -63,9 +64,12 @@ const logoTo = computed(() => {
         </RouterLink>
         <RouterLink
           :to="{ name: 'lessons' }"
+          :target="flow.isSchool.value ? '_blank' : undefined"
+          :rel="flow.isSchool.value ? 'noopener' : undefined"
           class="hidden min-h-11 shrink-0 items-center rounded-control px-3 font-semibold text-quiet hover:text-ink sm:flex"
         >
           Lessons
+          <span v-if="flow.isSchool.value" class="sr-only">(opens in a new tab)</span>
         </RouterLink>
 
         <AccountControls v-if="session.isSignedIn || flow.isSchool.value" />

@@ -1,6 +1,7 @@
 import type { InferResponseType } from 'hono/client'
 import { ref } from 'vue'
-import { api, ApiRequestError, call, messageOf } from '../lib/api'
+import type { api } from '../lib/api'
+import { ApiRequestError, call, messageOf } from '../lib/api'
 import { useRespondentFlow } from './useRespondentFlow'
 
 export type AttemptResult = InferResponseType<(typeof api.attempts)[':id']['result']['$get'], 200>
@@ -28,7 +29,7 @@ export function useResult() {
     const id = flow.attempt.value?.id
     if (!id) return movedUnlessFailed()
     try {
-      result.value = await call(api.attempts[':id'].result.$get({ param: { id } }))
+      result.value = await call(flow.client().attempts[':id'].result.$get({ param: { id } }))
       return 'ok'
     } catch (err) {
       if (

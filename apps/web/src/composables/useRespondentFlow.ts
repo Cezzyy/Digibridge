@@ -1,6 +1,7 @@
 import { ONLINE_CONSENT_NOTICE, SCHOOL_CONSENT_NOTICE } from '@digibridge/shared'
 import { computed } from 'vue'
 import type { RouteLocationRaw } from 'vue-router'
+import { api, type Api } from '../lib/api'
 import { linkConsentKey, useSchoolLinkStore } from '../stores/schoolLink'
 import { useSessionStore, type Me } from '../stores/session'
 
@@ -8,6 +9,9 @@ import { useSessionStore, type Me } from '../stores/session'
 export type FlowStep = 'consent' | 'profile' | 'home' | 'assessment' | 'results'
 
 export type FlowAttempt = NonNullable<Me['attempt']>
+
+/** A student's calls and attempt updates, fixed when taken (`useRespondentFlow().hold`). */
+export type HeldFlow = { client: Api; setAttempt: (next: FlowAttempt) => void }
 
 const SCHOOL_ROUTE_NAMES = {
   consent: 'school-consent',
@@ -21,8 +25,9 @@ const SCHOOL_ROUTE_NAMES = {
  * The respondent flow's pages work for both kinds of student: online, signed in with Google (the
  * session store and /me), and through a school link with a respondent token (the schoolLink
  * store and GET /links/:code). This is the one place that tells them apart: which respondent and
- * attempt, which notice, where each step lives, and how to load them again. School mode is on
- * while a school-link page is open (the router's `meta.school`).
+ * attempt, which notice, where each step lives, which sign-in its calls send, and how to load
+ * them again. School mode is on while a school-link page is on screen (the router's
+ * `meta.school`, set once the page has opened).
  */
 export function useRespondentFlow() {
   const session = useSessionStore()
@@ -71,6 +76,25 @@ export function useRespondentFlow() {
     return isSchool.value ? school.reload() : session.loadMe()
   }
 
+  /** The API as this student: the respondent token through a link, else the Google sign-in. */
+  function client(): Api {
+    return isSchool.value ? school.client() : api
+  }
+
+  /**
+   * This student's calls and attempt updates as they are now, kept for work that can outlive the
+   * page, like an answer's save that retries after the student has moved on: it still goes out
+   * as them, and its result lands in their state.
+   */
+  function hold(): HeldFlow {
+    const calls = client()
+    const toSchool = isSchool.value
+    return {
+      client: calls,
+      setAttempt: (next) => (toSchool ? school.setAttempt(next) : session.setAttempt(next)),
+    }
+  }
+
   return {
     isSchool,
     respondent,
@@ -83,5 +107,7 @@ export function useRespondentFlow() {
     page,
     setAttempt,
     reload,
+    client,
+    hold,
   }
 }
