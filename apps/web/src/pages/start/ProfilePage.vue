@@ -62,7 +62,7 @@ const router = useRouter()
 const online = useCreateRespondent()
 const joining = useJoinLink()
 
-// The page is opened for one mode and stays in it: online and school links have their own routes.
+// The page is opened for one mode and link and stays in it: App.vue remounts it when either changes.
 const isSchool = flow.isSchool.value
 const preview = flow.preview
 const saving = computed(() => online.saving.value || joining.saving.value)
