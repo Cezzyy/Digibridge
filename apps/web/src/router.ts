@@ -261,7 +261,8 @@ function checkStep(step: Step) {
 
 // The same flow through a school link, from the link's state (GET /links/:code) instead of /me:
 // the notice and profile until the student joins, then home, the assessment and results. A
-// student who joined can always come back, even once the link closed (LNK-04).
+// student who joined can always come back, even once the link closed (LNK-04). Staff signed in
+// with Google never join: they go through the same pages as a preview, as they do online.
 function checkSchoolStep(step: Step | undefined) {
   const school = useSchoolLinkStore()
   const code = school.code ?? ''
@@ -276,7 +277,8 @@ function checkSchoolStep(step: Step | undefined) {
       if (joined) return at('school-home')
       return useConsentStore().versionFor(linkConsentKey(code)) !== null || at('school-consent')
     case 'home':
-      if (!joined) return at('school-consent')
+      // Staff who open a link get a preview: home without joining, like online (LNK-01).
+      if (!joined) return useSessionStore().isStaff || at('school-consent')
       return !finished || at('school-results')
     case 'assessment':
       return status === 'in_progress' || at('school-home')
@@ -306,7 +308,8 @@ async function enterSchoolLink(to: RouteLocationNormalized) {
     return { name: 'school-consent', params: { code: joined }, replace: true }
   }
   school.enter(code)
-  await school.open(code)
+  // The Google session too: staff who open the link get a preview that saves nothing.
+  await Promise.all([useSessionStore().init(), school.open(code)])
   // App.vue shows the error screen over the page for a link that can't be opened (LNK-02).
   if (school.failure) return true
   return checkSchoolStep(to.meta.step)

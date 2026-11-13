@@ -56,6 +56,10 @@ const HIDDEN_BUTTON = 'border-transparent! text-transparent!'
           <span class="size-5" />
           Copy link
         </span>
+        <span :class="[SECONDARY_BUTTON, BLOCK, HIDDEN_BUTTON]">
+          <span class="size-5" />
+          Preview
+        </span>
         <span :class="[DANGER_BUTTON, BLOCK, HIDDEN_BUTTON]">
           <span class="size-5" />
           Close link
