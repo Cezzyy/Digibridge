@@ -337,7 +337,7 @@ const finishedOn = computed(() =>
               <p class="mt-4 leading-relaxed">{{ card.data.advice }}</p>
               <ul class="mt-4 grid flex-1 gap-3 @lg:grid-cols-2">
                 <li v-for="pick in card.data.lessons" :key="pick.tier">
-                  <LessonCard :pick="pick" />
+                  <LessonCard :pick="pick" :new-tab="flow.isSchool.value" />
                 </li>
               </ul>
             </template>

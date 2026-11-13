@@ -263,9 +263,8 @@ function checkStep(step: Step) {
 // the notice and profile until the student joins, then home, the assessment and results. A
 // student who joined can always come back, even once the link closed (LNK-04). Staff signed in
 // with Google never join: they go through the same pages as a preview, as they do online.
-function checkSchoolStep(step: Step | undefined) {
+function checkSchoolStep(code: string, step: Step | undefined) {
   const school = useSchoolLinkStore()
-  const code = school.code ?? ''
   const at = (name: string) => ({ name, params: { code } })
   const joined = school.respondent !== null
   const status = school.attempt?.status
@@ -307,21 +306,18 @@ async function enterSchoolLink(to: RouteLocationNormalized) {
   if (joined && joined !== code) {
     return { name: 'school-consent', params: { code: joined }, replace: true }
   }
-  school.enter(code)
   // The Google session too: staff who open the link get a preview that saves nothing.
   await Promise.all([useSessionStore().init(), school.open(code)])
   // App.vue shows the error screen over the page for a link that can't be opened (LNK-02).
   if (school.failure) return true
-  return checkSchoolStep(to.meta.step)
+  return checkSchoolStep(code, to.meta.step)
 }
 
 router.beforeEach(async (to, from) => {
   const clean = withoutCallbackParams(to, from)
   if (clean) return clean
 
-  // The API client sends the respondent token on school-link pages only.
   if (to.meta.school) return enterSchoolLink(to)
-  useSchoolLinkStore().leave()
 
   const requires = to.meta.requires
   if (!requires) return true
@@ -340,9 +336,13 @@ router.beforeEach(async (to, from) => {
 // screen instead; its Try again reloads, which also picks up a new deploy's file names.
 router.onError(() => useSessionStore().failPage())
 
-// The page that opened sets the theme. A navigation that failed leaves the current one.
+// The page that opened sets the theme, and whether it's a school link's (school mode, which
+// picks the student's calls). Only once it has opened: while a guard decides, the page on screen
+// keeps its mode, and so do its calls. A navigation that failed leaves the current ones.
 router.afterEach((to, _from, failure) => {
-  if (!failure) followSystemTheme(to.matched.some((route) => route.meta.followsSystemTheme))
+  if (failure) return
+  followSystemTheme(to.matched.some((route) => route.meta.followsSystemTheme))
+  useSchoolLinkStore().show(to.meta.school ? String(to.params.code) : null)
 })
 
 // Going to any page after the first one (a button, the logo, the back button) closes the error
