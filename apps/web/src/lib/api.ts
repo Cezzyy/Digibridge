@@ -23,18 +23,27 @@ export function setRespondentToken(token: string | null) {
   respondentToken = token
 }
 
-// Typed client for /api/v1, built from the API's route types. Each call sends the
-// signed-in user's token; getSession refreshes it first if it has expired. On school-link pages
-// it sends the respondent token instead.
-export const api = hc<AppType>(import.meta.env.VITE_API_URL, {
-  fetch: fetchWithTimeout,
-  headers: async (): Promise<Record<string, string>> => {
-    if (respondentToken !== null) return { [RESPONDENT_TOKEN_HEADER]: respondentToken }
-    const { data } = await supabase.auth.getSession()
-    const token = data.session?.access_token
-    return token ? { Authorization: `Bearer ${token}` } : {}
-  },
-}).api.v1
+// The signed-in user's Google token; getSession refreshes it first if it has expired.
+async function googleHeaders(): Promise<Record<string, string>> {
+  const { data } = await supabase.auth.getSession()
+  const token = data.session?.access_token
+  return token ? { Authorization: `Bearer ${token}` } : {}
+}
+
+const client = (headers: () => Promise<Record<string, string>>) =>
+  hc<AppType>(import.meta.env.VITE_API_URL, { fetch: fetchWithTimeout, headers }).api.v1
+
+// Typed client for /api/v1, built from the API's route types. Each call sends the signed-in
+// user's token, or on school-link pages the respondent token instead.
+export const api = client(async () =>
+  respondentToken !== null ? { [RESPONDENT_TOKEN_HEADER]: respondentToken } : googleHeaders(),
+)
+
+/**
+ * Always sends the Google sign-in, even on a school-link page: for GET /me, which is about the
+ * account. With the respondent token it would get 401, and the session store would sign out.
+ */
+export const accountApi = client(googleHeaders)
 
 /** An error from the API ({ error: { code, message } }), or `network` when it couldn't be reached. */
 export class ApiRequestError extends Error {
