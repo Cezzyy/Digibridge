@@ -57,8 +57,13 @@ const susAttemptId = computed(() =>
 // ---- Done, through a school link ----
 
 const finishing = ref(false)
-/** The survey Done offers first: only while it's unanswered and the student hasn't skipped it. */
-const finishSusAttemptId = computed(() => (susSent.value ? null : susAttemptId.value))
+/**
+ * The survey Done offers first, whenever it's still unanswered (SUS-03): skipping the card
+ * doesn't skip it here, so Done asks again. The student can still skip it in the dialog.
+ */
+const finishSusAttemptId = computed(() =>
+  result.value && !result.value.susAnswered && !susSent.value ? result.value.id : null,
+)
 
 function onRatedInDialog() {
   susSent.value = true
