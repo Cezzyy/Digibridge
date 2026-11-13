@@ -20,6 +20,10 @@ const route = useRoute()
 const router = useRouter()
 const starting = computed(() => route.matched.length === 0)
 const showHeader = computed(() => !route.meta.hideHeader)
+// The respondent pages (notice, profile, home, assessment, results) serve both online and school
+// links, and read their mode, notice and link once at setup. Vue would reuse the instance when
+// the route switches modes or links, so a new key remounts them instead.
+const pageKey = computed(() => (route.meta.school ? `school:${String(route.params.code)}` : 'app'))
 
 const retry: ErrorAction = { label: 'Try again', onClick: () => window.location.reload() }
 
@@ -88,7 +92,7 @@ const failureScreen = computed(() => {
   <AppSplash v-else-if="starting" />
   <template v-else>
     <AppHeader v-if="showHeader" />
-    <RouterView />
+    <RouterView :key="pageKey" />
   </template>
   <!-- Outside the v-if, so Sign out on the error screen's top bar asks too. -->
   <SignOutDialog />
