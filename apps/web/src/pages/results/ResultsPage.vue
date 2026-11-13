@@ -42,16 +42,18 @@ async function fetchResult() {
 }
 void fetchResult()
 
-// The usability survey sits under the results until it's answered (SUS-02). Skip hides it for
-// this visit only, so it's offered again next time. The card's attempt, or null while it's hidden.
-const susSkipped = ref(false)
-/** Sent from the card or from Done's dialog during this visit. */
-const susSent = ref(false)
-const ratedInDialog = ref(false)
+// The usability survey during this visit, when the result said it was unanswered: still open,
+// skipped on the card, or sent from the card (which then thanks the student in place) or from
+// Done's dialog (which hides the card).
+const susState = ref<'open' | 'skipped' | 'sent-card' | 'sent-dialog'>('open')
+const susPending = computed(() =>
+  result.value && !result.value.susAnswered ? result.value.id : null,
+)
+
+// The survey sits under the results until it's answered (SUS-02). Skip hides it for this visit
+// only, so it's offered again next time. The card's attempt, or null while it's hidden.
 const susAttemptId = computed(() =>
-  result.value && !result.value.susAnswered && !susSkipped.value && !ratedInDialog.value
-    ? result.value.id
-    : null,
+  susState.value === 'open' || susState.value === 'sent-card' ? susPending.value : null,
 )
 
 // ---- Done, through a school link ----
@@ -62,13 +64,8 @@ const finishing = ref(false)
  * doesn't skip it here, so Done asks again. The student can still skip it in the dialog.
  */
 const finishSusAttemptId = computed(() =>
-  result.value && !result.value.susAnswered && !susSent.value ? result.value.id : null,
+  susState.value === 'open' || susState.value === 'skipped' ? susPending.value : null,
 )
-
-function onRatedInDialog() {
-  susSent.value = true
-  ratedInDialog.value = true
-}
 
 async function finish() {
   const code = school.code
@@ -397,8 +394,8 @@ const finishedOn = computed(() =>
         v-if="susAttemptId"
         :attempt-id="susAttemptId"
         class="motion-safe:animate-rise"
-        @saved="susSent = true"
-        @skip="susSkipped = true"
+        @saved="susState = 'sent-card'"
+        @skip="susState = 'skipped'"
       />
     </div>
 
@@ -434,7 +431,7 @@ const finishedOn = computed(() =>
     v-if="flow.isSchool.value"
     :open="finishing"
     :sus-attempt-id="finishSusAttemptId"
-    @rated="onRatedInDialog"
+    @rated="susState = 'sent-dialog'"
     @close="finishing = false"
     @finish="finish"
   />
