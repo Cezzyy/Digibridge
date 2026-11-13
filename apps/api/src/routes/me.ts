@@ -13,7 +13,8 @@ const MeSchema = z
       avatarUrl: z.string().nullable(),
       role: roleSchema,
     }),
-    // Null until the user agrees to the consent notice and fills in their profile.
+    // Null until the user agrees to the consent notice and fills in their profile, and always
+    // for staff (even with a respondent from before their role changed).
     // Online respondents have no school details, so none are sent (PRO-06).
     respondent: RespondentSummarySchema.nullable(),
     // Their one attempt, unless it was voided (then they can start again).
