@@ -16,6 +16,7 @@ import {
 import type { Db } from '../config/db'
 import type { AuthEnv } from '../env'
 import { newLinkCode } from '../lib/link-code'
+import { linkResponses } from '../lib/link-responses'
 import { ApiError } from '../middleware'
 import type {
   closeLinkRoute,
@@ -24,12 +25,6 @@ import type {
   overviewRoute,
 } from '../routes/admin'
 
-/**
- * A link's response count: the students who joined through it. A student counts from the moment
- * their profile is saved, so a voided attempt still does: they can start again.
- */
-const responsesOf = (db: Db) => db.$count(respondents, eq(respondents.schoolLinkId, schoolLinks.id))
-
 /** School links with their creator's name and response count, newest first. */
 async function selectLinks(db: Db, where?: SQL) {
   const rows = await db
@@ -37,7 +32,7 @@ async function selectLinks(db: Db, where?: SQL) {
       ...getTableColumns(schoolLinks),
       creatorName: profiles.fullName,
       creatorEmail: profiles.email,
-      responses: responsesOf(db),
+      responses: linkResponses(db, schoolLinks.id),
     })
     .from(schoolLinks)
     .leftJoin(profiles, eq(profiles.id, schoolLinks.createdBy))
@@ -76,7 +71,7 @@ export const getOverview: RouteHandler<typeof overviewRoute, AuthEnv> = async (c
         closedAt: schoolLinks.closedAt,
         expiresAt: schoolLinks.expiresAt,
         maxResponses: schoolLinks.maxResponses,
-        responses: responsesOf(db),
+        responses: linkResponses(db, schoolLinks.id),
       })
       .from(schoolLinks),
   ])
