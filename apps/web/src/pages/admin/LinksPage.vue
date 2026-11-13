@@ -78,7 +78,8 @@ function stopClosing() {
       <h1 class="text-3xl leading-tight font-bold sm:text-4xl">School links</h1>
       <p class="mt-2 max-w-2xl text-lg text-quiet">
         Make a link for a class, then send it only to the students you choose. They open it on their
-        own phone or laptop, without signing in.
+        own phone or laptop, without signing in. To try a link yourself, use Preview: nothing you
+        enter is saved.
       </p>
     </div>
     <!-- Shown while the list loads too (only a first, empty list opens the form instead). -->

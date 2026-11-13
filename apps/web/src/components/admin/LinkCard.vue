@@ -9,8 +9,9 @@ import StrokeIcon from './StrokeIcon.vue'
 
 // One school link on the links page: its name, school, who made it and when, its status, its
 // last day, who can use it and how many have joined (with a bar when there's a limit), then
-// its address with Copy and Close. Closed and expired links keep their details but lose the
-// address bar. LinkCardSkeleton draws the same layout while the list loads: change both together.
+// its address with Copy, Preview and Close. Preview opens the link in a new tab, where a signed-in
+// staff member goes through the student pages without saving anything, so trying a link never
+// takes a student's place. Closed and expired links keep their details but lose the address bar. LinkCardSkeleton draws the same layout while the list loads: change both together.
 const props = defineProps<{ link: SchoolLinkRow; isNew?: boolean }>()
 const emit = defineEmits<{ close: [] }>()
 
@@ -138,6 +139,11 @@ const ICON_TILE =
             </span>
           </span>
         </button>
+        <a :href="url" target="_blank" rel="noopener" :class="SECONDARY_BUTTON" class="bg-surface">
+          <StrokeIcon :d="ICONS.preview" class="size-5" />
+          Preview
+          <span class="sr-only">(opens in a new tab)</span>
+        </a>
         <button type="button" :class="DANGER_BUTTON" class="bg-surface" @click="emit('close')">
           <StrokeIcon :d="ICONS.close" class="size-5" />
           Close link

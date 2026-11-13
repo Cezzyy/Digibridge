@@ -52,9 +52,11 @@ watch(
   (done) => done && void router.replace(flow.page('results')),
 )
 
-// Online the page needs /me; through a link, the student's place in it.
+// Online the page needs /me; through a link, the student's place in it, or staff for a preview.
 const ready = computed(() =>
-  flow.isSchool.value ? flow.respondent.value !== null : !!(session.me && session.role),
+  flow.isSchool.value
+    ? flow.respondent.value !== null || flow.preview.value
+    : !!(session.me && session.role),
 )
 
 type View = 'start' | 'in-progress' | 'staff'
@@ -425,7 +427,7 @@ const studentSteps = STEPS.slice(1)
 
         <RouterLink
           v-if="view === 'staff'"
-          :to="{ name: 'consent' }"
+          :to="flow.page('consent')"
           :class="[PRIMARY_BUTTON, 'shrink-0']"
         >
           Try the student steps

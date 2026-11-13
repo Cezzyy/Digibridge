@@ -35,6 +35,11 @@ export function useRespondentFlow() {
   const attempt = computed<FlowAttempt | null>(() =>
     isSchool.value ? school.attempt : (session.me?.attempt ?? null),
   )
+  /**
+   * Staff trying the student steps, online or through a link: the pages check their answers but
+   * save nothing, so their tries stay out of the research data (and off a link's limit).
+   */
+  const preview = computed(() => session.isStaff && respondent.value === null)
   /** Submitted or expired: results is the student's page from now on. */
   const finished = computed(() => {
     const status = attempt.value?.status
@@ -71,6 +76,7 @@ export function useRespondentFlow() {
     respondent,
     attempt,
     finished,
+    preview,
     notice,
     consentKey,
     failed,

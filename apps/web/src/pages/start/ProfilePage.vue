@@ -51,8 +51,9 @@ import { useSessionStore } from '../../stores/session'
 // only: online never asks for school details (PRO-06). Through a school link it adds student
 // number, course and year level (LNK-03); a link made for one course or year level fills that in
 // and the student can't change it. Saving sends the consent from the previous page with it,
-// which the `step` guard makes sure exists. Staff online get a preview: the answers are checked
-// but not saved (the API refuses them), so their tries stay out of the research data.
+// which the `step` guard makes sure exists. Staff get a preview, online and through a link: the
+// answers are checked but not saved, so their tries stay out of the research data and don't
+// take a place on a link.
 const session = useSessionStore()
 const school = useSchoolLinkStore()
 const flow = useRespondentFlow()
@@ -63,7 +64,7 @@ const joining = useJoinLink()
 
 // The page is opened for one mode and stays in it: online and school links have their own routes.
 const isSchool = flow.isSchool.value
-const preview = computed(() => !isSchool && session.isStaff)
+const preview = flow.preview
 const saving = computed(() => online.saving.value || joining.saving.value)
 const saveError = computed(() => online.error.value ?? joining.error.value)
 
