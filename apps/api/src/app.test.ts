@@ -472,6 +472,14 @@ describe('GET /api/v1/me', () => {
     const body = await (await get('/api/v1/me', user.headers)).json()
     expect(body).toMatchObject({ respondent: { id: respondent.id }, attempt: null })
   })
+
+  it('leaves out the respondent of a user who became staff', async () => {
+    const user = await signedIn('admin')
+    const respondent = await addRespondent(user.id)
+    await addAttempt(respondent.id, 'in_progress')
+    const body = await (await get('/api/v1/me', user.headers)).json()
+    expect(body).toMatchObject({ profile: { role: 'admin' }, respondent: null, attempt: null })
+  })
 })
 
 describe('POST /api/v1/respondents', () => {
