@@ -32,8 +32,15 @@ export const getLink: RouteHandler<typeof getLinkRoute, AppEnv> = async (c) => {
   const tokenHash = token === undefined ? null : await hashRespondentToken(token)
 
   // One query: the link, its response count, and with a token, the student who joined through
-  // this link and their attempt that isn't voided (at most one of each).
-  const [row] = await c.var.db
+  // this link and their attempt that isn't voided (at most one of each). Only a new student (no
+  // token) is checked against the limit, and only a link with a limit needs counting, so the
+  // count runs in that case alone; otherwise it's 0, which linkStatus never reads.
+  const db = c.var.db
+  const responses =
+    tokenHash === null
+      ? sql<number>`case when ${schoolLinks.maxResponses} is null then 0 else ${linkResponses(db, schoolLinks.id)} end`
+      : sql<number>`0`
+  const [row] = await db
     .select({
       code: schoolLinks.code,
       school: schoolLinks.school,
@@ -43,7 +50,7 @@ export const getLink: RouteHandler<typeof getLinkRoute, AppEnv> = async (c) => {
       maxResponses: schoolLinks.maxResponses,
       expiresAt: schoolLinks.expiresAt,
       closedAt: schoolLinks.closedAt,
-      responses: linkResponses(c.var.db, schoolLinks.id),
+      responses: responses.mapWith(Number),
       respondentId: respondents.id,
       fullName: respondents.fullName,
       attemptId: attempts.id,
