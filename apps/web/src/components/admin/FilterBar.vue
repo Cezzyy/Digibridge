@@ -9,12 +9,12 @@ import {
   INTERNET_ACCESS_LABELS,
   isRealDate,
   MODE_LABELS,
-  MODES,
   SEX_LABELS,
   SEXES,
   YEAR_LEVEL_LABELS,
   YEAR_LEVELS,
   type DashboardFilters,
+  type Mode,
 } from '@digibridge/shared'
 import { computed, ref, watch } from 'vue'
 import { useDashboardFilters } from '../../composables/useDashboardFilters'
@@ -43,7 +43,12 @@ const options = <T extends string | number>(values: readonly T[], labels: Record
     ...values.map((value) => ({ value, label: labels[value] })),
   ] as Option<T>[]
 
-const modeOptions = options(MODES, MODE_LABELS)
+// The mode filter, named after the respondents table's Came in column.
+const modeOptions: Option<Mode>[] = [
+  { value: null, label: 'All' },
+  { value: 'school', label: 'School links' },
+  { value: 'online', label: MODE_LABELS.online },
+]
 const sexOptions = options(SEXES, SEX_LABELS)
 const ageOptions = options(AGE_GROUPS, AGE_GROUP_LABELS)
 const deviceOptions = options(DEVICES, DEVICE_LABELS)
@@ -129,7 +134,7 @@ const DATE_MIN = '2026-01-01'
       :class="open ? 'block' : 'hidden'"
     >
       <div class="grid gap-x-5 gap-y-4 sm:grid-cols-2 lg:grid-cols-4">
-        <SelectField v-model="mode" label="Mode" :options="modeOptions" />
+        <SelectField v-model="mode" label="Came in" :options="modeOptions" />
         <SelectField v-model="sex" label="Sex" :options="sexOptions" />
         <SelectField v-model="ageGroup" label="Age group" :options="ageOptions" />
         <SelectField v-model="device" label="Owns" :options="deviceOptions" />
