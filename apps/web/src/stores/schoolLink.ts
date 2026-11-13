@@ -91,7 +91,10 @@ export const useSchoolLinkStore = defineStore('schoolLink', () => {
       link.value = null
       if (err instanceof ApiRequestError && err.code === 'unauthorized' && tokenFor(linkCode)) {
         // The token no longer matches anyone (the team removed the student): start over here.
-        forget()
+        // Clear only the place, not `loaded`: this retry is part of the load `open` keeps, so
+        // the guard's next redirect reuses it instead of fetching the link again.
+        place.value = null
+        writePlace(null)
         return fetchLink(linkCode)
       }
       if (err instanceof ApiRequestError && err.code === 'not_found') {
