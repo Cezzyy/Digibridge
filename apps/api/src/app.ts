@@ -9,6 +9,13 @@ import {
   submitAttempt,
 } from './handlers/attempts'
 import { closeLink, createLink, getOverview, listLinks } from './handlers/admin'
+import {
+  createLesson,
+  deleteLesson,
+  getAdminLesson,
+  listAdminLessons,
+  updateLesson,
+} from './handlers/admin-lessons'
 import { getRespondent, listRespondents } from './handlers/admin-respondents'
 import { getItemAnalysis } from './handlers/admin-items'
 import { getStats } from './handlers/admin-stats'
@@ -26,6 +33,13 @@ import {
 } from './middleware'
 import { addApiDocs } from './openapi'
 import { closeLinkRoute, createLinkRoute, listLinksRoute, overviewRoute } from './routes/admin'
+import {
+  createLessonRoute,
+  deleteLessonRoute,
+  getAdminLessonRoute,
+  listAdminLessonsRoute,
+  updateLessonRoute,
+} from './routes/admin-lessons'
 import { getRespondentRoute, listRespondentsRoute } from './routes/admin-respondents'
 import { itemAnalysisRoute } from './routes/admin-items'
 import { statsRoute } from './routes/admin-stats'
@@ -69,6 +83,11 @@ const v1Routes = v1
   .openapi(getRespondentRoute, getRespondent)
   .openapi(statsRoute, getStats)
   .openapi(itemAnalysisRoute, getItemAnalysis)
+  .openapi(listAdminLessonsRoute, listAdminLessons)
+  .openapi(getAdminLessonRoute, getAdminLesson)
+  .openapi(createLessonRoute, createLesson)
+  .openapi(updateLessonRoute, updateLesson)
+  .openapi(deleteLessonRoute, deleteLesson)
 
 // Builds the Hono app: routes under /api/v1, docs under /api.
 // CORS is added before the routes so it runs on every response, errors included.
