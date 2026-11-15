@@ -17,6 +17,13 @@ import {
   updateLesson,
 } from './handlers/admin-lessons'
 import {
+  createQuestion,
+  deleteQuestion,
+  getAdminQuestion,
+  listAdminQuestions,
+  updateQuestion,
+} from './handlers/admin-questions'
+import {
   deleteRespondent,
   getRespondent,
   listRespondents,
@@ -45,6 +52,13 @@ import {
   listAdminLessonsRoute,
   updateLessonRoute,
 } from './routes/admin-lessons'
+import {
+  createQuestionRoute,
+  deleteQuestionRoute,
+  getAdminQuestionRoute,
+  listAdminQuestionsRoute,
+  updateQuestionRoute,
+} from './routes/admin-questions'
 import {
   deleteRespondentRoute,
   getRespondentRoute,
@@ -100,6 +114,11 @@ const v1Routes = v1
   .openapi(createLessonRoute, createLesson)
   .openapi(updateLessonRoute, updateLesson)
   .openapi(deleteLessonRoute, deleteLesson)
+  .openapi(listAdminQuestionsRoute, listAdminQuestions)
+  .openapi(getAdminQuestionRoute, getAdminQuestion)
+  .openapi(createQuestionRoute, createQuestion)
+  .openapi(updateQuestionRoute, updateQuestion)
+  .openapi(deleteQuestionRoute, deleteQuestion)
 
 // Builds the Hono app: routes under /api/v1, docs under /api.
 // CORS is added before the routes so it runs on every response, errors included.
