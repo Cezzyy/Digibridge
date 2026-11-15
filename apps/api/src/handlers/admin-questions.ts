@@ -121,6 +121,23 @@ async function writeChoices(
   return rows.sort((a, b) => a.position - b.position).map(({ position: _p, ...choice }) => choice)
 }
 
+/**
+ * Whether a choice's text moves to another position. Answers point at a choice's ID, which stays
+ * with its position, so on a shown question a swap would change what past answers mean, and
+ * which of them is right, while the right position stays put. Compared as the schema compares
+ * choices: trimmed already, any letter case.
+ */
+function choicesSwapped(
+  current: readonly { label: string }[],
+  next: readonly { label: string }[],
+): boolean {
+  const positionOf = new Map(current.map((choice, i) => [choice.label.toLowerCase(), i]))
+  return next.some((choice, i) => {
+    const was = positionOf.get(choice.label.toLowerCase())
+    return was !== undefined && was !== i
+  })
+}
+
 export const listAdminQuestions: RouteHandler<typeof listAdminQuestionsRoute, AuthEnv> = async (
   c,
 ) => {
@@ -200,6 +217,12 @@ export const updateQuestion: RouteHandler<typeof updateQuestionRoute, AuthEnv> =
         throw new ApiError(
           'conflict',
           'Students have already seen this question, so its area, difficulty and right answer can’t change. Make it inactive and add a new one instead.',
+        )
+      }
+      if (isShown && newChoices && choicesSwapped(currentChoices, newChoices)) {
+        throw new ApiError(
+          'conflict',
+          'Students have already seen this question, so its choices can’t swap places. Fix each choice’s wording where it is, or make the question inactive and add a new one.',
         )
       }
 

@@ -212,6 +212,21 @@ describe('admin questions editor (CMS-01 to CMS-03)', () => {
       expect(await readQuestion(id, admin.headers)).toEqual(before)
     })
 
+    it('keeps a shown question’s choices from swapping places (CMS-02)', async () => {
+      const { id } = await shownQuestion()
+      const admin = await signedIn('admin')
+      const before = await readQuestion(id, admin.headers)
+      const right = before.choices.findIndex((c) => c.isCorrect)
+      const other = right === 0 ? 1 : 0
+      const labels = before.choices.map((c) => c.label)
+      ;[labels[right], labels[other]] = [labels[other]!.toUpperCase(), labels[right]!]
+      const res = await send('PATCH', `/api/v1/admin/questions/${id}`, admin.headers, {
+        choices: before.choices.map((c, i) => ({ label: labels[i]!, isCorrect: c.isCorrect })),
+      })
+      expect(res.status).toBe(409)
+      expect(await readQuestion(id, admin.headers)).toEqual(before)
+    })
+
     it('counts a voided attempt as having shown it', async () => {
       const { id, attempt } = await shownQuestion()
       await testDb.update(attempts).set(voidedFields()).where(eq(attempts.id, attempt.id))
