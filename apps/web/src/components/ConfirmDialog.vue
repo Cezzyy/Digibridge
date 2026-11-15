@@ -5,7 +5,8 @@ import { DANGER_BUTTON, PRIMARY_BUTTON, SECONDARY_BUTTON } from '../lib/buttons'
 // Asks before an action that can't be undone, like closing a school link or signing out. A
 // native modal dialog, so focus stays inside it, Cancel has focus (so a stray Enter doesn't
 // confirm) and Esc closes it (unless the action is running). The default slot holds any fields
-// the action needs, under the message; `danger` gives the confirm button the danger style.
+// the action needs, under the message; `danger` gives the confirm button the danger style, and
+// `wide` more room for them.
 const props = defineProps<{
   open: boolean
   title: string
@@ -16,6 +17,8 @@ const props = defineProps<{
   busy: boolean
   error: string | null
   danger?: boolean
+  /** A wider dialog, for one with fields side by side. */
+  wide?: boolean
 }>()
 const emit = defineEmits<{ confirm: []; close: [] }>()
 
@@ -43,7 +46,8 @@ function onCancel(event: Event) {
     ref="dialog"
     :aria-labelledby="`${id}-title`"
     :aria-describedby="`${id}-body`"
-    class="m-auto w-[calc(100%-2rem)] max-w-md rounded-card bg-surface p-6 text-ink shadow-lg backdrop:bg-scrim sm:p-7"
+    :class="wide ? 'max-w-lg' : 'max-w-md'"
+    class="m-auto w-[calc(100%-2rem)] rounded-card bg-surface p-6 text-ink shadow-lg backdrop:bg-scrim sm:p-7"
     @cancel="onCancel"
     @close="emit('close')"
   >
