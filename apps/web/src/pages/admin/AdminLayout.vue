@@ -1,11 +1,14 @@
 <script setup lang="ts">
+import { useRoute } from 'vue-router'
 import StrokeIcon from '../../components/admin/StrokeIcon.vue'
 import { useAdminNav } from '../../composables/useAdminNav'
 
 // The frame of every /admin page, under AppHeader: a menu on the left from `lg`, which stays put
 // while the page scrolls. Below `lg` the same pages are in the menu that opens from the header's
-// menu button (AdminMenu), so the page starts right under the header.
+// menu button (AdminMenu), so the page starts right under the header. Pages are 5xl wide at
+// most, except those with `meta.adminWide`, which take the whole width (the lessons editor).
 const items = useAdminNav()
+const route = useRoute()
 </script>
 
 <template>
@@ -32,7 +35,7 @@ const items = useAdminNav()
     </nav>
 
     <main class="min-w-0 flex-1 px-4 py-8 sm:px-8 lg:px-10 lg:py-10">
-      <div class="mx-auto max-w-5xl">
+      <div class="mx-auto" :class="route.meta.adminWide ? 'max-w-[110rem]' : 'max-w-5xl'">
         <RouterView />
       </div>
     </main>

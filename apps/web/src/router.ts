@@ -40,6 +40,8 @@ declare module 'vue-router' {
     followsSystemTheme?: boolean
     /** Below `lg`, AppHeader's menu has the admin pages (AdminMenu) instead of AppMenu. */
     adminMenu?: boolean
+    /** An admin page that uses the whole width beside the side menu, like the lessons editor. */
+    adminWide?: boolean
     /** A school-link page (/s/:code/…): the respondent flow without Google (LNK-02). */
     school?: boolean
   }
@@ -149,6 +151,25 @@ export const router = createRouter({
           name: 'admin-links',
           component: () => import('./pages/admin/LinksPage.vue'),
           meta: { requires: 'admin' },
+        },
+        // The lessons editor (CMS-04), admin only: the list, then one lesson, new or saved.
+        {
+          path: 'lessons',
+          name: 'admin-lessons',
+          component: () => import('./pages/admin/LessonListPage.vue'),
+          meta: { requires: 'admin' },
+        },
+        {
+          path: 'lessons/new',
+          name: 'admin-lesson-new',
+          component: () => import('./pages/admin/LessonEditorPage.vue'),
+          meta: { requires: 'admin', adminWide: true },
+        },
+        {
+          path: 'lessons/:id',
+          name: 'admin-lesson',
+          component: () => import('./pages/admin/LessonEditorPage.vue'),
+          meta: { requires: 'admin', adminWide: true },
         },
       ],
     },

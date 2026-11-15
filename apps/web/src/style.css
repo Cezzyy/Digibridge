@@ -140,6 +140,36 @@
   }
 }
 
+/* A student page shown inside the admin area (the lessons editor's preview). Students only ever
+   see the light theme, so `.light-theme` keeps the light tokens when the system is dark. It sets
+   its own text color, since the color it inherits was worked out with the dark tokens. */
+.light-theme {
+  color: var(--color-ink);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root[data-theme='system'] .light-theme {
+    color-scheme: light;
+    --color-evergreen: #1e5b44;
+    --color-evergreen-hover: #174a37;
+    --color-evergreen-soft: #edf6f0;
+    --color-marigold-text: #8a5a00;
+    --color-marigold-soft: #fdf1da;
+    --color-ink: #12241c;
+    --color-quiet: #4f6459;
+    --color-line: #d4e3da;
+    --color-line-strong: #6f8a7c;
+    --color-surface: #ffffff;
+    --color-mist: #e4efe8;
+    --color-mist-soft: #f2f7f4;
+    --color-track: #e7f1eb;
+    --color-error: #c2412d;
+    --color-error-soft: #fbedea;
+    --color-on-evergreen: #ffffff;
+    --color-skeleton: #e4efe8;
+  }
+}
+
 /* Screen height, for pages that must fit on one screen without scrolling (sign in, home):
    `short:` below 48rem tall (most laptops), `tall:` from 56rem (large monitors), `snug:` below
    62.5rem, or below 58rem on 3xl-wide screens (home hides its heading and tightens there). */
