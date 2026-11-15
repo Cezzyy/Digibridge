@@ -1,10 +1,11 @@
 <script setup lang="ts">
 import { ref, useId, watch } from 'vue'
-import { PRIMARY_BUTTON, SECONDARY_BUTTON } from '../lib/buttons'
+import { DANGER_BUTTON, PRIMARY_BUTTON, SECONDARY_BUTTON } from '../lib/buttons'
 
 // Asks before an action that can't be undone, like closing a school link or signing out. A
 // native modal dialog, so focus stays inside it, Cancel has focus (so a stray Enter doesn't
-// confirm) and Esc closes it (unless the action is running).
+// confirm) and Esc closes it (unless the action is running). The default slot holds any fields
+// the action needs, under the message; `danger` gives the confirm button the danger style.
 const props = defineProps<{
   open: boolean
   title: string
@@ -14,6 +15,7 @@ const props = defineProps<{
   busyLabel: string
   busy: boolean
   error: string | null
+  danger?: boolean
 }>()
 const emit = defineEmits<{ confirm: []; close: [] }>()
 
@@ -48,10 +50,18 @@ function onCancel(event: Event) {
     <h2 :id="`${id}-title`" class="text-xl leading-tight font-bold">{{ title }}</h2>
     <div :id="`${id}-body`" class="mt-3 space-y-2 leading-relaxed text-quiet">
       <p>{{ message }}</p>
-      <p v-if="error" role="alert" class="font-semibold text-error">{{ error }}</p>
     </div>
+    <div v-if="$slots.default" class="mt-5">
+      <slot />
+    </div>
+    <p v-if="error" role="alert" class="mt-3 font-semibold text-error">{{ error }}</p>
     <div class="mt-6 flex flex-col gap-3 sm:flex-row-reverse">
-      <button type="button" :class="PRIMARY_BUTTON" :disabled="busy" @click="emit('confirm')">
+      <button
+        type="button"
+        :class="danger ? DANGER_BUTTON : PRIMARY_BUTTON"
+        :disabled="busy"
+        @click="emit('confirm')"
+      >
         {{ busy ? busyLabel : error ? 'Try again' : confirmLabel }}
       </button>
       <button
