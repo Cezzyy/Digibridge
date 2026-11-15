@@ -9,6 +9,8 @@ import {
   LESSON_TIERS,
   LESSON_TITLE_MAX,
   lessonInputSchema,
+  LEVEL_LABELS,
+  levelsForLessonTier,
   slugFromTitle,
   type AreaCode,
   type LessonInput,
@@ -108,6 +110,12 @@ watch(unsaved, (value) => (dirty.value = value), { immediate: true })
 
 const AREA_OPTIONS = AREA_CODES.map((code) => ({ value: code, label: AREA_LABELS[code] }))
 const TIER_OPTIONS = LESSON_TIERS.map((tier) => ({ value: tier, label: LESSON_TIER_LABELS[tier] }))
+const and = new Intl.ListFormat('en', { type: 'conjunction' })
+/** "Foundations is for Beginner and Basic, Intermediate for Basic and Intermediate, …", from LESSON_TIERS_FOR_LEVEL. */
+const TIER_HINT = `${LESSON_TIERS.map(
+  (tier, i) =>
+    `${LESSON_TIER_LABELS[tier]}${i === 0 ? ' is' : ''} for ${and.format(levelsForLessonTier(tier).map((level) => LEVEL_LABELS[level]))}`,
+).join(', ')}.`
 
 /** What the API gets. Empty links are null; a resource row left wholly empty is dropped. */
 const inputFor = (isPublished: boolean): LessonInput => ({
@@ -261,7 +269,7 @@ onUnmounted(() => clearTimeout(timer))
           <SelectField
             v-model="draft.tier"
             label="Level"
-            hint="Foundations is for Beginner and Basic, Intermediate for Basic and Intermediate, Advanced for Intermediate and Advanced."
+            :hint="TIER_HINT"
             :options="TIER_OPTIONS"
           />
           <p

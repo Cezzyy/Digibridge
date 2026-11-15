@@ -1,7 +1,7 @@
 import { z } from 'zod'
 import { areaCodeSchema } from '../assessment/rules'
 import { lessonTierSchema } from '../enums/values'
-import { LESSON_SLUG_MAX, lessonResourceSchema, lessonSlugSchema } from './lesson'
+import { httpsLinkSchema, LESSON_SLUG_MAX, lessonResourceSchema, lessonSlugSchema } from './lesson'
 
 // A lesson as an admin writes it in the lessons editor (CMS-04): what the API checks on create
 // and edit, and what the editor's form checks before it sends.
@@ -12,10 +12,8 @@ export const LESSON_SUMMARY_MAX = 300
 export const LESSON_BODY_MAX = 50_000
 export const LESSON_RESOURCES_MAX = 10
 
-const HTTP_LINK = /^https?$/
-
-/** An optional http(s) link: null when the admin leaves it empty. */
-const optionalLink = (message: string) => z.url({ protocol: HTTP_LINK, message }).nullable()
+/** An optional https link: null when the admin leaves it empty. */
+const optionalLink = (message: string) => httpsLinkSchema(message).nullable()
 
 export const lessonInputSchema = z.object({
   area: areaCodeSchema,
@@ -48,6 +46,17 @@ export const lessonInputSchema = z.object({
   isPublished: z.boolean(),
 })
 export type LessonInput = z.infer<typeof lessonInputSchema>
+
+/**
+ * What the editor sends on a save: the lesson, plus, when the save publishes it, `replaces`: the
+ * lesson the admin agreed to take the place of, or null for none. The API answers 409 if the
+ * place holds something else by then (another admin published there since), instead of
+ * unpublishing a lesson nobody was asked about.
+ */
+export const lessonSaveSchema = lessonInputSchema.extend({
+  replaces: z.uuid().nullable().optional(),
+})
+export type LessonSave = z.infer<typeof lessonSaveSchema>
 
 /**
  * A slug made from a title, for the editor to suggest: "Spot scams & phishing!" becomes

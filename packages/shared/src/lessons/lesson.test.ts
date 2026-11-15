@@ -1,5 +1,11 @@
 import { describe, expect, it } from 'vitest'
-import { lessonResourceSchema, lessonSlugSchema, levelsForLessonTier } from './lesson'
+import {
+  LESSON_LINK_MAX,
+  LESSON_RESOURCE_LABEL_MAX,
+  lessonResourceSchema,
+  lessonSlugSchema,
+  levelsForLessonTier,
+} from './lesson'
 
 describe('lessonSlugSchema', () => {
   it('takes lowercase words joined by single dashes', () => {
@@ -25,16 +31,24 @@ describe('lessonSlugSchema', () => {
 })
 
 describe('lessonResourceSchema', () => {
-  it('takes a name and an http(s) link, trimming the name', () => {
+  it('takes a name and an https link, trimming the name', () => {
     expect(lessonResourceSchema.parse({ label: ' NPC ', url: 'https://privacy.gov.ph' })).toEqual({
       label: 'NPC',
       url: 'https://privacy.gov.ph',
     })
   })
 
-  it('refuses an empty name and links that are not http(s)', () => {
-    expect(lessonResourceSchema.safeParse({ label: ' ', url: 'https://a.ph' }).success).toBe(false)
-    for (const url of ['javascript:alert(1)', 'ftp://a.ph', 'privacy.gov.ph']) {
+  it('refuses an empty or long name, and links that are not https or too long', () => {
+    for (const label of [' ', 'a'.repeat(LESSON_RESOURCE_LABEL_MAX + 1)]) {
+      expect(lessonResourceSchema.safeParse({ label, url: 'https://a.ph' }).success).toBe(false)
+    }
+    for (const url of [
+      'javascript:alert(1)',
+      'ftp://a.ph',
+      'http://privacy.gov.ph',
+      'privacy.gov.ph',
+      `https://a.ph/${'a'.repeat(LESSON_LINK_MAX)}`,
+    ]) {
       expect(lessonResourceSchema.safeParse({ label: 'A', url }).success).toBe(false)
     }
   })

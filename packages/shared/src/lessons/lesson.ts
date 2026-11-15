@@ -14,10 +14,28 @@ export const lessonSlugSchema = z
   .max(LESSON_SLUG_MAX)
   .regex(LESSON_SLUG_REGEX, { message: 'Use lowercase letters, numbers and single dashes.' })
 
-/** An outside resource listed under a lesson: a name and an http(s) link. */
+export const LESSON_LINK_MAX = 2048
+export const LESSON_RESOURCE_LABEL_MAX = 120
+
+/**
+ * An https link, as lessons hold them (picture, video, resources): the lesson page is https, so
+ * an http picture would be mixed content the browser upgrades or blocks.
+ */
+export const httpsLinkSchema = (message: string) =>
+  z
+    .url({ protocol: /^https$/, message })
+    .max(LESSON_LINK_MAX, { message: 'This link is too long.' })
+
+/** An outside resource listed under a lesson: a name and an https link. */
 export const lessonResourceSchema = z.object({
-  label: z.string().trim().min(1, { message: 'Give the resource a name.' }),
-  url: z.url({ protocol: /^https?$/, message: 'Enter a link that starts with https://' }),
+  label: z
+    .string()
+    .trim()
+    .min(1, { message: 'Give the resource a name.' })
+    .max(LESSON_RESOURCE_LABEL_MAX, {
+      message: `Keep the name under ${LESSON_RESOURCE_LABEL_MAX} characters.`,
+    }),
+  url: httpsLinkSchema('Enter a link that starts with https://'),
 })
 export type LessonResource = z.infer<typeof lessonResourceSchema>
 
