@@ -52,7 +52,7 @@ TypeScript end to end: a Vue SPA on Cloudflare Pages calls a Hono API on Cloudfl
 | File storage | Cloudflare R2, private `digibridge-media` bucket bound to the API as `MEDIA`; the API serves images at `/api/v1/media/:key` | Images for scenario items and lessons. Uploads go through the binding, so no storage keys; a public R2 bucket would need a custom domain |
 | Scheduled jobs | Cloudflare Cron Trigger on the API Worker | Closes attempts whose time ran out |
 | Hosting | Cloudflare Pages (web), Cloudflare Workers (API) | Free tier fits the pilot |
-| Tests | Vitest: `app.test.ts` with `test-helpers.ts` for routes, run against PGlite (in-memory Postgres with the real migrations), plus unit tests for scoring | Fast, no server or database needed (`app.request()`); SQL and constraints still tested |
+| Tests | Vitest: route tests in `src/test/` (one file per area, with `helpers.ts` and `fixtures.ts`), run against PGlite (in-memory Postgres with the real migrations), plus unit tests for scoring | Fast, no server or database needed (`app.request()`); SQL and constraints still tested |
 
 ## Repository structure
 
@@ -81,8 +81,7 @@ digibridge/
 │     │  ├─ openapi/         OpenAPI setup and API docs page
 │     │  ├─ app.ts           builds the Hono app, mounts routes, exports AppType
 │     │  ├─ index.ts         Worker entry: fetch + scheduled (cron)
-│     │  ├─ app.test.ts      route tests
-│     │  └─ test-helpers.ts  signed-in requests, test data
+│     │  └─ test/            route tests, one file per area, plus setup, helpers and fixtures
 │     └─ wrangler.toml
 ├─ packages/
 │  ├─ db/                     Drizzle schema and seeds (db:generate, db:seed)
@@ -432,7 +431,7 @@ The scoring and shuffling logic gets unit tests; everything else is covered by M
 - Item selection always gives 4 basic, 4 intermediate and 2 advanced per area.
 - Shuffle keeps all 30 items and all 4 choices, with no duplicates.
 
-Route tests live in `apps/api/src/app.test.ts`. They call `app.request()` directly, so no server or Worker runtime is needed, and use `test-helpers.ts` to build signed-in requests for each role. Each Must endpoint gets at least one test for success and one for a blocked role.
+Route tests live in `apps/api/src/test/`, one file per area (attempts, links, admin respondents and so on). They call `app.request()` directly, so no server or Worker runtime is needed, and use `test/helpers.ts` to build signed-in requests for each role and `test/fixtures.ts` for the requests and rows several files share. Each Must endpoint gets at least one test for success and one for a blocked role.
 
 **Manual test cases (Morales)**
 
