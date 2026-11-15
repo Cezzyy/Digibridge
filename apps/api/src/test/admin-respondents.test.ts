@@ -1,5 +1,5 @@
 import { answers, areaResults, choices, profiles, respondents, susResponses } from '@digibridge/db'
-import { AREA_CODES } from '@digibridge/shared'
+import { AREA_CODES, RESPONDENT_TOKEN_HEADER, SCHOOL_CONSENT_NOTICE } from '@digibridge/shared'
 import { eq } from 'drizzle-orm'
 import { describe, expect, it } from 'vitest'
 import { app } from '../app'
@@ -356,6 +356,47 @@ describe('POST /api/v1/admin/attempts/:id/void', () => {
       env,
     )
     expect(saved.status).toBe(409)
+  })
+
+  it('ends a school-link student’s token, so whoever has the number joins again to start over', async () => {
+    const link = await addSchoolLink()
+    const joinAs = (fullName: string) =>
+      app.request(
+        `/api/v1/links/${link.code}/respondents`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            fullName,
+            birthDate: '2007-06-15',
+            sex: 'female',
+            devices: ['smartphone'],
+            internetAccess: ['mobile_data'],
+            studentNumber: 'C23-01-7001-MAN121',
+            course: 'BSIT',
+            yearLevel: 2,
+            showIdentity: true,
+            consentVersion: SCHOOL_CONSENT_NOTICE.version,
+          }),
+        },
+        env,
+      )
+    // Someone joins under another student's number and starts.
+    const first = (await (await joinAs('Wrong Person')).json()) as { token: string }
+    const wrong = { [RESPONDENT_TOKEN_HEADER]: first.token }
+    const { id } = (await (await start(wrong)).json()) as { id: string }
+    const admin = await signedIn('admin')
+    expect((await voidIt(id, { reason: 'wrong_person' }, admin.headers)).status).toBe(200)
+
+    // Their browser can't start again under that number…
+    expect((await get(`/api/v1/links/${link.code}`, wrong)).status).toBe(401)
+    expect((await start(wrong)).status).toBe(401)
+    expect((await get(`/api/v1/attempts/${id}`, wrong)).status).toBe(404)
+    // …and the student it belongs to can still join with it.
+    const res = await joinAs('Right Person')
+    expect(res.status).toBe(201)
+    const second = (await res.json()) as { token: string }
+    expect((await start({ [RESPONDENT_TOKEN_HEADER]: second.token })).status).toBe(201)
   })
 
   it('needs a note with other, and a known reason', async () => {

@@ -58,8 +58,11 @@ export const useAttemptStore = defineStore('attempt', () => {
   const closed = ref(false)
   const submitting = ref(false)
   const submitError = ref<string | null>(null)
-  /** The team voided the attempt: there's nothing left to submit. */
-  const voided = ref(false)
+  /**
+   * The attempt isn't theirs to submit anymore: the team voided it (409), or it's gone to them
+   * (404: a void through a school link also ends the student's token, and a delete removes them).
+   */
+  const gone = ref(false)
 
   // The newest choice per question that the server hasn't confirmed, and the save loop running
   // for it. Kept outside Vue's reactivity: only the page's view of them (saveStates) is shown.
@@ -87,7 +90,7 @@ export const useAttemptStore = defineStore('attempt', () => {
     current.value = 0
     closed.value = false
     submitError.value = null
-    voided.value = false
+    gone.value = false
     wanted.clear()
     owner = null
   }
@@ -264,8 +267,10 @@ export const useAttemptStore = defineStore('attempt', () => {
       held.setAttempt({ id: result.id, status: result.status })
       return result
     } catch (err) {
-      // The only 409 on submit: the team voided the attempt.
-      if (err instanceof ApiRequestError && err.code === 'conflict') voided.value = true
+      // A 409 on submit means the team voided it; a 404, that it's gone to them (see `gone`).
+      if (err instanceof ApiRequestError && (err.code === 'conflict' || err.code === 'not_found')) {
+        gone.value = true
+      }
       submitError.value = messageOf(err)
       return null
     } finally {
@@ -283,7 +288,7 @@ export const useAttemptStore = defineStore('attempt', () => {
     closed,
     submitting,
     submitError,
-    voided,
+    gone,
     answeredCount,
     unsavedCount,
     deadline,

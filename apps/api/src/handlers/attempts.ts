@@ -25,6 +25,7 @@ import { pickItems, type PoolItem } from '../lib/pick-items'
 import { scoreAndClose, timeIsUp, type Tx } from '../lib/close-attempt'
 import { susScore } from '../lib/sus'
 import { ApiError, UNKNOWN_TOKEN_MESSAGE } from '../middleware'
+import { notNullViolation } from '../lib/pg-errors'
 import { respondentIs } from '../lib/respondent'
 import type {
   getAttemptRoute,
@@ -134,14 +135,26 @@ export const startAttempt: RouteHandler<typeof startAttemptRoute, RespondentEnv>
 
   const startedAt = new Date()
   const expiresAt = new Date(startedAt.getTime() + ATTEMPT_DURATION_MINUTES * 60_000)
+  // The respondent is read again as the row goes in, under FOR SHARE. A rejoin through a link
+  // locks this row before it checks for attempts, then gives it a new token and maybe a new link:
+  // it either waits for this start (and then refuses), or goes first, and then the row no longer
+  // matches the caller's key, so respondent_id comes out null and nothing goes in.
+  const me = db.$with('me').as(
+    db
+      .select({ id: respondents.id, schoolLinkId: respondents.schoolLinkId })
+      .from(respondents)
+      .where(and(eq(respondents.id, respondent.id), respondentIs(key)))
+      .for('share'),
+  )
   // The partial unique index allows one attempt per respondent that isn't voided, so a second
   // start sent at the same moment inserts nothing and gets the first one's attempt.
   const [created] = await db
+    .with(me)
     .insert(attempts)
     .values({
-      respondentId: respondent.id,
+      respondentId: sql`(select ${me.id} from ${me})`,
       // The link they joined through (LNK-05); null online.
-      schoolLinkId: respondent.schoolLinkId,
+      schoolLinkId: sql`(select ${me.schoolLinkId} from ${me})`,
       startedAt,
       expiresAt,
       questionOrder: picked.questionOrder,
@@ -149,6 +162,11 @@ export const startAttempt: RouteHandler<typeof startAttemptRoute, RespondentEnv>
     })
     .onConflictDoNothing()
     .returning(summaryColumns)
+    .catch((err: unknown) => {
+      if (notNullViolation(err) !== 'respondent_id') throw err
+      if ('tokenHash' in key) throw new ApiError('unauthorized', UNKNOWN_TOKEN_MESSAGE)
+      throw new ApiError('conflict', 'Fill in your profile before you start.')
+    })
   if (created) return reply(created, 201)
 
   const winner = await currentAttempt(db, respondent.id)

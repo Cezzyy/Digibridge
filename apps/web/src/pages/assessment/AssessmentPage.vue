@@ -103,7 +103,7 @@ async function submit({ evenIfUnsaved = false } = {}) {
   if (result) {
     dialogOpen.value = false
     await showResults()
-  } else if (store.voided) {
+  } else if (store.gone) {
     await leave()
   }
 }
