@@ -32,7 +32,7 @@ import ResourceListField from './ResourceListField.vue'
 // (LES-02), with a live preview beside the form from `xl` and behind a Preview button below
 // that. Checked with the API's own schema; errors show once Save or Publish is pressed, then
 // follow each change. The page does the saving and asks before a publish replaces another
-// lesson or an unpublish leaves the place empty; after a save it passes the saved lesson back
+// lesson or an unpublish or a move leaves the place empty; after a save it passes the saved lesson back
 // in `lesson`, and the form starts again from it. `dirty` tells the page about unsaved changes.
 
 const props = defineProps<{
@@ -161,6 +161,17 @@ const occupant = computed(
 )
 
 const published = computed(() => props.lesson?.isPublished ?? false)
+/** A published lesson set to go to another area or tier than where it is now. */
+const moved = computed(
+  () =>
+    published.value &&
+    (draft.value.area !== props.lesson?.area || draft.value.tier !== props.lesson?.tier),
+)
+/**
+ * Publishing into a place, or moving a published lesson to one, needs the list to tell what it
+ * would replace; with the list missing it's off, so nothing is replaced without asking.
+ */
+const placeUnknown = computed(() => props.lessons === null && (!published.value || moved.value))
 
 const done = computed(() => {
   const f = issues.value.fields
@@ -182,7 +193,7 @@ const address = computed(() => `${window.location.origin}/lessons/${draft.value.
 
 function save(isPublished: boolean) {
   tried.value = true
-  if (!result.value.success) return
+  if (!result.value.success || (isPublished && placeUnknown.value)) return
   emit('save', inputFor(isPublished), isPublished ? occupant.value : null)
 }
 
@@ -358,7 +369,7 @@ onUnmounted(() => clearTimeout(timer))
               >
                 Unpublish
               </button>
-              <button type="submit" :class="PRIMARY_BUTTON" :disabled="saving">
+              <button type="submit" :class="PRIMARY_BUTTON" :disabled="saving || placeUnknown">
                 {{ saving ? 'Saving…' : 'Save changes' }}
               </button>
             </template>
@@ -369,7 +380,7 @@ onUnmounted(() => clearTimeout(timer))
               <button
                 type="button"
                 :class="PRIMARY_BUTTON"
-                :disabled="saving || !lessons"
+                :disabled="saving || placeUnknown"
                 @click="save(true)"
               >
                 Publish
