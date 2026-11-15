@@ -120,7 +120,7 @@ describe('POST /api/v1/attempts', () => {
     await start(user.headers)
     await testDb
       .update(attempts)
-      .set({ ...voidedFields(), voidReason: 'Lost connection' })
+      .set({ ...voidedFields(), voidNote: 'Lost connection' })
       .where(eq(attempts.respondentId, user.respondentId))
     expect((await start(user.headers)).status).toBe(201)
     expect(await attemptsOf(user.respondentId)).toHaveLength(2)
@@ -422,7 +422,7 @@ describe('attempts in progress', () => {
       const { user, attempt } = await started()
       await testDb
         .update(attempts)
-        .set({ ...voidedFields(), voidReason: 'Test' })
+        .set({ ...voidedFields(), voidNote: 'Test' })
         .where(eq(attempts.id, attempt.id))
       const res = await submit(attempt.id, user.headers)
       expect(res.status).toBe(409)

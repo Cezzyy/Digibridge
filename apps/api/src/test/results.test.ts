@@ -150,7 +150,7 @@ describe('GET /api/v1/attempts/:id/result', () => {
     await submit(attempt.id, user.headers)
     await testDb
       .update(attempts)
-      .set({ ...voidedFields(), voidReason: 'Test' })
+      .set({ ...voidedFields(), voidNote: 'Test' })
       .where(eq(attempts.id, attempt.id))
     expect((await result(attempt.id, user.headers)).status).toBe(409)
   })
