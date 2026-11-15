@@ -44,11 +44,16 @@ const emit = defineEmits<{ close: []; changed: []; deleted: [] }>()
 
 const { detail, notFound, error, load } = useRespondent()
 const dialog = ref<HTMLDialogElement | null>(null)
+const actions = useRespondentActions()
+const asking = ref<'void' | 'delete' | null>(null)
 
 watch(
   () => props.id,
   (id) => {
     const el = dialog.value
+    // A Void or Delete dialog is for the respondent it was opened on: closing the drawer, or
+    // opening another respondent (Back, a link), closes it too.
+    asking.value = null
     if (id) {
       void load(id)
       if (el && !el.open) el.showModal()
@@ -72,21 +77,21 @@ const voided = computed(() => {
   }
 })
 
-const actions = useRespondentActions()
-const asking = ref<'void' | 'delete' | null>(null)
-
 function ask(action: 'void' | 'delete') {
   actions.reset()
   asking.value = action
 }
 
 async function voidIt(input: VoidAttempt) {
+  const id = props.id
   const attemptId = attempt.value?.id
-  if (!attemptId || !props.id) return
+  if (!attemptId || !id) return
   if (!(await actions.voidAttempt(attemptId, input))) return
-  asking.value = null
   emit('changed')
-  void load(props.id)
+  // The drawer may have closed or moved to someone else while it ran.
+  if (props.id !== id) return
+  asking.value = null
+  void load(id)
 }
 
 async function deleteIt() {
@@ -345,6 +350,7 @@ const profile = computed(() => {
       <VoidAttemptDialog
         :open="asking === 'void'"
         :in-progress="attempt?.status === 'in_progress'"
+        :school="respondent.mode === 'school'"
         :busy="actions.voiding.value"
         :error="actions.voidError.value"
         @confirm="voidIt"
