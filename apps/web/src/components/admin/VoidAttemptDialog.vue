@@ -9,6 +9,7 @@ import {
 } from '@digibridge/shared'
 import { computed, ref, useId, watch } from 'vue'
 import ConfirmDialog from '../ConfirmDialog.vue'
+import RadioGroup from '../form/RadioGroup.vue'
 
 // Asks an admin why they're voiding an attempt (USR-03): one of VOID_REASONS, and a note, which
 // `other` needs. Checked with voidAttemptSchema on Void; `confirm` sends the checked input.
@@ -49,10 +50,12 @@ const errors = computed(() => {
   }
 })
 
-const message = computed(() =>
-  props.inProgress
-    ? 'They’re still taking it: voiding stops it now, and their answers stop saving. It’s left out of every result and stat, and they can start again.'
-    : 'It’s left out of every result and stat, and they can start again. Their answers and scores stay here for the record.',
+const reasons = VOID_REASONS.map((value) => ({ value, label: VOID_REASON_LABELS[value] }))
+
+const message = computed(
+  () =>
+    (props.inProgress ? 'They’re still taking it, so this stops it now. ' : '') +
+    'It’s left out of every result and stat, and they can start again. Answers and scores stay for the record.',
 )
 
 function confirm() {
@@ -71,50 +74,41 @@ function confirm() {
     :busy="busy"
     :error="error"
     danger
+    wide
     @confirm="confirm"
     @close="emit('close')"
   >
-    <fieldset :aria-describedby="errors.reason ? `${id}-reason-error` : undefined">
-      <legend class="text-lg font-semibold">Why?</legend>
-      <div class="mt-2 grid gap-1">
-        <label
-          v-for="value in VOID_REASONS"
-          :key="value"
-          class="flex min-h-11 cursor-pointer items-center gap-3 rounded-control px-2 hover:bg-evergreen-soft"
-        >
-          <input
-            v-model="reason"
-            type="radio"
-            :name="`${id}-reason`"
-            :value="value"
-            :disabled="busy"
-            class="size-5 shrink-0 accent-evergreen"
-          />
-          <span>{{ VOID_REASON_LABELS[value] }}</span>
-        </label>
-      </div>
-      <p v-if="errors.reason" :id="`${id}-reason-error`" class="mt-2 font-semibold text-error">
-        {{ errors.reason }}
-      </p>
-    </fieldset>
+    <RadioGroup
+      v-model="reason"
+      legend="Why?"
+      :options="reasons"
+      :error="errors.reason"
+      :disabled="busy"
+    />
 
     <div class="mt-4">
-      <label :for="`${id}-note`" class="text-lg font-semibold">Note</label>
-      <p :id="`${id}-note-hint`" class="mt-0.5 text-quiet">
-        {{ reason === 'other' ? 'Say what happened.' : 'Optional. What happened, for the team.' }}
-      </p>
+      <label :for="`${id}-note`" class="font-semibold">
+        Note
+        <span class="font-normal text-quiet">{{
+          reason === 'other' ? '(say what happened)' : '(optional)'
+        }}</span>
+      </label>
       <textarea
         :id="`${id}-note`"
         v-model="note"
-        rows="3"
+        rows="2"
         :maxlength="VOID_NOTE_MAX_LENGTH"
         :disabled="busy"
         :aria-invalid="errors.note ? 'true' : undefined"
-        :aria-describedby="`${id}-note-hint` + (errors.note ? ` ${id}-note-error` : '')"
-        class="mt-2 block w-full rounded-control border bg-surface px-4 py-3 text-lg transition-colors hover:border-evergreen focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-evergreen"
+        :aria-describedby="errors.note ? `${id}-note-error` : undefined"
+        class="mt-1.5 block w-full resize-none rounded-control border bg-surface px-3 py-2 leading-snug transition-colors hover:border-evergreen focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-evergreen disabled:opacity-60"
         :class="errors.note ? 'border-error' : 'border-line-strong'"
       />
-      <p v-if="errors.note" :id="`${id}-note-error`" class="mt-2 font-semibold text-error">
+      <p
+        v-if="errors.note"
+        :id="`${id}-note-error`"
+        class="mt-1.5 text-sm font-semibold text-error"
+      >
         {{ errors.note }}
       </p>
     </div>
