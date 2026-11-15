@@ -18,8 +18,8 @@ import { useSchoolLinks } from '../../composables/useSchoolLinks'
 
 // Item analysis (DSH-08), admin only: each area's questions with their percent correct, how
 // often each choice was picked, and flags for items that look too easy, too hard or confusing.
-// Follows the dashboard filters; counts finished attempts only. It can move into the questions
-// page once that's built.
+// Follows the dashboard filters; counts finished attempts only. Each card links to its question
+// in the questions editor, which is a page of its own.
 const { filters } = useDashboardFilters()
 const { items, error, loading, load } = useItemAnalysis()
 const schoolLinks = useSchoolLinks()
@@ -56,7 +56,13 @@ const shown = computed(() =>
     <p class="mt-2 max-w-3xl text-lg text-quiet">
       How each question did. Too easy means {{ ITEM_EASY_MIN_PCT }}% or more got it right, too hard
       fewer than {{ ITEM_HARD_BELOW_PCT }}%, and confusing a wrong choice picked more than the right
-      one. Flags show once {{ ITEM_FLAG_MIN_SEEN }} people have seen an item.
+      one. Flags show once {{ ITEM_FLAG_MIN_SEEN }} people have seen an item. To change a question,
+      open it in
+      <RouterLink
+        :to="{ name: 'admin-questions', query: { area } }"
+        class="font-semibold text-evergreen underline-offset-4 hover:underline"
+        >Questions</RouterLink
+      >.
     </p>
   </div>
 

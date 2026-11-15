@@ -13,7 +13,8 @@ import StrokeIcon from './StrokeIcon.vue'
 
 // One question in item analysis (DSH-08): its percent correct, how many saw it, its flags with
 // what each means, and each choice with how often it was picked (the right one marked). Bars are
-// shares of everyone who saw the item, so blanks show as what's left over.
+// shares of everyone who saw the item, so blanks show as what's left over. Edit question opens it
+// in the questions editor.
 const props = defineProps<{ item: ItemStats }>()
 
 const LETTERS = ['A', 'B', 'C', 'D']
@@ -91,5 +92,12 @@ const tooFew = computed(() => props.item.seen > 0 && props.item.seen < ITEM_FLAG
       </li>
     </ul>
     <p v-if="item.blank" class="mt-2 ml-6 text-sm text-quiet">{{ item.blank }} left it blank</p>
+
+    <RouterLink
+      :to="{ name: 'admin-question', params: { id: item.questionId } }"
+      class="mt-2 inline-flex min-h-11 items-center text-sm font-semibold text-evergreen hover:underline"
+    >
+      Edit question
+    </RouterLink>
   </article>
 </template>
