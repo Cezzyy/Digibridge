@@ -1,4 +1,4 @@
-import type { LessonInput } from '@digibridge/shared'
+import type { LessonSave } from '@digibridge/shared'
 import type { InferResponseType } from 'hono/client'
 import { ref } from 'vue'
 import { api, ApiRequestError, call, messageOf } from '../lib/api'
@@ -34,7 +34,7 @@ export function useLessonEditor() {
   }
 
   /** Saves `input` as a new lesson, or over the one `id` names. Resolves the saved lesson, or null with `saveError` set. */
-  async function save(input: LessonInput, id?: string) {
+  async function save(input: LessonSave, id?: string) {
     saving.value = true
     saveError.value = null
     try {

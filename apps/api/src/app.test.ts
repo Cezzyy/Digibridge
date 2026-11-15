@@ -2037,6 +2037,35 @@ describe('lessons', () => {
         expect(await published()).toEqual(['other-tier', 'spot-scams'])
       })
 
+      it('answers 409 when another lesson holds the place than `replaces` says, and keeps it', async () => {
+        const oldId = await insertLesson('old-scams', 'safety', 'foundations')
+        const admin = await signedIn('admin')
+        for (const replaces of [null, crypto.randomUUID()]) {
+          const stale = await send('POST', '/api/v1/admin/lessons', admin.headers, {
+            ...input,
+            isPublished: true,
+            replaces,
+          })
+          expect(stale.status).toBe(409)
+          expect(await published()).toEqual(['old-scams'])
+        }
+        const agreed = await send('POST', '/api/v1/admin/lessons', admin.headers, {
+          ...input,
+          isPublished: true,
+          replaces: oldId,
+        })
+        expect(agreed.status).toBe(201)
+        expect(await published()).toEqual(['spot-scams'])
+      })
+
+      it('answers 404 when the areas were never seeded', async () => {
+        await clearQuestionBank()
+        const admin = await signedIn('admin')
+        const res = await send('POST', '/api/v1/admin/lessons', admin.headers, input)
+        expect(res.status).toBe(404)
+        expect(await testDb.select().from(lessons)).toEqual([])
+      })
+
       it('answers 409 for a slug in use and 400 for a bad field', async () => {
         await insertLesson('spot-scams', 'info_literacy', 'advanced', { isPublished: false })
         const admin = await signedIn('admin')
@@ -2045,7 +2074,13 @@ describe('lessons', () => {
         expect(await taken.json()).toEqual({
           error: { code: 'conflict', message: expect.stringContaining('slug') },
         })
-        for (const bad of [{ slug: 'Not A Slug' }, { title: ' ' }, { videoUrl: 'ftp://a.ph' }]) {
+        for (const bad of [
+          { slug: 'Not A Slug' },
+          { title: ' ' },
+          { videoUrl: 'ftp://a.ph' },
+          { imageUrl: 'http://example.com/a.png' },
+          { replaces: 'not-an-id' },
+        ]) {
           const res = await send('POST', '/api/v1/admin/lessons', admin.headers, {
             ...input,
             slug: 'fresh',
@@ -2092,6 +2127,26 @@ describe('lessons', () => {
         })
         expect(res.status).toBe(200)
         expect(await published()).toEqual(['new'])
+      })
+
+      it('answers 409 when publishing would unpublish a lesson `replaces` doesn’t name', async () => {
+        await insertLesson('theirs', 'safety', 'foundations')
+        const id = await insertLesson('mine', 'safety', 'foundations', { isPublished: false })
+        const admin = await signedIn('admin')
+        const res = await send('PATCH', `/api/v1/admin/lessons/${id}`, admin.headers, {
+          isPublished: true,
+          replaces: null,
+        })
+        expect(res.status).toBe(409)
+        expect(await published()).toEqual(['theirs'])
+        // Saving a published lesson where it is, with nothing else there, replaces nothing.
+        const live = await insertLesson('live', 'safety', 'advanced')
+        const kept = await send('PATCH', `/api/v1/admin/lessons/${live}`, admin.headers, {
+          title: 'Renamed',
+          replaces: null,
+        })
+        expect(kept.status).toBe(200)
+        expect(await published()).toEqual(['live', 'theirs'])
       })
 
       it('a published lesson moved to another area and tier takes that one’s place', async () => {

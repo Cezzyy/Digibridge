@@ -229,7 +229,7 @@ School-link respondents use the same respondent-flow routes (`/api/v1/attempts/*
 | GET, POST | `/api/v1/admin/questions` | Admin | List with item analysis; create a question with its 4 choices |
 | PATCH | `/api/v1/admin/questions/:id` | Admin | Edit. Correct choice locked once answered. |
 | POST | `/api/v1/admin/questions/import` | Admin | Import CSV rows; returns created count and row errors |
-| GET, POST | `/api/v1/admin/lessons` | Admin | List every lesson, drafts included; create a lesson. Publishing one unpublishes the lesson published for the same area and tier, in one transaction. 409 for a slug in use |
+| GET, POST | `/api/v1/admin/lessons` | Admin | List every lesson, drafts included; create a lesson. Publishing one unpublishes the lesson published for the same area and tier, in one transaction; the save's `replaces` names the lesson the admin agreed to replace (null for none), and anything else there is a 409. 409 for a slug in use; 404 if the areas were never seeded |
 | GET, PATCH, DELETE | `/api/v1/admin/lessons/:id` | Admin | Read one lesson for the editor; edit any of its fields (publishing swaps as above); delete a draft (409 for a published lesson: unpublish it first) |
 | POST | `/api/v1/admin/uploads` | Admin | Upload an image to the R2 `MEDIA` bucket; returns its `/api/v1/media/:key` URL |
 | GET | `/api/v1/admin/users` | Admin | Accounts with role and last sign-in |

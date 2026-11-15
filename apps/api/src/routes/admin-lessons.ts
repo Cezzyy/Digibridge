@@ -1,4 +1,4 @@
-import { lessonInputSchema } from '@digibridge/shared'
+import { lessonSaveSchema } from '@digibridge/shared'
 import { createRoute, z } from '@hono/zod-openapi'
 import { auth, requireRole } from '../middleware'
 import { errorResponse } from '../openapi'
@@ -35,7 +35,11 @@ const lessonBody = <T extends z.ZodType>(schema: T, id: string) => ({
 const ADMIN_ERRORS = { ...SIGNED_IN_ERRORS, 403: errorResponse('Not an admin') }
 
 const PUBLISH_NOTE =
-  'Only one lesson per area and tier is published at a time (LES-01): publishing this one unpublishes the one before, in the same transaction.'
+  'Only one lesson per area and tier is published at a time (LES-01): publishing this one unpublishes the one before, in the same transaction. Send `replaces` with the ID of the lesson the admin agreed to replace, or null for none, and a save that would unpublish any other is refused with 409.'
+
+const CONFLICT = errorResponse(
+  'The slug is taken, or another lesson is published in its place than `replaces` says, or was published there just now',
+)
 
 export const listAdminLessonsRoute = createRoute({
   method: 'get',
@@ -89,7 +93,7 @@ export const createLessonRoute = createRoute({
   description: `With its area, tier, slug, title, summary, Markdown body, optional image and video links, and outside resources (CMS-04, LES-02). ${PUBLISH_NOTE}`,
   middleware: [auth, requireRole('admin')] as const,
   security: [{ Bearer: [] }],
-  request: lessonBody(lessonInputSchema, 'NewLesson'),
+  request: lessonBody(lessonSaveSchema, 'NewLesson'),
   responses: {
     201: {
       description: 'The new lesson',
@@ -97,7 +101,8 @@ export const createLessonRoute = createRoute({
     },
     400: errorResponse('A field is missing or not valid'),
     ...ADMIN_ERRORS,
-    409: errorResponse('The slug is taken, or another lesson was published in its place just now'),
+    404: errorResponse('The area isn’t set up (the areas were never seeded)'),
+    409: CONFLICT,
   },
 })
 
@@ -111,7 +116,7 @@ export const updateLessonRoute = createRoute({
   security: [{ Bearer: [] }],
   request: {
     params: LessonIdParamsSchema,
-    ...lessonBody(lessonInputSchema.partial(), 'LessonChanges'),
+    ...lessonBody(lessonSaveSchema.partial(), 'LessonChanges'),
   },
   responses: {
     200: {
@@ -120,8 +125,8 @@ export const updateLessonRoute = createRoute({
     },
     400: errorResponse('A field or the ID is not valid'),
     ...ADMIN_ERRORS,
-    404: errorResponse('No lesson with this ID'),
-    409: errorResponse('The slug is taken, or another lesson was published in its place just now'),
+    404: errorResponse('No lesson with this ID, or the area it moves to isn’t set up'),
+    409: CONFLICT,
   },
 })
 

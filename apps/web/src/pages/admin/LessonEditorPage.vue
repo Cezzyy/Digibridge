@@ -80,15 +80,24 @@ function onSave(input: LessonInput, replaces: AdminLessonRow | null) {
       ? { area: was.area, tier: was.tier }
       : null
   if (replaces || leaves) pending.value = { input, replaces, leaves }
-  else void commit(input)
+  else void commit(input, null)
 }
 
-async function commit(input: LessonInput) {
+async function commit(input: LessonInput, replaces: AdminLessonRow | null) {
   const wasPublished = lesson.value?.isPublished ?? false
   // The saved lesson's own ID, not the address's: after a new lesson's first save the address
-  // changes only once `router.replace` ends, or not at all if that's cut short.
-  const saved = await save(input, lesson.value?.id ?? id.value ?? undefined)
-  if (!saved) return
+  // changes only once `router.replace` ends, or not at all if that's cut short. A publish says
+  // which lesson it was agreed to replace, so the API refuses it if another took that place since.
+  const saved = await save(
+    { ...input, replaces: input.isPublished ? (replaces?.id ?? null) : undefined },
+    lesson.value?.id ?? id.value ?? undefined,
+  )
+  if (!saved) {
+    // The list may be what's stale (another admin published), so the next try asks about the
+    // lesson there now.
+    void loadLessons()
+    return
+  }
   pending.value = null
   // `dirty` follows the form, which keeps anything typed while this saved.
   notice.value =
@@ -278,7 +287,7 @@ onUnmounted(() => {
     :busy-label="confirm.busyLabel"
     :busy="saving"
     :error="saveError"
-    @confirm="pending && commit(pending.input)"
+    @confirm="pending && commit(pending.input, pending.replaces)"
     @close="stopPending"
   />
 
