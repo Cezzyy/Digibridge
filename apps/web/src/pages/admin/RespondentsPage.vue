@@ -142,6 +142,11 @@ function closeDrawer() {
   if (router.options.history.state.back === list) router.back()
   else replaceQuery({ respondent: undefined })
 }
+/** Their row goes from the list once their data is deleted (USR-03). */
+function onDeleted() {
+  closeDrawer()
+  void reload()
+}
 </script>
 
 <template>
@@ -249,5 +254,7 @@ function closeDrawer() {
     :preview="openRow"
     :is-admin="session.isAdmin"
     @close="closeDrawer"
+    @changed="reload"
+    @deleted="onDeleted"
   />
 </template>

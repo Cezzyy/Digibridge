@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { AREA_CODES, AREA_LABELS, type Mode, type RespondentStatus } from '@digibridge/shared'
 import { computed } from 'vue'
+import { DANGER_BUTTON } from '../../lib/buttons'
 import SkeletonText from '../results/SkeletonText.vue'
 import RespondentStatusBadge from './RespondentStatusBadge.vue'
 
@@ -13,6 +14,7 @@ import RespondentStatusBadge from './RespondentStatusBadge.vue'
 const props = defineProps<{ isAdmin: boolean; mode?: Mode; status?: RespondentStatus }>()
 
 const BLOCK = 'bg-skeleton motion-safe:animate-skeleton'
+const HIDDEN_BUTTON = 'border-transparent! text-transparent!'
 const STATUS_PILL = `inline-flex shrink-0 items-center gap-1.5 rounded-full px-3 py-1 text-sm font-semibold whitespace-nowrap text-transparent ${BLOCK}`
 const LEVEL_PILL = `inline-flex w-fit shrink-0 items-center rounded-full font-display font-bold whitespace-nowrap text-transparent ${BLOCK}`
 
@@ -35,6 +37,8 @@ const profileRows = computed(() => [
 
 const started = computed(() => props.status !== 'not_started')
 const inProgress = computed(() => props.status === 'in_progress')
+/** The drawer offers Void while there's an attempt that isn't voided. */
+const voidable = computed(() => started.value && props.status !== 'voided')
 
 const SUS_ROWS = [
   'w-4/5',
@@ -182,5 +186,39 @@ const ANSWER_ITEMS = [
         </div>
       </section>
     </template>
+
+    <section v-if="isAdmin" class="rounded-card border border-line bg-surface p-5">
+      <h3 class="text-lg font-bold">Manage</h3>
+      <p class="mt-1 text-quiet">Only admins see this.</p>
+      <div class="mt-4 divide-y divide-line">
+        <div
+          v-if="voidable"
+          class="flex flex-col gap-3 pb-4 sm:flex-row sm:items-center sm:justify-between"
+        >
+          <div class="min-w-0">
+            <p class="font-semibold">Void the attempt</p>
+            <p class="text-quiet">
+              When it went wrong, like a lost connection or the wrong person taking it. They can
+              start again.
+            </p>
+          </div>
+          <span :class="[DANGER_BUTTON, BLOCK, HIDDEN_BUTTON]" class="shrink-0">Void attempt</span>
+        </div>
+        <div
+          class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between"
+          :class="{ 'pt-4': voidable }"
+        >
+          <div class="min-w-0">
+            <p class="font-semibold">Delete their data</p>
+            <p class="text-quiet">
+              When they ask, as the Data Privacy Act allows. It can’t be undone.
+            </p>
+          </div>
+          <span :class="[DANGER_BUTTON, BLOCK, HIDDEN_BUTTON]" class="shrink-0">
+            Delete respondent
+          </span>
+        </div>
+      </div>
+    </section>
   </div>
 </template>
