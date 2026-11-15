@@ -60,8 +60,35 @@ const heading = computed(() => {
 const dirty = ref(false)
 const notice = ref<string | null>(null)
 
-async function onSave(input: QuestionInput) {
+/** A save waiting on the reminder: rewording a question students have seen. */
+const pending = ref<QuestionInput | null>(null)
+
+/**
+ * Whether the save changes what students read: the question or a choice's text. Past answers point
+ * at the choices, so the answer sheet and item analysis show them with the new wording.
+ */
+function rewords(input: QuestionInput): boolean {
+  const was = question.value
+  if (!was) return false
+  return (
+    input.stem.trim() !== was.stem ||
+    input.choices.some((choice, i) => choice.label.trim() !== was.choices[i]?.label)
+  )
+}
+
+function onSave(input: QuestionInput) {
   notice.value = null
+  if (question.value?.shown && rewords(input)) pending.value = input
+  else void commit(input)
+}
+
+function confirmPending() {
+  const input = pending.value
+  pending.value = null
+  if (input) void commit(input)
+}
+
+async function commit(input: QuestionInput) {
   // The saved question's own ID, not the address's: after a new question's first save the
   // address changes only once `router.replace` ends, or not at all if that's cut short.
   const saved = await save(input, question.value?.id ?? id.value ?? undefined)
@@ -191,6 +218,18 @@ onUnmounted(() => {
       @save="onSave"
     />
   </template>
+
+  <ConfirmDialog
+    :open="pending !== null"
+    title="Change the wording?"
+    message="Students have already seen this question. Their past answers will show the new wording, so keep each choice meaning the same. To ask something different, make this question inactive and add a new one."
+    confirm-label="Save"
+    busy-label="Saving…"
+    :busy="false"
+    :error="null"
+    @confirm="confirmPending"
+    @close="pending = null"
+  />
 
   <ConfirmDialog
     :open="leaving"
