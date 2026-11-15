@@ -58,7 +58,9 @@ const message = computed(
   () =>
     (props.inProgress ? 'They’re still taking it, so this stops it now. ' : '') +
     'It’s left out of every result and stat, and they can start again' +
-    (props.school ? ' by opening the school link and filling in their details again. ' : '. ') +
+    (props.school
+      ? ' by opening a school link that’s still open (this one, or a new one if it has ended) and filling in their details again. '
+      : '. ') +
     'Answers and scores stay for the record.',
 )
 
