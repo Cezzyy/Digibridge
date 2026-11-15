@@ -13,7 +13,7 @@ Every feature is built in this order:
 3. **Route contract** in `apps/api/src/routes` with `createRoute`: method, path, middleware, request schema and every response status.
 4. **Handler** in `apps/api/src/handlers`: the logic.
 5. **Bind and mount** the route with its handler in `app.ts`.
-6. **Tests** in `app.test.ts`: one for success, one for a blocked role or bad input.
+6. **Tests** in the area's file in `apps/api/src/test/`: one for success, one for a blocked role or bad input.
 7. **Web data composable** using the `hc` client.
 8. **Page and components.**
 9. **Ship check:** `pnpm lint`, `typecheck`, `test` and `build` all pass, then merge.

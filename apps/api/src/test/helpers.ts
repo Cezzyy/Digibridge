@@ -1,6 +1,6 @@
-// Test setup for app.test.ts: an in-memory Postgres with the real migrations, and
-// Supabase-style access tokens signed with a test key.
-// Don't import app here: app.test.ts's mock of config/db imports this file.
+// Test setup for the route tests: an in-memory Postgres with the real migrations, and
+// Supabase-style access tokens signed with a test key. Shared requests and rows are in fixtures.ts.
+// Don't import app here: setup.ts's mock of config/db imports this file.
 import { choices, competencyAreas, profiles, questions, schema, schoolLinks } from '@digibridge/db'
 import {
   AREA_CODES,
@@ -18,7 +18,7 @@ import { migrate } from 'drizzle-orm/pglite/migrator'
 import { exportJWK, generateKeyPair, SignJWT, type CryptoKey } from 'jose'
 import { fileURLToPath } from 'node:url'
 import { vi } from 'vitest'
-import type { Bindings } from './env'
+import type { Bindings } from '../env'
 
 export const SUPABASE_URL = 'https://test-project.supabase.co'
 export const WEB_ORIGIN = 'http://localhost:5173'
@@ -31,18 +31,26 @@ export const env = {
 
 // ---- Database ----
 
-// app.test.ts mocks config/db so every request uses this database.
+// setup.ts mocks config/db so every request uses this database.
 export const testDb = drizzle(new PGlite(), { schema })
 
 // .href: Node's URL type and the Workers one don't match.
-const MIGRATIONS = fileURLToPath(new URL('../../../supabase/migrations', import.meta.url).href)
+const MIGRATIONS = fileURLToPath(new URL('../../../../supabase/migrations', import.meta.url).href)
 
-/** Run once per test file, before the tests. */
-export async function setUpDatabase() {
-  // Supabase's auth.users, cut down to the column profiles.id references.
-  await testDb.execute(sql`create schema auth`)
-  await testDb.execute(sql`create table auth.users (id uuid primary key)`)
-  await migrate(testDb, { migrationsFolder: MIGRATIONS })
+let ready: Promise<void> | undefined
+
+/**
+ * Builds the database before a test file's tests. The route test files share a worker's module
+ * graph (`isolate: false` in vitest.config.ts), so only the first call in each worker builds it.
+ */
+export function setUpDatabase() {
+  ready ??= (async () => {
+    // Supabase's auth.users, cut down to the column profiles.id references.
+    await testDb.execute(sql`create schema auth`)
+    await testDb.execute(sql`create table auth.users (id uuid primary key)`)
+    await migrate(testDb, { migrationsFolder: MIGRATIONS })
+  })()
+  return ready
 }
 
 /**
@@ -172,6 +180,11 @@ export const bearer = (token: string) => ({ Authorization: `Bearer ${token}` })
 export async function signedIn(role: Role = 'respondent') {
   const id = await addAuthUser()
   const email = `${role}-${id.slice(0, 8)}@aclc.test`
-  await testDb.insert(profiles).values({ id, email, role })
-  return { id, email, headers: bearer(await tokenFor(id, { email })) }
+  // The same sign-in time on the profile and the token, so the API never takes the token for a
+  // newer Google sign-in (as it would if a second ticked over between the two).
+  const signedInAt = Math.floor(Date.now() / 1000)
+  await testDb
+    .insert(profiles)
+    .values({ id, email, role, lastSignInAt: new Date(signedInAt * 1000) })
+  return { id, email, headers: bearer(await tokenFor(id, { email, signedInAt })) }
 }
