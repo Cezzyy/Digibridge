@@ -35,7 +35,12 @@ export function useAdminNav() {
             icon: ICONS.items,
           },
           { label: 'School links', to: { name: 'admin-links' }, icon: ICONS.link },
-          { label: 'Lessons', to: { name: 'admin-lessons' }, icon: ICONS.lessons },
+          {
+            label: 'Lessons',
+            to: { name: 'admin-lessons' },
+            icon: ICONS.lessons,
+            currentOn: ['admin-lesson-new', 'admin-lesson'],
+          },
         ]
       : []),
     { label: 'Student preview', to: { name: 'home' }, icon: ICONS.preview },

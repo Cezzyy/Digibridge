@@ -2,6 +2,7 @@
 import { useRoute } from 'vue-router'
 import StrokeIcon from '../../components/admin/StrokeIcon.vue'
 import { useAdminNav } from '../../composables/useAdminNav'
+import { currentPageAttrs } from '../../lib/nav'
 
 // The frame of every /admin page, under AppHeader: a menu on the left from `lg`, which stays put
 // while the page scrolls. Below `lg` the same pages are in the menu that opens from the header's
@@ -21,9 +22,11 @@ const route = useRoute()
         <p class="px-3 text-sm font-semibold tracking-wide text-quiet uppercase">Admin</p>
         <ul class="mt-3 flex flex-col gap-1">
           <li v-for="item in items" :key="item.label">
-            <!-- RouterLink sets aria-current="page" on the page that's open. -->
+            <!-- RouterLink sets aria-current="page" on the page that's open; currentPageAttrs
+                 on the pages under it. -->
             <RouterLink
               :to="item.to"
+              v-bind="currentPageAttrs(item, route.name)"
               class="flex min-h-11 items-center gap-3 rounded-control px-3 font-semibold whitespace-nowrap text-quiet transition-colors hover:bg-mist-soft hover:text-ink aria-[current=page]:bg-evergreen-soft aria-[current=page]:text-evergreen"
             >
               <StrokeIcon :d="item.icon" class="size-5" />
