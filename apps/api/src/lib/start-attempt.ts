@@ -1,17 +1,10 @@
-import {
-  attempts,
-  attemptStatusEnum,
-  choices,
-  competencyAreas,
-  questions,
-  respondents,
-} from '@digibridge/db'
+import { attempts, choices, competencyAreas, questions, respondents } from '@digibridge/db'
 import type { AreaCode, AttemptStatus } from '@digibridge/shared'
 import { and, eq, or, sql } from 'drizzle-orm'
+import type { AnyPgColumn } from 'drizzle-orm/pg-core'
 import type { Db } from '../config/db'
 import type { RespondentKey } from '../env'
 import type { PickedItems, PoolItem } from './pick-items'
-import { notNullViolation } from './pg-errors'
 import { respondentIs } from './respondent'
 
 // Reading the item pool and saving a new attempt (POST /attempts, TRD "Assessment engine").
@@ -80,7 +73,7 @@ export async function insertAttempt(
   // The respondent is read again as the row goes in, under FOR SHARE. A rejoin through a link
   // locks this row before it checks for attempts, then gives it a new token and maybe a new link:
   // it either waits for this start (and then refuses), or goes first, and then the row no longer
-  // matches the caller's key, so respondent_id comes out null and nothing goes in.
+  // matches the caller's key, so `me` is empty and nothing goes in.
   const me = db.$with('me').as(
     db
       .select({ id: respondents.id, schoolLinkId: respondents.schoolLinkId })
@@ -112,32 +105,52 @@ export async function insertAttempt(
       .for('share', { of: questions }),
   )
 
-  try {
-    // The partial unique index allows one attempt per respondent that isn't voided, so a second
-    // start sent at the same moment inserts nothing and gets the first one's attempt.
-    const [created] = await db
-      .with(me, unchanged)
-      .insert(attempts)
-      .values({
-        respondentId: sql`(select ${me.id} from ${me})`,
-        // The link they joined through (LNK-05); null online.
-        schoolLinkId: sql`(select ${me.schoolLinkId} from ${me})`,
-        // Null, so the insert fails on NOT NULL, unless every picked question is unchanged.
-        status: sql`case when (select count(*) from ${unchanged}) = ${picked.items.length}
-          then 'in_progress'::${sql.raw(attemptStatusEnum.enumName)} end`,
-        startedAt,
-        expiresAt,
-        questionOrder: picked.questionOrder,
-        choiceOrder: picked.choiceOrder,
-      })
-      .onConflictDoNothing()
-      .returning(attemptSummaryColumns)
-    return created ?? 'taken'
-  } catch (err) {
-    // respondent_id comes before status, so a missing respondent is reported first.
-    const column = notNullViolation(err)
-    if (column === 'respondent_id') return 'no_respondent'
-    if (column === 'status') return 'stale'
-    throw err
-  }
+  // The values to insert, each in its column's own encoding and cast to its type, since they
+  // ride in a SELECT. `respondent_id` and `school_link_id` (LNK-05; null online) come from `me`.
+  const columns = [
+    attempts.startedAt,
+    attempts.expiresAt,
+    attempts.questionOrder,
+    attempts.choiceOrder,
+  ]
+  const values = [startedAt, expiresAt, picked.questionOrder, picked.choiceOrder]
+  const cast = (column: AnyPgColumn, v: unknown) =>
+    sql`${sql.param(v, column)}::${sql.raw(column.getSQLType())}`
+  const name = (column: AnyPgColumn) => sql.identifier(column.name)
+
+  // INSERT … SELECT FROM me, so no row goes in when `me` finds no one or a picked question
+  // changed, and a stale pick is a result, not an error. The partial unique index allows one
+  // attempt per respondent that isn't voided, so a second start sent at the same moment inserts
+  // nothing too, and gets the first one's attempt. Drizzle's own insert-select must list every
+  // column in table order, so this one is written out.
+  const created = db.$with('created', attemptSummaryColumns).as(sql`
+    insert into ${attempts}
+      (${sql.join([attempts.respondentId, attempts.schoolLinkId, ...columns].map(name), sql`, `)})
+    select ${me.id}, ${me.schoolLinkId}, ${sql.join(
+      columns.map((column, i) => cast(column, values[i])),
+      sql`, `,
+    )}
+    from ${me}
+    where (select count(*) from ${unchanged}) = ${picked.items.length}
+    on conflict do nothing
+    returning ${sql.join(Object.values(attemptSummaryColumns).map(name), sql`, `)}
+  `)
+
+  // Which of the outcomes it was, read in the same statement: no row when `me` finds no one,
+  // else the new attempt, or how many picked questions were unchanged when nothing went in.
+  const [row] = await db
+    .with(me, unchanged, created)
+    .select({
+      unchanged: sql<number>`(select count(*) from ${unchanged})::int`,
+      id: created.id,
+      status: created.status,
+      startedAt: created.startedAt,
+      expiresAt: created.expiresAt,
+    })
+    .from(me)
+    .leftJoin(created, sql`true`)
+  if (!row) return 'no_respondent'
+  const { unchanged: fresh, ...attempt } = row
+  if (attempt.id !== null) return attempt as AttemptSummary
+  return fresh === picked.items.length ? 'taken' : 'stale'
 }
