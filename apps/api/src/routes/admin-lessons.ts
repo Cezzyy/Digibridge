@@ -2,7 +2,7 @@ import { lessonSaveSchema } from '@digibridge/shared'
 import { createRoute, z } from '@hono/zod-openapi'
 import { auth, requireRole } from '../middleware'
 import { errorResponse } from '../openapi'
-import { SIGNED_IN_ERRORS } from './admin'
+import { ADMIN_ERRORS } from './admin'
 import { LessonSchema, LessonSummarySchema } from './lessons'
 
 // The lessons editor (CMS-04). Admin only. Unlike the public library, it sees drafts too.
@@ -31,8 +31,6 @@ const lessonBody = <T extends z.ZodType>(schema: T, id: string) => ({
     content: { 'application/json': { schema: schema.meta({ id }) } },
   },
 })
-
-const ADMIN_ERRORS = { ...SIGNED_IN_ERRORS, 403: errorResponse('Not an admin') }
 
 const PUBLISH_NOTE =
   'Only one lesson per area and tier is published at a time (LES-01): publishing this one unpublishes the one before, in the same transaction. Send `replaces` with the ID of the lesson the admin agreed to replace, or null for none, and a save that would unpublish any other is refused with 409.'

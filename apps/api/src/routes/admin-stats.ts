@@ -8,7 +8,7 @@ import {
 import { createRoute, z } from '@hono/zod-openapi'
 import { auth, requireRole } from '../middleware'
 import { errorResponse } from '../openapi'
-import { SIGNED_IN_ERRORS } from './admin'
+import { STAFF_ERRORS } from './admin'
 
 // The analysis page (DSH-01 to DSH-04, SUS-05). Scores count finished attempts only (submitted,
 // or closed by the timer); voided ones count nowhere. Percentages are 0 to 100, to 2 decimals,
@@ -74,7 +74,6 @@ export const statsRoute = createRoute({
       content: { 'application/json': { schema: StatsSchema } },
     },
     400: errorResponse('A filter or the grouping is not valid'),
-    ...SIGNED_IN_ERRORS,
-    403: errorResponse('Signed in as a respondent'),
+    ...STAFF_ERRORS,
   },
 })
