@@ -2,7 +2,7 @@
 import { computed, onMounted, onUnmounted, ref, useId, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import { askSignOut } from '../composables/useSignOut'
-import type { NavItem } from '../lib/nav'
+import { currentPageAttrs, type NavItem } from '../lib/nav'
 import { useSessionStore } from '../stores/session'
 import { ICONS } from './admin/admin-icons'
 import StrokeIcon from './admin/StrokeIcon.vue'
@@ -120,9 +120,15 @@ const FOOTER_BUTTON =
             class="side-menu-item"
             :style="{ '--item': index }"
           >
-            <!-- RouterLink sets aria-current="page" on the page that's open. A link to the page
-                 already open doesn't change the route, so the click closes the menu too. -->
-            <RouterLink :to="item.to" :class="LINK" @click="close">
+            <!-- RouterLink sets aria-current="page" on the page that's open; currentPageAttrs
+                 on the pages under it. A link to the page already open doesn't change the
+                 route, so the click closes the menu too. -->
+            <RouterLink
+              :to="item.to"
+              v-bind="currentPageAttrs(item, route.name)"
+              :class="LINK"
+              @click="close"
+            >
               <StrokeIcon :d="item.icon" class="size-5" />
               {{ item.label }}
             </RouterLink>
