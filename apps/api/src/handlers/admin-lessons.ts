@@ -4,7 +4,7 @@ import type { RouteHandler } from '@hono/zod-openapi'
 import { and, asc, desc, eq, ne, type SQL } from 'drizzle-orm'
 import type { Db } from '../config/db'
 import type { AuthEnv } from '../env'
-import { areaIdOf } from '../lib/area-id'
+import { areaIdOf, toEditorJson } from '../lib/area-id'
 import type { Tx } from '../lib/close-attempt'
 import { notNullViolation, uniqueViolation } from '../lib/pg-errors'
 import { ApiError } from '../middleware'
@@ -36,17 +36,6 @@ const savedColumns = {
 }
 
 const lessonColumns = { ...savedColumns, area: competencyAreas.code }
-
-// Area codes are the seeded AREA_CODES.
-const toJson = <T extends { area: string; updatedAt: Date }>({
-  area,
-  updatedAt,
-  ...lesson
-}: T) => ({
-  ...lesson,
-  area: area as AreaCode,
-  updatedAt: updatedAt.toISOString(),
-})
 
 /**
  * Unpublishes whatever is published for this area and tier, other than `keep`, so the lesson
@@ -138,11 +127,11 @@ export const listAdminLessons: RouteHandler<typeof listAdminLessonsRoute, AuthEn
       desc(lessons.isPublished),
       desc(lessons.updatedAt),
     )
-  return c.json({ lessons: rows.map(toJson) }, 200)
+  return c.json({ lessons: rows.map(toEditorJson) }, 200)
 }
 
 export const getAdminLesson: RouteHandler<typeof getAdminLessonRoute, AuthEnv> = async (c) =>
-  c.json(toJson(await selectLesson(c.var.db, c.req.valid('param').id)), 200)
+  c.json(toEditorJson(await selectLesson(c.var.db, c.req.valid('param').id)), 200)
 
 export const createLesson: RouteHandler<typeof createLessonRoute, AuthEnv> = async (c) => {
   const { area, replaces, ...lesson } = c.req.valid('json')
@@ -157,7 +146,7 @@ export const createLesson: RouteHandler<typeof createLessonRoute, AuthEnv> = asy
       return row!
     }),
   )
-  return c.json(toJson({ ...created, area }), 201)
+  return c.json(toEditorJson({ ...created, area }), 201)
 }
 
 export const updateLesson: RouteHandler<typeof updateLessonRoute, AuthEnv> = async (c) => {
@@ -195,7 +184,7 @@ export const updateLesson: RouteHandler<typeof updateLessonRoute, AuthEnv> = asy
       return { ...row!, area }
     }),
   )
-  return c.json(toJson(updated), 200)
+  return c.json(toEditorJson(updated), 200)
 }
 
 export const deleteLesson: RouteHandler<typeof deleteLessonRoute, AuthEnv> = async (c) => {

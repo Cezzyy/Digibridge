@@ -10,3 +10,17 @@ import { sql } from 'drizzle-orm'
  */
 export const areaIdOf = (code: AreaCode) =>
   sql<string>`(select ${competencyAreas.id} from ${competencyAreas} where ${competencyAreas.code} = ${code})`
+
+/**
+ * A row as the editors' JSON: `area` typed as the code it is (codes are the seeded AREA_CODES)
+ * and `updatedAt` as an ISO string. Shared by the lessons and questions editors.
+ */
+export const toEditorJson = <T extends { area: string; updatedAt: Date }>({
+  area,
+  updatedAt,
+  ...row
+}: T) => ({
+  ...row,
+  area: area as AreaCode,
+  updatedAt: updatedAt.toISOString(),
+})

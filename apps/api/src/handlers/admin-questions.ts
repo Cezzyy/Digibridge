@@ -4,7 +4,7 @@ import type { RouteHandler } from '@hono/zod-openapi'
 import { and, asc, eq, sql } from 'drizzle-orm'
 import type { Db } from '../config/db'
 import type { AuthEnv } from '../env'
-import { areaIdOf } from '../lib/area-id'
+import { areaIdOf, toEditorJson } from '../lib/area-id'
 import type { Tx } from '../lib/close-attempt'
 import { notNullViolation } from '../lib/pg-errors'
 import { ApiError } from '../middleware'
@@ -64,17 +64,6 @@ const savedColumns = {
 
 const choiceColumns = { id: choices.id, label: choices.label, isCorrect: choices.isCorrect }
 type Choice = { id: string; label: string; isCorrect: boolean }
-
-// Area codes are the seeded AREA_CODES.
-const toJson = <T extends { area: string; updatedAt: Date }>({
-  area,
-  updatedAt,
-  ...question
-}: T) => ({
-  ...question,
-  area: area as AreaCode,
-  updatedAt: updatedAt.toISOString(),
-})
 
 /** Turns a save into a 404 when its area was never seeded. */
 async function saving<T>(save: () => Promise<T>): Promise<T> {
@@ -148,7 +137,7 @@ export const listAdminQuestions: RouteHandler<typeof listAdminQuestionsRoute, Au
     .innerJoin(competencyAreas, eq(competencyAreas.id, questions.areaId))
     // The difficulty enum is in order: basic, intermediate, advanced.
     .orderBy(competencyAreas.sortOrder, questions.difficulty, questions.createdAt, questions.id)
-  return c.json({ questions: rows.map(toJson) }, 200)
+  return c.json({ questions: rows.map(toEditorJson) }, 200)
 }
 
 export const getAdminQuestion: RouteHandler<typeof getAdminQuestionRoute, AuthEnv> = async (c) => {
@@ -163,7 +152,7 @@ export const getAdminQuestion: RouteHandler<typeof getAdminQuestionRoute, AuthEn
     choicesOf(db, id),
   ])
   if (!question) throw new ApiError('not_found', NOT_FOUND)
-  return c.json(toJson({ ...question, choices: questionChoices }), 200)
+  return c.json(toEditorJson({ ...question, choices: questionChoices }), 200)
 }
 
 export const createQuestion: RouteHandler<typeof createQuestionRoute, AuthEnv> = async (c) => {
@@ -177,7 +166,7 @@ export const createQuestion: RouteHandler<typeof createQuestionRoute, AuthEnv> =
       return { ...row!, choices: await writeChoices(tx, row!.id, newChoices, false) }
     }),
   )
-  return c.json(toJson({ ...created, area, shown: false }), 201)
+  return c.json(toEditorJson({ ...created, area, shown: false }), 201)
 }
 
 export const updateQuestion: RouteHandler<typeof updateQuestionRoute, AuthEnv> = async (c) => {
@@ -239,7 +228,7 @@ export const updateQuestion: RouteHandler<typeof updateQuestionRoute, AuthEnv> =
       return { ...row!, area, shown: isShown, choices: savedChoices }
     }),
   )
-  return c.json(toJson(updated), 200)
+  return c.json(toEditorJson(updated), 200)
 }
 
 export const deleteQuestion: RouteHandler<typeof deleteQuestionRoute, AuthEnv> = async (c) => {
