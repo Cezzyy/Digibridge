@@ -1,11 +1,11 @@
 import { competencyAreas, lessons } from '@digibridge/db'
 import type { AreaCode, LessonTier } from '@digibridge/shared'
 import type { RouteHandler } from '@hono/zod-openapi'
-import { and, asc, desc, eq, ne } from 'drizzle-orm'
+import { and, asc, desc, eq, ne, sql, type SQL } from 'drizzle-orm'
 import type { Db } from '../config/db'
 import type { AuthEnv } from '../env'
 import type { Tx } from '../lib/close-attempt'
-import { uniqueViolation } from '../lib/unique-violation'
+import { notNullViolation, uniqueViolation } from '../lib/pg-errors'
 import { ApiError } from '../middleware'
 import type {
   createLessonRoute,
@@ -47,38 +47,52 @@ const toJson = <T extends { area: string; updatedAt: Date }>({
   updatedAt: updatedAt.toISOString(),
 })
 
-/** The id of an area by its code. A missing one means the areas were never seeded. */
-async function areaIdFor(tx: Tx, code: AreaCode) {
-  const [area] = await tx
-    .select({ id: competencyAreas.id })
-    .from(competencyAreas)
-    .where(eq(competencyAreas.code, code))
-  if (!area) throw new ApiError('not_found', 'This area isn’t set up yet.')
-  return area.id
-}
+/**
+ * An area's id by its code, as a subquery, so it rides in the statement that needs it instead of
+ * costing a query of its own. It's null for an area that was never seeded: in an UPDATE's WHERE
+ * that matches nothing, and in the lesson's NOT NULL `area_id` it fails, which `saving` turns
+ * into a 404.
+ */
+const areaIdOf = (code: AreaCode) =>
+  sql<string>`(select ${competencyAreas.id} from ${competencyAreas} where ${competencyAreas.code} = ${code})`
 
 /**
  * Unpublishes whatever is published for this area and tier, other than `keep`, so the lesson
- * being saved can take its place (LES-01: one published lesson per area and tier).
+ * being saved can take its place (LES-01: one published lesson per area and tier). `replaces`,
+ * when the editor sends it, is the lesson the admin agreed to replace (null for none): anything
+ * else there means another admin published since the editor looked, so it's a 409 and the
+ * transaction rolls back.
  */
-async function clearSlot(tx: Tx, areaId: string, tier: LessonTier, keep?: string) {
-  await tx
+async function clearSlot(
+  tx: Tx,
+  place: { areaId: string | SQL<string>; tier: LessonTier },
+  replaces: string | null | undefined,
+  keep?: string,
+) {
+  const cleared = await tx
     .update(lessons)
     .set({ isPublished: false })
     .where(
       and(
-        eq(lessons.areaId, areaId),
-        eq(lessons.tier, tier),
+        eq(lessons.areaId, place.areaId),
+        eq(lessons.tier, place.tier),
         eq(lessons.isPublished, true),
         keep ? ne(lessons.id, keep) : undefined,
       ),
     )
+    .returning({ id: lessons.id })
+  if (replaces !== undefined && (cleared[0]?.id ?? null) !== replaces) {
+    throw new ApiError(
+      'conflict',
+      'Another lesson was published for this area and level since you opened this page. Check which one is there now, then publish again.',
+    )
+  }
 }
 
 /**
- * Saves `save` and turns the unique violations it can hit into 409s: a slug in use, or another
- * admin publishing for the same area and tier at the same moment (the second one waits on the
- * first's index entry, then fails once it commits).
+ * Saves `save` and turns the errors it can hit into answers: a slug in use, or another admin
+ * publishing for the same area and tier at the same moment (the second one waits on the first's
+ * index entry, then fails once it commits), are 409s; an area that was never seeded is a 404.
  */
 async function saving<T>(save: () => Promise<T>): Promise<T> {
   try {
@@ -93,6 +107,9 @@ async function saving<T>(save: () => Promise<T>): Promise<T> {
         'conflict',
         'Another lesson was just published for this area and level. Reload and try again.',
       )
+    }
+    if (notNullViolation(err) === 'area_id') {
+      throw new ApiError('not_found', 'This area isn’t set up yet.')
     }
     throw err
   }
@@ -136,11 +153,11 @@ export const getAdminLesson: RouteHandler<typeof getAdminLessonRoute, AuthEnv> =
   c.json(toJson(await selectLesson(c.var.db, c.req.valid('param').id)), 200)
 
 export const createLesson: RouteHandler<typeof createLessonRoute, AuthEnv> = async (c) => {
-  const { area, ...lesson } = c.req.valid('json')
+  const { area, replaces, ...lesson } = c.req.valid('json')
   const created = await saving(() =>
     c.var.db.transaction(async (tx) => {
-      const areaId = await areaIdFor(tx, area)
-      if (lesson.isPublished) await clearSlot(tx, areaId, lesson.tier)
+      const areaId = areaIdOf(area)
+      if (lesson.isPublished) await clearSlot(tx, { areaId, tier: lesson.tier }, replaces)
       const [row] = await tx
         .insert(lessons)
         .values({ ...lesson, areaId })
@@ -153,7 +170,7 @@ export const createLesson: RouteHandler<typeof createLessonRoute, AuthEnv> = asy
 
 export const updateLesson: RouteHandler<typeof updateLessonRoute, AuthEnv> = async (c) => {
   const { id } = c.req.valid('param')
-  const { area: newArea, ...changes } = c.req.valid('json')
+  const { area: newArea, replaces, ...changes } = c.req.valid('json')
 
   const updated = await saving(() =>
     c.var.db.transaction(async (tx) => {
@@ -172,10 +189,10 @@ export const updateLesson: RouteHandler<typeof updateLessonRoute, AuthEnv> = asy
       if (!current) throw new ApiError('not_found', NOT_FOUND)
 
       const area = newArea ?? (current.area as AreaCode)
-      const areaId = area === current.area ? current.areaId : await areaIdFor(tx, area)
+      const areaId = area === current.area ? current.areaId : areaIdOf(area)
       // A lesson moved to another area or tier while published takes that one's place too.
       if (changes.isPublished ?? current.isPublished) {
-        await clearSlot(tx, areaId, changes.tier ?? current.tier, id)
+        await clearSlot(tx, { areaId, tier: changes.tier ?? current.tier }, replaces, id)
       }
       const [row] = await tx
         .update(lessons)
