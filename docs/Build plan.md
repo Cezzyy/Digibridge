@@ -86,7 +86,7 @@ Done when an admin can load the 30 real items by CSV and read the pilot data on 
 - [ ] **Questions:** list per area, create and edit with exactly 4 choices and 1 correct, correct choice locked once answered, deactivate instead of delete (CMS-01 to CMS-03).
 - [ ] **Uploads:** `POST /api/v1/admin/uploads` to the R2 `MEDIA` bucket, PNG, JPEG or WebP up to 2 MB, and `GET /api/v1/media/:key` to serve them (CMS-05).
 - [ ] **CSV import:** columns from the TRD, report row errors, and the readiness check of 10 active items per area in the 4/4/2 mix (CMS-06, CMS-07). Needed before the real items can go in.
-- [ ] **Lessons editor:** list and Markdown editor with preview (CMS-04).
+- [x] **Lessons editor:** list and Markdown editor with preview (CMS-04).
 - [x] **Dashboard:** `GET /api/v1/admin/stats` with every filter, including mode and school link, summary cards including mean SUS, level chart per area, comparison chart by a chosen grouping; course and year level count school-link respondents only and say so (DSH-01 to DSH-04, SUS-05).
 - [x] **Respondents:** paged table, detail drawer, Hidden for respondents who chose it, the school link's label, empty school cells for online respondents, read only for facilitators (DSH-05, DSH-07, PRO-05).
 - [ ] **CSV export:** admin only, follows the filters, includes SUS and the school link, keeps hidden identities hidden (DSH-06).
