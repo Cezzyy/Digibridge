@@ -1,9 +1,10 @@
 import { competencyAreas, lessons } from '@digibridge/db'
 import type { AreaCode, LessonTier } from '@digibridge/shared'
 import type { RouteHandler } from '@hono/zod-openapi'
-import { and, asc, desc, eq, ne, sql, type SQL } from 'drizzle-orm'
+import { and, asc, desc, eq, ne, type SQL } from 'drizzle-orm'
 import type { Db } from '../config/db'
 import type { AuthEnv } from '../env'
+import { areaIdOf } from '../lib/area-id'
 import type { Tx } from '../lib/close-attempt'
 import { notNullViolation, uniqueViolation } from '../lib/pg-errors'
 import { ApiError } from '../middleware'
@@ -46,15 +47,6 @@ const toJson = <T extends { area: string; updatedAt: Date }>({
   area: area as AreaCode,
   updatedAt: updatedAt.toISOString(),
 })
-
-/**
- * An area's id by its code, as a subquery, so it rides in the statement that needs it instead of
- * costing a query of its own. It's null for an area that was never seeded: in an UPDATE's WHERE
- * that matches nothing, and in the lesson's NOT NULL `area_id` it fails, which `saving` turns
- * into a 404.
- */
-const areaIdOf = (code: AreaCode) =>
-  sql<string>`(select ${competencyAreas.id} from ${competencyAreas} where ${competencyAreas.code} = ${code})`
 
 /**
  * Unpublishes whatever is published for this area and tier, other than `keep`, so the lesson
