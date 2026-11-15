@@ -7,7 +7,7 @@ import {
 import { createRoute, z } from '@hono/zod-openapi'
 import { auth, requireRole } from '../middleware'
 import { errorResponse } from '../openapi'
-import { SIGNED_IN_ERRORS } from './admin'
+import { ADMIN_ERRORS } from './admin'
 
 // Item analysis (DSH-08). Admin only: it shows the right choice of every question.
 
@@ -53,7 +53,6 @@ export const itemAnalysisRoute = createRoute({
       },
     },
     400: errorResponse('A filter is not valid'),
-    ...SIGNED_IN_ERRORS,
-    403: errorResponse('Not an admin'),
+    ...ADMIN_ERRORS,
   },
 })

@@ -57,7 +57,7 @@ export const startAttemptRoute = createRoute({
   },
 })
 
-const AttemptParamsSchema = z.object({
+export const AttemptParamsSchema = z.object({
   id: z.uuid().openapi({ param: { name: 'id', in: 'path' }, description: 'The attempt' }),
 })
 

@@ -18,7 +18,8 @@ import {
 import { createRoute, z } from '@hono/zod-openapi'
 import { auth, requireRole } from '../middleware'
 import { errorResponse } from '../openapi'
-import { SIGNED_IN_ERRORS } from './admin'
+import { ADMIN_ERRORS, STAFF_ERRORS } from './admin'
+import { AttemptParamsSchema } from './attempts'
 
 // The respondents table and one respondent's details (DSH-05, DSH-07, PRO-05). Staff read them;
 // only admins get the answer sheet. A respondent who chose not to show who they are has a null
@@ -83,8 +84,7 @@ export const listRespondentsRoute = createRoute({
       },
     },
     400: errorResponse('A filter, the sort or the page is not valid'),
-    ...SIGNED_IN_ERRORS,
-    403: errorResponse('Signed in as a respondent'),
+    ...STAFF_ERRORS,
   },
 })
 
@@ -174,13 +174,10 @@ export const getRespondentRoute = createRoute({
         },
       },
     },
-    ...SIGNED_IN_ERRORS,
-    403: errorResponse('Signed in as a respondent'),
+    ...STAFF_ERRORS,
     404: errorResponse('No respondent with this id'),
   },
 })
-
-const ADMIN_ERRORS = { ...SIGNED_IN_ERRORS, 403: errorResponse('Not an admin') }
 
 export const deleteRespondentRoute = createRoute({
   method: 'delete',
@@ -220,9 +217,7 @@ export const voidAttemptRoute = createRoute({
   middleware: [auth, requireRole('admin')] as const,
   security: [{ Bearer: [] }],
   request: {
-    params: z.object({
-      id: z.uuid().openapi({ param: { name: 'id', in: 'path' }, description: 'The attempt' }),
-    }),
+    params: AttemptParamsSchema,
     body: {
       content: { 'application/json': { schema: voidAttemptSchema.meta({ id: 'VoidAttempt' }) } },
       required: true,

@@ -7,6 +7,15 @@ export const SIGNED_IN_ERRORS = {
   401: errorResponse('Not signed in, or the sign-in has expired'),
 }
 
+/** The 401 and 403 of a route for staff (admins and facilitators). */
+export const STAFF_ERRORS = {
+  ...SIGNED_IN_ERRORS,
+  403: errorResponse('Signed in as a respondent'),
+}
+
+/** The 401 and 403 of a route for admins only. */
+export const ADMIN_ERRORS = { ...SIGNED_IN_ERRORS, 403: errorResponse('Not an admin') }
+
 /** Counts for the admin overview page. Voided attempts count nowhere. */
 const OverviewSchema = z
   .object({
@@ -33,8 +42,7 @@ export const overviewRoute = createRoute({
       description: 'The counts',
       content: { 'application/json': { schema: OverviewSchema } },
     },
-    ...SIGNED_IN_ERRORS,
-    403: errorResponse('Signed in as a respondent'),
+    ...STAFF_ERRORS,
   },
 })
 
@@ -74,8 +82,7 @@ export const listLinksRoute = createRoute({
       description: 'Every school link',
       content: { 'application/json': { schema: z.array(SchoolLinkSchema) } },
     },
-    ...SIGNED_IN_ERRORS,
-    403: errorResponse('Not an admin'),
+    ...ADMIN_ERRORS,
   },
 })
 
@@ -103,8 +110,7 @@ export const createLinkRoute = createRoute({
       content: { 'application/json': { schema: SchoolLinkSchema } },
     },
     400: errorResponse('A field is missing or not valid'),
-    ...SIGNED_IN_ERRORS,
-    403: errorResponse('Not an admin'),
+    ...ADMIN_ERRORS,
   },
 })
 
@@ -128,8 +134,7 @@ export const closeLinkRoute = createRoute({
       content: { 'application/json': { schema: SchoolLinkSchema } },
     },
     400: errorResponse('The ID is not valid'),
-    ...SIGNED_IN_ERRORS,
-    403: errorResponse('Not an admin'),
+    ...ADMIN_ERRORS,
     404: errorResponse('No link with this ID'),
   },
 })
