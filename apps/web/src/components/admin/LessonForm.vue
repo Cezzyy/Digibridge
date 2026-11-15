@@ -218,14 +218,20 @@ function save(isPublished: boolean) {
 const VIEWS = { edit: 'Edit', preview: 'Preview' } as const
 const view = ref<keyof typeof VIEWS>('edit')
 
-// The preview follows the text a moment after typing stops, so long lessons stay smooth.
-const previewBody = ref(draft.value.bodyMd)
+// The preview follows the body, picture and video links a moment after typing stops, so long
+// lessons stay smooth and a link half typed doesn't load a picture or video for every letter.
+const previewOf = () => ({
+  bodyMd: draft.value.bodyMd,
+  imageUrl: draft.value.imageUrl,
+  videoUrl: draft.value.videoUrl,
+})
+const preview = ref(previewOf())
 let timer: ReturnType<typeof setTimeout> | undefined
 watch(
-  () => draft.value.bodyMd,
-  (body) => {
+  () => [draft.value.bodyMd, draft.value.imageUrl, draft.value.videoUrl],
+  () => {
     clearTimeout(timer)
-    timer = setTimeout(() => (previewBody.value = body), 200)
+    timer = setTimeout(() => (preview.value = previewOf()), 200)
   },
 )
 onUnmounted(() => clearTimeout(timer))
@@ -423,9 +429,9 @@ onUnmounted(() => clearTimeout(timer))
             :tier="draft.tier"
             :title="draft.title"
             :summary="draft.summary"
-            :body-md="previewBody"
-            :image-url="draft.imageUrl"
-            :video-url="draft.videoUrl"
+            :body-md="preview.bodyMd"
+            :image-url="preview.imageUrl"
+            :video-url="preview.videoUrl"
             :resources="draft.resources"
           />
         </div>
