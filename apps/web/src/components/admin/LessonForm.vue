@@ -33,7 +33,8 @@ import ResourceListField from './ResourceListField.vue'
 // that. Checked with the API's own schema; errors show once Save or Publish is pressed, then
 // follow each change. The page does the saving and asks before a publish replaces another
 // lesson or an unpublish or a move leaves the place empty; after a save it passes the saved lesson back
-// in `lesson`, and the form starts again from it. `dirty` tells the page about unsaved changes.
+// in `lesson`, and the form starts again from it, keeping anything typed while it saved.
+// `dirty` tells the page about unsaved changes.
 
 const props = defineProps<{
   /** The saved lesson, or null for a new one. */
@@ -78,12 +79,19 @@ const saved = ref(snapshot())
 /** A saved lesson keeps its slug, since changing it changes the lesson's address. */
 const slugEdited = ref(props.lesson !== null)
 const tried = ref(false)
+/** The draft as it was when Save was pressed, to tell whether it changed while saving. */
+let sent: string | null = null
 
 watch(
   () => props.lesson,
   (lesson) => {
-    Object.assign(draft.value, draftOf(lesson))
-    saved.value = snapshot()
+    const next = draftOf(lesson)
+    // The fields stay open while saving, so keep anything typed since Save was pressed: it
+    // stays unsaved against the lesson that came back.
+    const typedSince = lesson !== null && sent !== null && snapshot() !== sent
+    if (!typedSince) Object.assign(draft.value, next)
+    saved.value = JSON.stringify(next)
+    sent = null
     slugEdited.value = lesson !== null
     tried.value = false
   },
@@ -194,6 +202,7 @@ const address = computed(() => `${window.location.origin}/lessons/${draft.value.
 function save(isPublished: boolean) {
   tried.value = true
   if (!result.value.success || (isPublished && placeUnknown.value)) return
+  sent = snapshot()
   emit('save', inputFor(isPublished), isPublished ? occupant.value : null)
 }
 
