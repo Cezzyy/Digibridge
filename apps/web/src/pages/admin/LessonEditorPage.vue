@@ -23,8 +23,8 @@ import { PRIMARY_BUTTON } from '../../lib/buttons'
 // One lesson in the lessons editor (CMS-04), admin only: /admin/lessons/new for a new one
 // (`?area=&tier=` from the list picks its place), /admin/lessons/:id for a saved one. The form
 // and its preview are in LessonForm; this page loads and saves, and asks first when publishing
-// would replace the lesson students see in that place, or unpublishing would leave it empty
-// (LES-01). After a new lesson's first save, the address becomes its own. Leaving with unsaved
+// would replace the lesson students see in that place, or unpublishing or moving a published
+// lesson would leave its place empty (LES-01). After a new lesson's first save, the address becomes its own. Leaving with unsaved
 // changes asks first too, inside the app and when closing the tab.
 const route = useRoute()
 const router = useRouter()
@@ -63,18 +63,24 @@ const heading = computed(() => (id.value ? (lesson.value?.title ?? null) : 'New 
 const dirty = ref(false)
 const notice = ref<string | null>(null)
 
-type Pending =
-  | { kind: 'replace'; input: LessonInput; replaces: AdminLessonRow }
-  | { kind: 'unpublish'; input: LessonInput }
+type Place = Pick<LessonInput, 'area' | 'tier'>
+/** A save to confirm: the lesson it unpublishes, and the place it leaves with none. */
+type Pending = { input: LessonInput; replaces: AdminLessonRow | null; leaves: Place | null }
 const pending = ref<Pending | null>(null)
+
+const placeName = (p: Place) => `${AREA_LABELS[p.area]}, ${LESSON_TIER_LABELS[p.tier]}`
 
 function onSave(input: LessonInput, replaces: AdminLessonRow | null) {
   notice.value = null
   saveError.value = null
-  if (replaces) pending.value = { kind: 'replace', input, replaces }
-  else if (lesson.value?.isPublished && !input.isPublished) {
-    pending.value = { kind: 'unpublish', input }
-  } else void commit(input)
+  const was = lesson.value
+  // A published lesson leaves its place empty when it's unpublished or moved elsewhere.
+  const leaves =
+    was?.isPublished && (!input.isPublished || input.area !== was.area || input.tier !== was.tier)
+      ? { area: was.area, tier: was.tier }
+      : null
+  if (replaces || leaves) pending.value = { input, replaces, leaves }
+  else void commit(input)
 }
 
 async function commit(input: LessonInput) {
@@ -102,12 +108,20 @@ function stopPending() {
 
 const confirm = computed(() => {
   const p = pending.value
-  if (p?.kind === 'replace') {
+  if (p?.input.isPublished) {
+    const left = p.leaves
+      ? ` Students’ results will show Coming soon for ${placeName(p.leaves)} until another lesson is published there.`
+      : ''
+    const replaced = p.replaces
+      ? ` ${p.replaces.title} goes back to being a draft, so you can publish it again later.`
+      : ''
     return {
-      title: `Publish in place of ${p.replaces.title}?`,
-      message: `Students will get this lesson for ${AREA_LABELS[p.input.area]}, ${LESSON_TIER_LABELS[p.input.tier]} from now on. ${p.replaces.title} goes back to being a draft, so you can publish it again later.`,
-      confirmLabel: 'Publish',
-      busyLabel: 'Publishing…',
+      title: p.replaces
+        ? `${p.leaves ? 'Move' : 'Publish'} in place of ${p.replaces.title}?`
+        : 'Move this lesson?',
+      message: `Students will get this lesson for ${placeName(p.input)} from now on.${replaced}${left}`,
+      confirmLabel: p.leaves ? 'Move' : 'Publish',
+      busyLabel: p.leaves ? 'Moving…' : 'Publishing…',
     }
   }
   return {
@@ -219,7 +233,7 @@ onUnmounted(() => {
     <ErrorPanel
       v-if="lessonsError"
       class="mt-6"
-      :message="`We couldn’t check which lessons are published, so Publish is off for now. ${lessonsError}`"
+      :message="`We couldn’t check which lessons are published, so Publish and moving a published lesson are off for now. ${lessonsError}`"
       @retry="loadLessons"
     />
 
