@@ -91,7 +91,7 @@ Done when an admin can load the 30 real items by CSV and read the pilot data on 
 - [x] **Respondents:** paged table, detail drawer, Hidden for respondents who chose it, the school link's label, empty school cells for online respondents, read only for facilitators (DSH-05, DSH-07, PRO-05).
 - [ ] **CSV export:** admin only, follows the filters, includes SUS and the school link, keeps hidden identities hidden (DSH-06).
 - [ ] **Users:** list, change role, last admin can't be demoted (USR-01, USR-02).
-- [ ] **Void and delete:** void an attempt with a reason; delete a respondent on request (USR-03).
+- [x] **Void and delete:** void an attempt with a reason; delete a respondent on request (USR-03).
 - [x] **Item analysis:** percent correct per item on the questions page (DSH-08).
 
 ## Small items and backend safety
