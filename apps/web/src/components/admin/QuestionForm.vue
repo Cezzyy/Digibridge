@@ -96,6 +96,15 @@ watch(unsaved, (value) => (dirty.value = value), { immediate: true })
 
 /** Students have seen it: its area, difficulty and right answer are fixed (CMS-02). */
 const locked = computed(() => props.question?.shown ?? false)
+// A save can find it seen since the page loaded (a 409): put back what's fixed now, keeping the
+// rest of the draft, so the next save doesn't ask for the same change.
+watch(locked, (now) => {
+  const question = props.question
+  if (!now || !question) return
+  draft.value.area = question.area
+  draft.value.difficulty = question.difficulty
+  draft.value.correct = question.choices.findIndex((c) => c.isCorrect)
+})
 
 const AREA_OPTIONS = AREA_CODES.map((code) => ({ value: code, label: AREA_LABELS[code] }))
 const DIFFICULTY_OPTIONS = DIFFICULTIES.map((d) => ({ value: d, label: DIFFICULTY_LABELS[d] }))

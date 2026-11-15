@@ -49,6 +49,11 @@ export function useQuestionEditor() {
       return saved
     } catch (err) {
       saveError.value = messageOf(err)
+      // Marked in place, not replaced: the form starts again from a new question, and would
+      // drop what the admin typed. It locks its fixed fields from `shown` alone.
+      if (id && question.value && err instanceof ApiRequestError && err.code === 'conflict') {
+        question.value.shown = true
+      }
       return null
     } finally {
       saving.value = false
