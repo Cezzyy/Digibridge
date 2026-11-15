@@ -286,7 +286,7 @@ export const getRespondent: RouteHandler<typeof getRespondentRoute, AuthEnv> = a
         overallPct: attempt.overallPct,
         overallLevel: attempt.overallLevel,
         voidReason: attempt.voidReasonCode,
-        voidNote: attempt.voidReason,
+        voidNote: attempt.voidNote,
         voidedAt: attempt.voidedAt?.toISOString() ?? null,
         areas: areas.map((area) => ({ ...area, area: area.area as AreaCode })),
         sus: sus
@@ -346,7 +346,7 @@ export const voidAttempt: RouteHandler<typeof voidAttemptRoute, AuthEnv> = async
       .set({
         status: 'voided',
         voidReasonCode: reason,
-        voidReason: note || null,
+        voidNote: note || null,
         voidedAt: sql`now()`,
         voidedBy: c.var.profile.id,
       })
@@ -355,7 +355,7 @@ export const voidAttempt: RouteHandler<typeof voidAttemptRoute, AuthEnv> = async
         id: attempts.id,
         respondentId: attempts.respondentId,
         voidReason: attempts.voidReasonCode,
-        voidNote: attempts.voidReason,
+        voidNote: attempts.voidNote,
         voidedAt: attempts.voidedAt,
       }),
   )

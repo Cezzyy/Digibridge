@@ -120,7 +120,7 @@ describe('POST /api/v1/attempts/:id/sus', () => {
     await submit(attempt.id, user.headers)
     await testDb
       .update(attempts)
-      .set({ ...voidedFields(), voidReason: 'Test' })
+      .set({ ...voidedFields(), voidNote: 'Test' })
       .where(eq(attempts.id, attempt.id))
     const res = await rate(attempt.id, answers, user.headers)
     expect(res.status).toBe(409)

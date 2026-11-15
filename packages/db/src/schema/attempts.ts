@@ -51,7 +51,7 @@ export const attempts = pgTable(
     resultsToken: text('results_token').unique(),
     // Why an admin voided it (USR-03), and their note: required with `other`, optional otherwise.
     voidReasonCode: voidReasonEnum('void_reason_code'),
-    voidReason: text('void_reason'),
+    voidNote: text('void_note'),
     voidedAt: timestamp('voided_at', { withTimezone: true }),
     // Null once the admin's account is deleted.
     voidedBy: uuid('voided_by').references(() => profiles.id, { onDelete: 'set null' }),
@@ -72,12 +72,12 @@ export const attempts = pgTable(
       'attempts_void_fields_by_status',
       sql`case when ${t.status} = ${statusLiteral('voided')}
           then ${t.voidReasonCode} is not null and ${t.voidedAt} is not null
-          else ${t.voidReasonCode} is null and ${t.voidReason} is null and ${t.voidedAt} is null
+          else ${t.voidReasonCode} is null and ${t.voidNote} is null and ${t.voidedAt} is null
             and ${t.voidedBy} is null end`,
     ),
     check(
       'attempts_void_note_for_other',
-      sql`${t.voidReasonCode} <> ${voidReasonLiteral('other')} or ${t.voidReason} is not null`,
+      sql`${t.voidReasonCode} <> ${voidReasonLiteral('other')} or ${t.voidNote} is not null`,
     ),
   ],
 ).enableRLS()

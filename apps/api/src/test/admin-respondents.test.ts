@@ -344,7 +344,7 @@ describe('POST /api/v1/admin/attempts/:id/void', () => {
     expect((await voidIt(id, { reason: 'technical' }, admin.headers)).status).toBe(200)
 
     const [attempt] = await attemptsOf(user.respondentId)
-    expect(attempt).toMatchObject({ voidReasonCode: 'technical', voidReason: null })
+    expect(attempt).toMatchObject({ voidReasonCode: 'technical', voidNote: null })
     const questionId = attempt!.questionOrder[0]!
     const saved = await app.request(
       `/api/v1/attempts/${id}/answers/${questionId}`,

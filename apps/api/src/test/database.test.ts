@@ -91,9 +91,9 @@ describe('attempts void checks', () => {
       })
     await expect(add({ status: 'voided' })).rejects.toThrow()
     await expect(add({ ...voidedFields(), voidReasonCode: 'other' })).rejects.toThrow()
-    await expect(add({ status: 'submitted', voidReason: 'Note' })).rejects.toThrow()
+    await expect(add({ status: 'submitted', voidNote: 'Note' })).rejects.toThrow()
     await expect(
-      add({ ...voidedFields(), voidReasonCode: 'other', voidReason: 'Note' }),
+      add({ ...voidedFields(), voidReasonCode: 'other', voidNote: 'Note' }),
     ).resolves.toBeDefined()
   })
 })
