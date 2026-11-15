@@ -257,6 +257,7 @@ The server owns the item order, the clock and the score. The browser only shows 
 3. For each area, take the active items: 4 basic, 4 intermediate, 2 advanced. If an area has more active items than that, pick randomly within each difficulty.
 4. Shuffle the 30 items together with Fisher–Yates using `crypto.getRandomValues`, and shuffle each item's 4 choices.
 5. Save `question_order`, `choice_order`, `started_at = now()` and `expires_at = now() + 25 min` in one insert.
+6. The insert locks the picked questions `FOR SHARE` and checks each is still active, in its area and at its difficulty. If the questions editor changed one after step 3 read it, nothing is saved and the start picks again from a fresh pool, up to 3 times, then answers 409. An edit or delete locks the question `FOR UPDATE` and reads whether it was shown in a later statement, so it either lands before the insert reads it or waits and then sees it as shown.
 
 **During the attempt**
 
