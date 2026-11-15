@@ -118,6 +118,7 @@ Scoring constants live in `packages/shared` so the API, the tests and any displa
 - `level`: beginner, basic, intermediate, advanced
 - `lesson_tier`: foundations, intermediate, advanced
 - `attempt_status`: in\_progress, submitted, expired, voided
+- `void_reason`: technical, wrong\_person, duplicate, retake\_requested, test\_entry, not\_eligible, other
 
 **Tables**
 
@@ -129,7 +130,7 @@ Scoring constants live in `packages/shared` so the API, the tests and any displa
 | `competency_areas` | `id`, `code`, `name`, `description`, `sort_order` | Seeded with 3 rows: `info_literacy`, `communication`, `safety`. |
 | `questions` | `id`, `area_id`, `difficulty`, `stem`, `image_url`, `is_scenario`, `explanation`, `is_active`, `created_by`, `created_at`, `updated_at` | Never hard-deleted once answered; set `is_active` false instead. |
 | `choices` | `id`, `question_id`, `label`, `is_correct`, `position` | Exactly 4 per question. Partial unique index on `question_id` where `is_correct` keeps 1 correct choice. |
-| `attempts` | `id`, `respondent_id`, `school_link_id` (null online), `status`, `started_at`, `expires_at`, `submitted_at`, `question_order` (uuid\[\]), `choice_order` (jsonb), `total_points`, `overall_pct`, `overall_level`, `results_token`, `void_reason`, `voided_by` | Partial unique index on `respondent_id` where `status <> 'voided'` enforces one attempt. `expires_at` = `started_at` + 25 min. `results_token` (random, unique) is set at submit for the QR link. |
+| `attempts` | `id`, `respondent_id`, `school_link_id` (null online), `status`, `started_at`, `expires_at`, `submitted_at`, `question_order` (uuid\[\]), `choice_order` (jsonb), `total_points`, `overall_pct`, `overall_level`, `results_token`, `void_reason_code`, `void_reason`, `voided_at`, `voided_by` | Partial unique index on `respondent_id` where `status <> 'voided'` enforces one attempt. `void_reason_code` is why an admin voided it and `void_reason` their note; check `attempts_void_fields_by_status`: a voided attempt has a code and `voided_at`, any other has no void fields; `attempts_void_note_for_other`: the note is required with `other`. `voided_by` set to null if the admin's account is deleted. `expires_at` = `started_at` + 25 min. `results_token` (random, unique) is set at submit for the QR link. |
 | `answers` | `attempt_id`, `question_id`, `choice_id`, `points`, `answered_at` | Primary key (`attempt_id`, `question_id`), so a changed answer overwrites. Foreign key (`question_id`, `choice_id`) to `choices`, so the choice belongs to the question. `points` filled at scoring. |
 | `area_results` | `attempt_id`, `area_id`, `points`, `max_points`, `pct`, `level` | Primary key (`attempt_id`, `area_id`). Written once at submit. |
 | `sus_responses` | `attempt_id`, `q1` to `q10` (smallint 1 to 5), `score` (numeric 0 to 100), `submitted_at` | Primary key `attempt_id`, so one SUS response per attempt. Only for submitted or expired attempts. |
@@ -209,7 +210,7 @@ All routes live under `/api/v1` (only the OpenAPI spec and docs page sit at `/ap
 | Method | Path | Auth | Purpose |
 | --- | --- | --- | --- |
 | GET | `/api/v1/links/:code` | Public, optional respondent token | The link's school, name, course and year-level lock. 404 unknown code, 410 `gone` closed, expired or full. With the token of a student who joined it: their respondent and attempt, whatever the link's status; 401 for a token that isn't for this link |
-| POST | `/api/v1/links/:code/respondents` | Public | Save consent to the school notice, the school profile and identity choice; returns the respondent token once. 400 for a course or year level outside the link's lock, 409 for a used student number, 410 `gone` if the link isn't open |
+| POST | `/api/v1/links/:code/respondents` | Public | Save consent to the school notice, the school profile and identity choice; returns the respondent token once. 400 for a course or year level outside the link's lock, 409 for a used student number, unless every attempt under it was voided: then the same respondent row takes the new profile, consent, link and token (the old token stops working), and a full link they already count on still lets them back in. 410 `gone` if the link isn't open |
 | GET, POST | `/api/v1/admin/links` | Admin | List links (status, responses) and make one |
 | POST | `/api/v1/admin/links/:id/close` | Admin | Close a link |
 
@@ -224,8 +225,8 @@ School-link respondents use the same respondent-flow routes (`/api/v1/attempts/*
 | GET | `/api/v1/admin/respondents/:id` | Facilitator, admin | Profile, area results and SUS answers of one respondent. Admins also get the answer sheet: each item in the order shown, with the choice picked and the right one |
 | GET | `/api/v1/admin/items` | Admin | Item analysis: per question how many saw it, got it right or left it blank, picks per choice, and flags (too easy at 90% or more right, too hard below 20%, confusing when a wrong choice beats the right one; none until 5 have seen it). Takes the dashboard filters |
 | GET | `/api/v1/admin/export.csv` | Admin | Filtered respondents with profile, area scores, levels and SUS score; hidden identities stay hidden |
-| POST | `/api/v1/admin/attempts/:id/void` | Admin | Void an attempt with a reason |
-| DELETE | `/api/v1/admin/respondents/:id` | Admin | Delete a respondent and their attempt on request |
+| POST | `/api/v1/admin/attempts/:id/void` | Admin | Void an attempt in progress or finished: a reason from `VOID_REASONS` and a note (`voidAttemptSchema`, note required with `other`). Its answers and scores stay; it's left out of all stats and the respondent can start again. 404 unknown, 409 already voided |
+| DELETE | `/api/v1/admin/respondents/:id` | Admin | Delete a respondent on request (USR-03), with their attempts, answers, area results and SUS through the cascades. An online respondent's profile stays, so signing in again starts over; a school-link student frees their place and student number. 204; 404 unknown |
 | GET, POST | `/api/v1/admin/questions` | Admin | List with item analysis; create a question with its 4 choices |
 | PATCH | `/api/v1/admin/questions/:id` | Admin | Edit. Correct choice locked once answered. |
 | POST | `/api/v1/admin/questions/import` | Admin | Import CSV rows; returns created count and row errors |
