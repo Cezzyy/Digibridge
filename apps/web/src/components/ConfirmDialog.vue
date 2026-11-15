@@ -5,8 +5,9 @@ import { DANGER_BUTTON, PRIMARY_BUTTON, SECONDARY_BUTTON } from '../lib/buttons'
 // Asks before an action that can't be undone, like closing a school link or signing out. A
 // native modal dialog, so focus stays inside it, Cancel has focus (so a stray Enter doesn't
 // confirm) and Esc closes it (unless the action is running). The default slot holds any fields
-// the action needs, under the message; `danger` gives the confirm button the danger style, and
-// `wide` more room for them.
+// the action needs, under the message; a failure shows under them and joins the message in the
+// dialog's description. `danger` gives the confirm button the danger style, and `wide` more room
+// for the fields.
 const props = defineProps<{
   open: boolean
   title: string
@@ -45,7 +46,7 @@ function onCancel(event: Event) {
   <dialog
     ref="dialog"
     :aria-labelledby="`${id}-title`"
-    :aria-describedby="`${id}-body`"
+    :aria-describedby="error ? `${id}-body ${id}-error` : `${id}-body`"
     :class="wide ? 'max-w-lg' : 'max-w-md'"
     class="m-auto w-[calc(100%-2rem)] rounded-card bg-surface p-6 text-ink shadow-lg backdrop:bg-scrim sm:p-7"
     @cancel="onCancel"
@@ -58,7 +59,9 @@ function onCancel(event: Event) {
     <div v-if="$slots.default" class="mt-5">
       <slot />
     </div>
-    <p v-if="error" role="alert" class="mt-3 font-semibold text-error">{{ error }}</p>
+    <p v-if="error" :id="`${id}-error`" role="alert" class="mt-3 font-semibold text-error">
+      {{ error }}
+    </p>
     <div class="mt-6 flex flex-col gap-3 sm:flex-row-reverse">
       <button
         type="button"
