@@ -12,6 +12,8 @@ import {
   SUS_ANSWER_MAX,
   SUS_ANSWER_MIN,
   SUS_STATEMENT_COUNT,
+  voidAttemptSchema,
+  voidReasonSchema,
 } from '@digibridge/shared'
 import { createRoute, z } from '@hono/zod-openapi'
 import { auth, requireRole } from '../middleware'
@@ -115,7 +117,10 @@ const AdminAttemptSchema = z
     totalPoints: z.int().nullable(),
     overallPct: z.number().nullable(),
     overallLevel: levelSchema.nullable(),
-    voidReason: z.string().nullable(),
+    // Set once voided (USR-03): the reason, the admin's note (required with `other`) and when.
+    voidReason: voidReasonSchema.nullable(),
+    voidNote: z.string().nullable(),
+    voidedAt: z.iso.datetime().nullable(),
     // Empty until scored.
     areas: z.array(
       z.object({
@@ -172,5 +177,65 @@ export const getRespondentRoute = createRoute({
     ...SIGNED_IN_ERRORS,
     403: errorResponse('Signed in as a respondent'),
     404: errorResponse('No respondent with this id'),
+  },
+})
+
+const ADMIN_ERRORS = { ...SIGNED_IN_ERRORS, 403: errorResponse('Not an admin') }
+
+export const deleteRespondentRoute = createRoute({
+  method: 'delete',
+  path: '/admin/respondents/{id}',
+  tags: ['Admin'],
+  summary: 'Delete a respondent’s data',
+  description:
+    'On the respondent’s request (USR-03): their profile and consent, their attempts with every answer, area result and SUS response. It can’t be undone. An online respondent’s Google account stays, so signing in again starts over from the notice; a school-link student frees their place on the link and their student number. Admin only.',
+  middleware: [auth, requireRole('admin')] as const,
+  security: [{ Bearer: [] }],
+  request: { params: RespondentParamsSchema },
+  responses: {
+    204: { description: 'Deleted' },
+    400: errorResponse('The ID is not valid'),
+    ...ADMIN_ERRORS,
+    404: errorResponse('No respondent with this ID'),
+  },
+})
+
+const VoidedAttemptSchema = z
+  .object({
+    id: z.uuid(),
+    status: z.literal('voided'),
+    voidReason: voidReasonSchema,
+    voidNote: z.string().nullable(),
+    voidedAt: z.iso.datetime(),
+  })
+  .openapi('VoidedAttempt')
+
+export const voidAttemptRoute = createRoute({
+  method: 'post',
+  path: '/admin/attempts/{id}/void',
+  tags: ['Admin'],
+  summary: 'Void an attempt',
+  description:
+    'For an attempt that went wrong (USR-03), in progress or finished: a reason and a note (required with `other`). A voided attempt is left out of every result and stat, its answers and scores stay for the record, and the respondent can start again. One in progress stops taking answers at once. A school-link student whose browser no longer holds their place can join the link again with the same student number. Admin only.',
+  middleware: [auth, requireRole('admin')] as const,
+  security: [{ Bearer: [] }],
+  request: {
+    params: z.object({
+      id: z.uuid().openapi({ param: { name: 'id', in: 'path' }, description: 'The attempt' }),
+    }),
+    body: {
+      content: { 'application/json': { schema: voidAttemptSchema.meta({ id: 'VoidAttempt' }) } },
+      required: true,
+    },
+  },
+  responses: {
+    200: {
+      description: 'Voided',
+      content: { 'application/json': { schema: z.object({ attempt: VoidedAttemptSchema }) } },
+    },
+    400: errorResponse('The ID, the reason or the note is not valid'),
+    ...ADMIN_ERRORS,
+    404: errorResponse('No attempt with this ID'),
+    409: errorResponse('Already voided'),
   },
 })

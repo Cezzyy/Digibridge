@@ -94,6 +94,16 @@ afterEach(clearAccounts)
 const get = (path: string, headers: Record<string, string> = {}) =>
   app.request(path, { headers }, env)
 
+/** The fields of a voided attempt, for setting one up straight in the database. */
+const voidedFields = () => ({
+  status: 'voided' as const,
+  voidReasonCode: 'technical' as const,
+  voidedAt: new Date(),
+})
+/** An attempt's status, with the void fields a voided one needs. */
+const withStatus = (status: 'in_progress' | 'submitted' | 'expired' | 'voided') =>
+  status === 'voided' ? voidedFields() : { status }
+
 describe('GET /api/v1/health', () => {
   it('answers ok', async () => {
     const res = await get('/api/v1/health')
@@ -426,7 +436,7 @@ describe('GET /api/v1/me', () => {
       .insert(attempts)
       .values({
         respondentId,
-        status,
+        ...withStatus(status),
         expiresAt: new Date(Date.now() + 25 * 60_000),
         questionOrder: [],
         choiceOrder: {},
@@ -753,7 +763,7 @@ describe('POST /api/v1/attempts', () => {
     await start(user.headers)
     await testDb
       .update(attempts)
-      .set({ status: 'voided', voidReason: 'Lost connection' })
+      .set({ ...voidedFields(), voidReason: 'Lost connection' })
       .where(eq(attempts.respondentId, user.respondentId))
     expect((await start(user.headers)).status).toBe(201)
     expect(await attemptsOf(user.respondentId)).toHaveLength(2)
@@ -1093,7 +1103,7 @@ describe('attempts in progress', () => {
       const { user, attempt } = await started()
       await testDb
         .update(attempts)
-        .set({ status: 'voided', voidReason: 'Test' })
+        .set({ ...voidedFields(), voidReason: 'Test' })
         .where(eq(attempts.id, attempt.id))
       const res = await submit(attempt.id, user.headers)
       expect(res.status).toBe(409)
@@ -1301,7 +1311,7 @@ describe('attempts in progress', () => {
       await submit(attempt.id, user.headers)
       await testDb
         .update(attempts)
-        .set({ status: 'voided', voidReason: 'Test' })
+        .set({ ...voidedFields(), voidReason: 'Test' })
         .where(eq(attempts.id, attempt.id))
       expect((await result(attempt.id, user.headers)).status).toBe(409)
     })
@@ -1419,7 +1429,7 @@ describe('attempts in progress', () => {
       await submit(attempt.id, user.headers)
       await testDb
         .update(attempts)
-        .set({ status: 'voided', voidReason: 'Test' })
+        .set({ ...voidedFields(), voidReason: 'Test' })
         .where(eq(attempts.id, attempt.id))
       const res = await rate(attempt.id, answers, user.headers)
       expect(res.status).toBe(409)
@@ -2412,6 +2422,39 @@ describe('respondents_school_fields_by_mode', () => {
   })
 })
 
+describe('attempts void checks', () => {
+  afterAll(clearQuestionBank)
+
+  it('needs a reason and time on a voided attempt, a note with other, and none otherwise', async () => {
+    const [row] = await testDb
+      .insert(respondents)
+      .values({
+        profileId: (await signedIn()).id,
+        fullName: 'Juan Dela Cruz',
+        birthDate: '2007-06-15',
+        sex: 'male',
+        mode: 'online',
+        consentVersion: '1',
+        consentedAt: new Date(),
+      })
+      .returning({ id: respondents.id })
+    const add = (values: Partial<typeof attempts.$inferInsert>) =>
+      testDb.insert(attempts).values({
+        respondentId: row!.id,
+        expiresAt: new Date(),
+        questionOrder: [],
+        choiceOrder: {},
+        ...values,
+      })
+    await expect(add({ status: 'voided' })).rejects.toThrow()
+    await expect(add({ ...voidedFields(), voidReasonCode: 'other' })).rejects.toThrow()
+    await expect(add({ status: 'submitted', voidReason: 'Note' })).rejects.toThrow()
+    await expect(
+      add({ ...voidedFields(), voidReasonCode: 'other', voidReason: 'Note' }),
+    ).resolves.toBeDefined()
+  })
+})
+
 describe('respondents_birth_date_range', () => {
   // Noon on Nov 8, 2026 in Manila (UTC+8). The check counts age on the day of consent there.
   const consentedAt = new Date('2026-11-08T04:00:00Z')
@@ -2482,7 +2525,7 @@ describe('admin', () => {
     await testDb.insert(attempts).values({
       respondentId: row!.id,
       schoolLinkId,
-      status,
+      ...withStatus(status),
       expiresAt: new Date(Date.now() + 25 * 60_000),
       questionOrder: [],
       choiceOrder: {},
@@ -2706,7 +2749,7 @@ describe('admin respondents', () => {
         .values({
           respondentId: row!.id,
           schoolLinkId: attempt.linkId,
-          status: attempt.status,
+          ...withStatus(attempt.status),
           expiresAt: new Date(Date.now() + 25 * 60_000),
           submittedAt: finished ? new Date() : null,
           overallPct: attempt.pct ?? null,
@@ -2982,6 +3025,193 @@ describe('admin respondents', () => {
       expect((await detail(user.respondentId, user.headers)).status).toBe(403)
     })
   })
+  describe('POST /api/v1/admin/attempts/:id/void', () => {
+    const voidIt = (id: string, body: unknown, headers: Record<string, string>) =>
+      app.request(
+        `/api/v1/admin/attempts/${id}/void`,
+        {
+          method: 'POST',
+          headers: { ...headers, 'Content-Type': 'application/json' },
+          body: JSON.stringify(body),
+        },
+        env,
+      )
+    /** An online respondent who started and submitted. */
+    const submitted = async () => {
+      const user = await respondent()
+      const { id } = (await (await start(user.headers)).json()) as { id: string }
+      await app.request(
+        `/api/v1/attempts/${id}/submit`,
+        { method: 'POST', headers: user.headers },
+        env,
+      )
+      return { user, id }
+    }
+
+    it('voids a finished attempt with its reason, and the respondent can start again (USR-03)', async () => {
+      const { user, id } = await submitted()
+      const admin = await signedIn('admin')
+      const res = await voidIt(id, { reason: 'duplicate', note: ' Second account ' }, admin.headers)
+      expect(res.status).toBe(200)
+      expect(await res.json()).toEqual({
+        attempt: {
+          id,
+          status: 'voided',
+          voidReason: 'duplicate',
+          voidNote: 'Second account',
+          voidedAt: expect.any(String),
+        },
+      })
+      const [row] = await attemptsOf(user.respondentId)
+      expect(row).toMatchObject({ status: 'voided', voidedBy: admin.id })
+      // The scores stay for the record.
+      expect(row!.overallLevel).not.toBeNull()
+
+      const detail = await get(`/api/v1/admin/respondents/${user.respondentId}`, admin.headers)
+      expect(await detail.json()).toMatchObject({
+        respondent: { status: 'voided', overallPct: null },
+        attempt: { status: 'voided', voidReason: 'duplicate', voidNote: 'Second account' },
+      })
+      expect((await get(`/api/v1/attempts/${id}/result`, user.headers)).status).toBe(409)
+      expect((await start(user.headers)).status).toBe(201)
+    })
+
+    it('stops an attempt in progress taking answers', async () => {
+      const user = await respondent()
+      const { id } = (await (await start(user.headers)).json()) as { id: string }
+      const admin = await signedIn('admin')
+      expect((await voidIt(id, { reason: 'technical' }, admin.headers)).status).toBe(200)
+
+      const [attempt] = await attemptsOf(user.respondentId)
+      expect(attempt).toMatchObject({ voidReasonCode: 'technical', voidReason: null })
+      const questionId = attempt!.questionOrder[0]!
+      const saved = await app.request(
+        `/api/v1/attempts/${id}/answers/${questionId}`,
+        {
+          method: 'PUT',
+          headers: { ...user.headers, 'Content-Type': 'application/json' },
+          body: JSON.stringify({ choiceId: attempt!.choiceOrder[questionId]![0] }),
+        },
+        env,
+      )
+      expect(saved.status).toBe(409)
+    })
+
+    it('needs a note with other, and a known reason', async () => {
+      const { id } = await submitted()
+      const admin = await signedIn('admin')
+      for (const body of [
+        { reason: 'other' },
+        { reason: 'other', note: '  ' },
+        { reason: 'bored' },
+      ]) {
+        expect((await voidIt(id, body, admin.headers)).status).toBe(400)
+      }
+      expect(
+        (await voidIt(id, { reason: 'other', note: 'Fire drill' }, admin.headers)).status,
+      ).toBe(200)
+    })
+
+    it('answers 409 when already voided and 404 for an unknown attempt', async () => {
+      const { id } = await submitted()
+      const admin = await signedIn('admin')
+      expect((await voidIt(id, { reason: 'technical' }, admin.headers)).status).toBe(200)
+      const again = await voidIt(id, { reason: 'test_entry' }, admin.headers)
+      expect(again.status).toBe(409)
+      expect(await again.json()).toMatchObject({ error: { code: 'conflict' } })
+      expect(
+        (await voidIt(crypto.randomUUID(), { reason: 'technical' }, admin.headers)).status,
+      ).toBe(404)
+    })
+
+    it('is for admins only', async () => {
+      const { user, id } = await submitted()
+      const staff = await signedIn('facilitator')
+      for (const headers of [staff.headers, user.headers]) {
+        expect((await voidIt(id, { reason: 'technical' }, headers)).status).toBe(403)
+      }
+      const [row] = await attemptsOf(user.respondentId)
+      expect(row!.status).toBe('submitted')
+    })
+  })
+
+  describe('DELETE /api/v1/admin/respondents/:id', () => {
+    const remove = (id: string, headers: Record<string, string>) =>
+      app.request(`/api/v1/admin/respondents/${id}`, { method: 'DELETE', headers }, env)
+
+    it('deletes the respondent with their attempt, answers, results and survey (USR-03)', async () => {
+      const user = await respondent()
+      const { id } = (await (await start(user.headers)).json()) as { id: string }
+      const [attempt] = await attemptsOf(user.respondentId)
+      const questionId = attempt!.questionOrder[0]!
+      const json = { ...user.headers, 'Content-Type': 'application/json' }
+      await app.request(
+        `/api/v1/attempts/${id}/answers/${questionId}`,
+        {
+          method: 'PUT',
+          headers: json,
+          body: JSON.stringify({ choiceId: attempt!.choiceOrder[questionId]![0] }),
+        },
+        env,
+      )
+      await app.request(
+        `/api/v1/attempts/${id}/submit`,
+        { method: 'POST', headers: user.headers },
+        env,
+      )
+      await app.request(
+        `/api/v1/attempts/${id}/sus`,
+        {
+          method: 'POST',
+          headers: json,
+          body: JSON.stringify({ answers: [3, 3, 3, 3, 3, 3, 3, 3, 3, 3] }),
+        },
+        env,
+      )
+
+      const admin = await signedIn('admin')
+      const res = await remove(user.respondentId, admin.headers)
+      expect(res.status).toBe(204)
+      expect(
+        (await get(`/api/v1/admin/respondents/${user.respondentId}`, admin.headers)).status,
+      ).toBe(404)
+      expect(await attemptsOf(user.respondentId)).toHaveLength(0)
+      for (const table of [answers, areaResults, susResponses]) {
+        expect(await testDb.select().from(table).where(eq(table.attemptId, id))).toHaveLength(0)
+      }
+      // The Google account stays: signing in again starts over from the notice.
+      expect(await testDb.select().from(profiles).where(eq(profiles.id, user.id))).toHaveLength(1)
+      expect(await (await get('/api/v1/me', user.headers)).json()).toMatchObject({
+        respondent: null,
+        attempt: null,
+      })
+    })
+
+    it('frees a school-link student’s place on the link', async () => {
+      const link = await addSchoolLink({ maxResponses: 1 })
+      const row = await addSchoolRespondent({ schoolLinkId: link.id })
+      expect(await (await get(`/api/v1/links/${link.code}`)).json()).toMatchObject({
+        error: { code: 'gone' },
+      })
+      const admin = await signedIn('admin')
+      expect((await remove(row.id, admin.headers)).status).toBe(204)
+      expect((await get(`/api/v1/links/${link.code}`)).status).toBe(200)
+    })
+
+    it('answers 404 for an unknown respondent and is for admins only', async () => {
+      const admin = await signedIn('admin')
+      expect((await remove(crypto.randomUUID(), admin.headers)).status).toBe(404)
+      const user = await respondent()
+      const staff = await signedIn('facilitator')
+      for (const headers of [staff.headers, user.headers]) {
+        expect((await remove(user.respondentId, headers)).status).toBe(403)
+      }
+      expect(
+        await testDb.select().from(respondents).where(eq(respondents.id, user.respondentId)),
+      ).toHaveLength(1)
+    })
+  })
+
   describe('GET /api/v1/admin/stats', () => {
     type Stats = {
       respondents: number

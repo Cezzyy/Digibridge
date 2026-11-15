@@ -19,7 +19,7 @@ import {
   type RespondentStatus,
 } from '@digibridge/shared'
 import type { RouteHandler } from '@hono/zod-openapi'
-import { and, asc, count, desc, eq, ilike, inArray, or, sql, type SQL } from 'drizzle-orm'
+import { and, asc, count, desc, eq, ilike, inArray, ne, or, sql, type SQL } from 'drizzle-orm'
 import type { Db } from '../config/db'
 import type { AuthEnv } from '../env'
 import {
@@ -30,7 +30,12 @@ import {
   type CurrentAttempts,
 } from '../lib/dashboard-filters'
 import { ApiError } from '../middleware'
-import type { getRespondentRoute, listRespondentsRoute } from '../routes/admin-respondents'
+import type {
+  deleteRespondentRoute,
+  getRespondentRoute,
+  listRespondentsRoute,
+  voidAttemptRoute,
+} from '../routes/admin-respondents'
 
 /** RESPONDENT_STATUSES from the respondent's attempt. Submitted and expired both have results. */
 const statusOf = (current: CurrentAttempts) =>
@@ -279,7 +284,9 @@ export const getRespondent: RouteHandler<typeof getRespondentRoute, AuthEnv> = a
         totalPoints: attempt.totalPoints,
         overallPct: attempt.overallPct,
         overallLevel: attempt.overallLevel,
-        voidReason: attempt.voidReason,
+        voidReason: attempt.voidReasonCode,
+        voidNote: attempt.voidReason,
+        voidedAt: attempt.voidedAt?.toISOString() ?? null,
         areas: areas.map((area) => ({ ...area, area: area.area as AreaCode })),
         sus: sus
           ? {
@@ -303,4 +310,63 @@ export const getRespondent: RouteHandler<typeof getRespondentRoute, AuthEnv> = a
     },
     200,
   )
+}
+
+/**
+ * Deletes a respondent on their request (USR-03). Their attempts, answers, area results and SUS
+ * response go with them through the foreign keys' cascades.
+ */
+export const deleteRespondent: RouteHandler<typeof deleteRespondentRoute, AuthEnv> = async (c) => {
+  const [deleted] = await c.var.db
+    .delete(respondents)
+    .where(eq(respondents.id, c.req.valid('param').id))
+    .returning({ id: respondents.id })
+  if (!deleted) throw new ApiError('not_found', 'We couldn’t find this respondent.')
+  return c.body(null, 204)
+}
+
+/**
+ * Voids an attempt in progress or finished (USR-03). One statement: the update waits for a submit
+ * (`for update`) or an answer save (`for share`) holding the row, then checks the status again, so
+ * the attempt is voided after them, never in between.
+ */
+export const voidAttempt: RouteHandler<typeof voidAttemptRoute, AuthEnv> = async (c) => {
+  const db = c.var.db
+  const { id } = c.req.valid('param')
+  const { reason, note } = c.req.valid('json')
+
+  const [voided] = await db
+    .update(attempts)
+    .set({
+      status: 'voided',
+      voidReasonCode: reason,
+      voidReason: note || null,
+      voidedAt: sql`now()`,
+      voidedBy: c.var.profile.id,
+    })
+    .where(and(eq(attempts.id, id), ne(attempts.status, 'voided')))
+    .returning({
+      id: attempts.id,
+      voidReason: attempts.voidReasonCode,
+      voidNote: attempts.voidReason,
+      voidedAt: attempts.voidedAt,
+    })
+  if (voided?.voidReason && voided.voidedAt) {
+    return c.json(
+      {
+        attempt: {
+          id: voided.id,
+          status: 'voided' as const,
+          voidReason: voided.voidReason,
+          voidNote: voided.voidNote,
+          voidedAt: voided.voidedAt.toISOString(),
+        },
+      },
+      200,
+    )
+  }
+
+  const [found] = await db.select({ id: attempts.id }).from(attempts).where(eq(attempts.id, id))
+  if (!found) throw new ApiError('not_found', 'We couldn’t find this attempt.')
+  throw new ApiError('conflict', 'This attempt is already voided.')
 }

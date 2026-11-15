@@ -16,7 +16,12 @@ import {
   listAdminLessons,
   updateLesson,
 } from './handlers/admin-lessons'
-import { getRespondent, listRespondents } from './handlers/admin-respondents'
+import {
+  deleteRespondent,
+  getRespondent,
+  listRespondents,
+  voidAttempt,
+} from './handlers/admin-respondents'
 import { getItemAnalysis } from './handlers/admin-items'
 import { getStats } from './handlers/admin-stats'
 import { getHealth } from './handlers/health'
@@ -40,7 +45,12 @@ import {
   listAdminLessonsRoute,
   updateLessonRoute,
 } from './routes/admin-lessons'
-import { getRespondentRoute, listRespondentsRoute } from './routes/admin-respondents'
+import {
+  deleteRespondentRoute,
+  getRespondentRoute,
+  listRespondentsRoute,
+  voidAttemptRoute,
+} from './routes/admin-respondents'
 import { itemAnalysisRoute } from './routes/admin-items'
 import { statsRoute } from './routes/admin-stats'
 import {
@@ -81,6 +91,8 @@ const v1Routes = v1
   .openapi(closeLinkRoute, closeLink)
   .openapi(listRespondentsRoute, listRespondents)
   .openapi(getRespondentRoute, getRespondent)
+  .openapi(deleteRespondentRoute, deleteRespondent)
+  .openapi(voidAttemptRoute, voidAttempt)
   .openapi(statsRoute, getStats)
   .openapi(itemAnalysisRoute, getItemAnalysis)
   .openapi(listAdminLessonsRoute, listAdminLessons)
