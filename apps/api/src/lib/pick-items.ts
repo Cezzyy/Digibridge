@@ -24,6 +24,8 @@ export type Shortfall = { area: AreaCode; difficulty: Difficulty; have: number; 
 export type PickedItems =
   | {
       ok: true
+      /** The picked items in the order shown. */
+      items: PoolItem[]
       /** Question IDs in the order shown. */
       questionOrder: string[]
       /** Question ID -> its choice IDs in the order shown. */
@@ -58,6 +60,7 @@ export function pickItems(pool: readonly PoolItem[]): PickedItems {
   const ordered = shuffle(picked)
   return {
     ok: true,
+    items: ordered,
     questionOrder: ordered.map((item) => item.id),
     choiceOrder: Object.fromEntries(ordered.map((item) => [item.id, shuffle(item.choiceIds)])),
   }

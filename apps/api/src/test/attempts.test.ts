@@ -1,13 +1,16 @@
-import { answers, areaResults, attempts, choices, questions } from '@digibridge/db'
+import { answers, areaResults, attempts, choices, competencyAreas, questions } from '@digibridge/db'
 import {
   ANSWER_GRACE_SECONDS,
   ATTEMPT_DURATION_MINUTES,
   CHOICES_PER_QUESTION,
   ITEMS_PER_ATTEMPT,
 } from '@digibridge/shared'
-import { eq, inArray } from 'drizzle-orm'
+import { eq, inArray, ne, sql } from 'drizzle-orm'
 import { afterAll, beforeEach, describe, expect, it, vi } from 'vitest'
-import { addQuestionBank, clearQuestionBank, signedIn, testDb } from './helpers'
+import { createDb } from '../config/db'
+import { pickItems, type PoolItem } from '../lib/pick-items'
+import { activePool, insertAttempt } from '../lib/start-attempt'
+import { addQuestionBank, clearQuestionBank, env, signedIn, testDb } from './helpers'
 import {
   get,
   useQuestionBank,
@@ -166,6 +169,75 @@ describe('POST /api/v1/attempts', () => {
       error.mockRestore()
       await testDb.update(questions).set({ isActive: true }).where(eq(questions.id, first!))
     }
+  })
+})
+
+describe('insertAttempt', () => {
+  // A start reads the pool, then inserts; the questions editor can change a picked question in
+  // between. PGlite runs one query at a time, so the edit goes in before the insert here.
+  beforeEach(async () => {
+    await clearQuestionBank()
+    await addQuestionBank()
+  })
+  afterAll(clearQuestionBank)
+
+  const db = createDb(env)
+  const where = (item: PoolItem) => eq(questions.id, item.id)
+  const edits: Record<string, (item: PoolItem) => Promise<unknown>> = {
+    'made inactive': async (item) =>
+      testDb.update(questions).set({ isActive: false }).where(where(item)),
+    'given another difficulty': async (item) =>
+      testDb
+        .update(questions)
+        .set({ difficulty: item.difficulty === 'basic' ? 'advanced' : 'basic' })
+        .where(where(item)),
+    'moved to another area': async (item) =>
+      testDb
+        .update(questions)
+        .set({
+          areaId: sql`(select ${competencyAreas.id} from ${competencyAreas} where ${ne(competencyAreas.code, item.area)} limit 1)`,
+        })
+        .where(where(item)),
+    deleted: async (item) => testDb.delete(questions).where(where(item)),
+  }
+
+  const tryInsert = async (
+    respondentId: string,
+    profileId: string,
+    edit?: typeof edits.deleted,
+  ) => {
+    const picked = pickItems(await activePool(db))
+    if (!picked.ok) throw new Error('The bank should have enough items')
+    await edit?.(picked.items[0]!)
+    const startedAt = new Date()
+    return insertAttempt(db, {
+      respondentId,
+      key: { profileId },
+      picked,
+      startedAt,
+      expiresAt: new Date(startedAt.getTime() + ATTEMPT_DURATION_MINUTES * 60_000),
+    })
+  }
+
+  it('saves an attempt whose picked questions are unchanged', async () => {
+    const user = await respondent()
+    expect(await tryInsert(user.respondentId, user.id)).toMatchObject({ status: 'in_progress' })
+    expect(await attemptsOf(user.respondentId)).toHaveLength(1)
+  })
+
+  it.each(Object.entries(edits))(
+    'saves nothing when a picked question was %s after the pool was read',
+    async (_, edit) => {
+      const user = await respondent()
+      expect(await tryInsert(user.respondentId, user.id, edit)).toBe('stale')
+      expect(await attemptsOf(user.respondentId)).toHaveLength(0)
+    },
+  )
+
+  it('reports the respondent missing before a stale pick', async () => {
+    const user = await respondent()
+    const other = await signedIn()
+    expect(await tryInsert(user.respondentId, other.id, edits.deleted)).toBe('no_respondent')
   })
 })
 

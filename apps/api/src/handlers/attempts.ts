@@ -15,17 +15,21 @@ import {
   FINISHED_ATTEMPT_STATUSES,
   LESSON_TIERS_FOR_LEVEL,
   type AreaCode,
-  type AttemptStatus,
 } from '@digibridge/shared'
 import type { RouteHandler } from '@hono/zod-openapi'
 import { and, eq, inArray, ne, sql } from 'drizzle-orm'
 import type { Db } from '../config/db'
 import type { RespondentEnv, RespondentKey } from '../env'
-import { pickItems, type PoolItem } from '../lib/pick-items'
+import { pickItems } from '../lib/pick-items'
 import { scoreAndClose, timeIsUp, type Tx } from '../lib/close-attempt'
 import { susScore } from '../lib/sus'
 import { ApiError, UNKNOWN_TOKEN_MESSAGE } from '../middleware'
-import { notNullViolation } from '../lib/pg-errors'
+import {
+  activePool,
+  attemptSummaryColumns,
+  insertAttempt,
+  type AttemptSummary,
+} from '../lib/start-attempt'
 import { respondentIs } from '../lib/respondent'
 import type {
   getAttemptRoute,
@@ -40,50 +44,28 @@ const ALREADY_TAKEN = 'You already took the assessment.'
 const NOT_READY = 'The assessment isn’t ready yet. Please try again later.'
 const VOIDED = 'This assessment was cancelled by the team.'
 
-const summaryColumns = {
-  id: attempts.id,
-  status: attempts.status,
-  startedAt: attempts.startedAt,
-  expiresAt: attempts.expiresAt,
-}
-type Summary = { id: string; status: AttemptStatus; startedAt: Date; expiresAt: Date }
-
 /** The respondent's one attempt that isn't voided, if any. */
 async function currentAttempt(db: Db, respondentId: string) {
   const [row] = await db
-    .select(summaryColumns)
+    .select(attemptSummaryColumns)
     .from(attempts)
     .where(and(eq(attempts.respondentId, respondentId), ne(attempts.status, 'voided')))
   return row
 }
 
-/** Active questions with their choices, as the pool for a new attempt. */
-async function activePool(db: Db): Promise<PoolItem[]> {
-  const rows = await db
-    .select({
-      id: questions.id,
-      area: competencyAreas.code,
-      difficulty: questions.difficulty,
-      choiceId: choices.id,
-    })
-    .from(questions)
-    .innerJoin(competencyAreas, eq(competencyAreas.id, questions.areaId))
-    .innerJoin(choices, eq(choices.questionId, questions.id))
-    .where(eq(questions.isActive, true))
-
-  const pool = new Map<string, PoolItem & { choiceIds: string[] }>()
-  for (const row of rows) {
-    const item = pool.get(row.id)
-    if (item) item.choiceIds.push(row.choiceId)
-    // Area codes are the seeded AREA_CODES; an unknown one simply never gets picked.
-    else pool.set(row.id, { ...row, area: row.area as AreaCode, choiceIds: [row.choiceId] })
-  }
-  return [...pool.values()]
+/** The answer when the caller's key finds no respondent. */
+function noRespondent(key: RespondentKey): never {
+  // A token always comes with a profile, so one that finds no one isn't valid (anymore).
+  if ('tokenHash' in key) throw new ApiError('unauthorized', UNKNOWN_TOKEN_MESSAGE)
+  throw new ApiError('conflict', 'Fill in your profile before you start.')
 }
+
+/** How many times a start picks again when an edit changed a picked question meanwhile. */
+const START_TRIES = 3
 
 export const startAttempt: RouteHandler<typeof startAttemptRoute, RespondentEnv> = async (c) => {
   const db = c.var.db
-  const reply = (attempt: Summary, status: 200 | 201) =>
+  const reply = (attempt: AttemptSummary, status: 200 | 201) =>
     c.json(
       {
         id: attempt.id,
@@ -103,7 +85,7 @@ export const startAttempt: RouteHandler<typeof startAttemptRoute, RespondentEnv>
       .select({
         id: respondents.id,
         schoolLinkId: respondents.schoolLinkId,
-        attempt: summaryColumns,
+        attempt: attemptSummaryColumns,
       })
       .from(respondents)
       .leftJoin(
@@ -113,11 +95,7 @@ export const startAttempt: RouteHandler<typeof startAttemptRoute, RespondentEnv>
       .where(respondentIs(key)),
     activePool(db),
   ])
-  if (!respondent) {
-    // A token always comes with a profile, so one that finds no one isn't valid (anymore).
-    if ('tokenHash' in key) throw new ApiError('unauthorized', UNKNOWN_TOKEN_MESSAGE)
-    throw new ApiError('conflict', 'Fill in your profile before you start.')
-  }
+  if (!respondent) noRespondent(key)
 
   // An attempt in progress is returned as it is (ASM-07); a finished one can't be retaken. A
   // school-link student joined while the link was open, so it isn't checked again here.
@@ -127,51 +105,39 @@ export const startAttempt: RouteHandler<typeof startAttemptRoute, RespondentEnv>
     return reply(existing, 200)
   }
 
-  const picked = pickItems(pool)
-  if (!picked.ok) {
-    console.error('Too few active items to start an attempt', picked.shortfalls)
-    throw new ApiError('conflict', NOT_READY)
-  }
+  // The pool was read before the insert, so an edit in between can change a picked question:
+  // insertAttempt then saves nothing, and the start picks again from a fresh pool.
+  for (let tries = 1, current = pool; ; tries++) {
+    const picked = pickItems(current)
+    if (!picked.ok) {
+      console.error('Too few active items to start an attempt', picked.shortfalls)
+      throw new ApiError('conflict', NOT_READY)
+    }
 
-  const startedAt = new Date()
-  const expiresAt = new Date(startedAt.getTime() + ATTEMPT_DURATION_MINUTES * 60_000)
-  // The respondent is read again as the row goes in, under FOR SHARE. A rejoin through a link
-  // locks this row before it checks for attempts, then gives it a new token and maybe a new link:
-  // it either waits for this start (and then refuses), or goes first, and then the row no longer
-  // matches the caller's key, so respondent_id comes out null and nothing goes in.
-  const me = db.$with('me').as(
-    db
-      .select({ id: respondents.id, schoolLinkId: respondents.schoolLinkId })
-      .from(respondents)
-      .where(and(eq(respondents.id, respondent.id), respondentIs(key)))
-      .for('share'),
-  )
-  // The partial unique index allows one attempt per respondent that isn't voided, so a second
-  // start sent at the same moment inserts nothing and gets the first one's attempt.
-  const [created] = await db
-    .with(me)
-    .insert(attempts)
-    .values({
-      respondentId: sql`(select ${me.id} from ${me})`,
-      // The link they joined through (LNK-05); null online.
-      schoolLinkId: sql`(select ${me.schoolLinkId} from ${me})`,
+    const startedAt = new Date()
+    const expiresAt = new Date(startedAt.getTime() + ATTEMPT_DURATION_MINUTES * 60_000)
+    const result = await insertAttempt(db, {
+      respondentId: respondent.id,
+      key,
+      picked,
       startedAt,
       expiresAt,
-      questionOrder: picked.questionOrder,
-      choiceOrder: picked.choiceOrder,
     })
-    .onConflictDoNothing()
-    .returning(summaryColumns)
-    .catch((err: unknown) => {
-      if (notNullViolation(err) !== 'respondent_id') throw err
-      if ('tokenHash' in key) throw new ApiError('unauthorized', UNKNOWN_TOKEN_MESSAGE)
-      throw new ApiError('conflict', 'Fill in your profile before you start.')
-    })
-  if (created) return reply(created, 201)
+    if (result === 'stale') {
+      if (tries === START_TRIES) {
+        console.error(`Picked questions kept changing during ${START_TRIES} starts`)
+        throw new ApiError('conflict', NOT_READY)
+      }
+      current = await activePool(db)
+      continue
+    }
+    if (result === 'no_respondent') noRespondent(key)
+    if (result !== 'taken') return reply(result, 201)
 
-  const winner = await currentAttempt(db, respondent.id)
-  if (winner?.status === 'in_progress') return reply(winner, 200)
-  throw new ApiError('conflict', ALREADY_TAKEN)
+    const winner = await currentAttempt(db, respondent.id)
+    if (winner?.status === 'in_progress') return reply(winner, 200)
+    throw new ApiError('conflict', ALREADY_TAKEN)
+  }
 }
 
 // ---- Reading, answering and submitting ----
