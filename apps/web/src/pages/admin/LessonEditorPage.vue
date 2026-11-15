@@ -29,8 +29,11 @@ import { PRIMARY_BUTTON } from '../../lib/buttons'
 const route = useRoute()
 const router = useRouter()
 const { lesson, notFound, loadError, load, saving, saveError, save } = useLessonEditor()
-const { lessons, load: loadLessons } = useAdminLessons()
+const { lessons, loadError: lessonsError, load: loadLessons } = useAdminLessons()
 onMounted(loadLessons)
+// Publish needs the list to know what it would replace, so it stays off while the list is
+// missing, or stale after a refresh failed (it could miss a lesson published since).
+const knownLessons = computed(() => (lessonsError.value ? null : lessons.value))
 
 /** The saved lesson's ID, or null on /admin/lessons/new. */
 const id = computed(() => (route.name === 'admin-lesson' ? String(route.params.id) : null))
@@ -213,6 +216,13 @@ onUnmounted(() => {
       {{ notice }}
     </p>
 
+    <ErrorPanel
+      v-if="lessonsError"
+      class="mt-6"
+      :message="`We couldn’t check which lessons are published, so Publish is off for now. ${lessonsError}`"
+      @retry="loadLessons"
+    />
+
     <div
       v-if="loading"
       aria-busy="true"
@@ -233,7 +243,7 @@ onUnmounted(() => {
       class="mt-8"
       :lesson="lesson"
       :start="start"
-      :lessons="lessons"
+      :lessons="knownLessons"
       :saving="saving && !pending"
       :error="pending ? null : saveError"
       @save="onSave"
