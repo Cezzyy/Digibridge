@@ -67,6 +67,9 @@ export const attempts = pgTable(
     index('attempts_status_submitted_at_idx').on(t.status, t.submittedAt),
     // Each link's response count, on the links page and when a student starts from it.
     index('attempts_school_link_id_idx').on(t.schoolLinkId),
+    // Whether any attempt has shown a question (`question_order @> array[id]`), which the
+    // questions editor checks for every question in its list, and before each edit or delete.
+    index('attempts_question_order_idx').using('gin', t.questionOrder),
     // A voided attempt has its reason and time; any other has no void fields at all.
     check(
       'attempts_void_fields_by_status',

@@ -1,0 +1,1 @@
+CREATE INDEX "attempts_question_order_idx" ON "attempts" USING gin ("question_order");
