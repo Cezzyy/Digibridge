@@ -10,31 +10,37 @@ import {
   SUS_ANSWER_LABELS,
   SUS_ANSWER_MIN,
   SUS_STATEMENTS,
+  VOID_REASON_LABELS,
+  type VoidAttempt,
 } from '@digibridge/shared'
 import { computed, ref, watch } from 'vue'
 import { useRespondent } from '../../composables/useRespondent'
+import { useRespondentActions } from '../../composables/useRespondentActions'
 import type { RespondentRow } from '../../composables/useRespondents'
-import { SECONDARY_BUTTON } from '../../lib/buttons'
+import { DANGER_BUTTON, SECONDARY_BUTTON } from '../../lib/buttons'
 import { wholePct } from '../../lib/levels'
 import LevelBadge from '../results/LevelBadge.vue'
 import ScoreBar from '../results/ScoreBar.vue'
 import SkeletonText from '../results/SkeletonText.vue'
 import { ICONS } from './admin-icons'
 import AnswerSheet from './AnswerSheet.vue'
+import DeleteRespondentDialog from './DeleteRespondentDialog.vue'
 import ErrorPanel from './ErrorPanel.vue'
 import { formatDay } from './link-text'
 import { classText, durationText, listText, modeText, nameText } from './respondent-text'
 import RespondentDetailSkeleton from './RespondentDetailSkeleton.vue'
 import RespondentStatusBadge from './RespondentStatusBadge.vue'
 import StrokeIcon from './StrokeIcon.vue'
+import VoidAttemptDialog from './VoidAttemptDialog.vue'
 
 // One respondent's details in a panel from the right (DSH-05): profile, results per area, SUS
 // answers, and for admins the answer sheet. A native modal dialog, so focus stays inside and Esc
 // closes it. `id` null closes it. Hidden names read Hidden (PRO-05). `preview` is their row from
 // the list when it's on the page: its name shows at once, and the loading placeholders take the
-// shape of their mode and status.
+// shape of their mode and status. Admins can also void the attempt and delete the respondent
+// (USR-03): `changed` asks the page to reload its list after a void, `deleted` after a delete.
 const props = defineProps<{ id: string | null; preview: RespondentRow | null; isAdmin: boolean }>()
-const emit = defineEmits<{ close: [] }>()
+const emit = defineEmits<{ close: []; changed: []; deleted: [] }>()
 
 const { detail, notFound, error, load } = useRespondent()
 const dialog = ref<HTMLDialogElement | null>(null)
@@ -55,6 +61,40 @@ const respondent = computed(() => detail.value?.respondent ?? null)
 const attempt = computed(() => detail.value?.attempt ?? null)
 /** Who the header names: the loaded respondent, else their row from the list. */
 const shown = computed(() => respondent.value ?? props.preview)
+
+/** How a voided attempt's void reads: "Voided on Nov 15, 2026:" and the reason. */
+const voided = computed(() => {
+  const a = attempt.value
+  if (a?.status !== 'voided') return null
+  return {
+    when: a.voidedAt ? `Voided on ${formatDay(a.voidedAt)}:` : 'Voided:',
+    reason: a.voidReason ? `${VOID_REASON_LABELS[a.voidReason]}.` : 'No reason given.',
+  }
+})
+
+const actions = useRespondentActions()
+const asking = ref<'void' | 'delete' | null>(null)
+
+function ask(action: 'void' | 'delete') {
+  actions.reset()
+  asking.value = action
+}
+
+async function voidIt(input: VoidAttempt) {
+  const attemptId = attempt.value?.id
+  if (!attemptId || !props.id) return
+  if (!(await actions.voidAttempt(attemptId, input))) return
+  asking.value = null
+  emit('changed')
+  void load(props.id)
+}
+
+async function deleteIt() {
+  if (!props.id) return
+  if (!(await actions.deleteRespondent(props.id))) return
+  asking.value = null
+  emit('deleted')
+}
 
 const profile = computed(() => {
   const r = respondent.value
@@ -150,13 +190,18 @@ const profile = computed(() => {
             class="rounded-card border border-line bg-surface p-5"
           >
             <h3 id="results-heading" class="text-lg font-bold">Results</h3>
-            <p
+            <div
               v-if="attempt.status === 'voided'"
               class="mt-3 rounded-control bg-error-soft p-3 text-error"
             >
-              <span class="font-semibold">Voided.</span>
-              {{ attempt.voidReason ?? 'No reason given.' }}
-            </p>
+              <p>
+                <span class="font-semibold">{{ voided?.when }}</span> {{ voided?.reason }}
+              </p>
+              <p v-if="attempt.voidNote" class="mt-1 whitespace-pre-line">
+                {{ attempt.voidNote }}
+              </p>
+              <p class="mt-1">It’s left out of every result and stat, and they can start again.</p>
+            </div>
             <p v-else-if="attempt.status === 'in_progress'" class="mt-2 text-quiet">
               Started {{ formatDay(attempt.startedAt) }}, still taking it. Scores show once they
               submit or time runs out.
@@ -243,7 +288,77 @@ const profile = computed(() => {
             <AnswerSheet class="mt-5" :items="attempt.answers" />
           </section>
         </template>
+
+        <section
+          v-if="isAdmin"
+          aria-labelledby="manage-heading"
+          class="rounded-card border border-line bg-surface p-5"
+        >
+          <h3 id="manage-heading" class="text-lg font-bold">Manage</h3>
+          <p class="mt-1 text-quiet">Only admins see this.</p>
+          <div class="mt-4 divide-y divide-line">
+            <div
+              v-if="attempt && attempt.status !== 'voided'"
+              class="flex flex-col gap-3 pb-4 sm:flex-row sm:items-center sm:justify-between"
+            >
+              <div class="min-w-0">
+                <p class="font-semibold">Void the attempt</p>
+                <p class="text-quiet">
+                  When it went wrong, like a lost connection or the wrong person taking it. They can
+                  start again.
+                </p>
+              </div>
+              <button
+                type="button"
+                :class="DANGER_BUTTON"
+                class="shrink-0 bg-surface"
+                @click="ask('void')"
+              >
+                Void attempt
+              </button>
+            </div>
+            <div
+              class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between"
+              :class="{ 'pt-4': attempt && attempt.status !== 'voided' }"
+            >
+              <div class="min-w-0">
+                <p class="font-semibold">Delete their data</p>
+                <p class="text-quiet">
+                  When they ask, as the Data Privacy Act allows. It can’t be undone.
+                </p>
+              </div>
+              <button
+                type="button"
+                :class="DANGER_BUTTON"
+                class="shrink-0 bg-surface"
+                @click="ask('delete')"
+              >
+                Delete respondent
+              </button>
+            </div>
+          </div>
+        </section>
       </template>
     </div>
+
+    <template v-if="isAdmin && respondent">
+      <VoidAttemptDialog
+        :open="asking === 'void'"
+        :in-progress="attempt?.status === 'in_progress'"
+        :busy="actions.voiding.value"
+        :error="actions.voidError.value"
+        @confirm="voidIt"
+        @close="asking = null"
+      />
+      <DeleteRespondentDialog
+        :open="asking === 'delete'"
+        :name="respondent.identityHidden ? null : respondent.fullName"
+        :mode="respondent.mode"
+        :busy="actions.deleting.value"
+        :error="actions.deleteError.value"
+        @confirm="deleteIt"
+        @close="asking = null"
+      />
+    </template>
   </dialog>
 </template>
