@@ -1,4 +1,9 @@
-import { SUS_ANSWER_MAX, SUS_ANSWER_MIN } from '@digibridge/shared'
+import {
+  SUS_ANSWER_MAX,
+  SUS_ANSWER_MIN,
+  type AttemptStatus,
+  type VoidReason,
+} from '@digibridge/shared'
 import { sql } from 'drizzle-orm'
 import {
   check,
@@ -15,8 +20,12 @@ import {
   uuid,
 } from 'drizzle-orm/pg-core'
 import { choices, competencyAreas, questions } from './content'
-import { attemptStatusEnum, levelEnum } from './enums'
+import { attemptStatusEnum, levelEnum, voidReasonEnum } from './enums'
 import { profiles, respondents, schoolLinks } from './people'
+
+// Enum values for the checks, typed so renaming one breaks the build.
+const statusLiteral = (status: AttemptStatus) => sql.raw(`'${status}'`)
+const voidReasonLiteral = (reason: VoidReason) => sql.raw(`'${reason}'`)
 
 // Question ID -> choice IDs in the order shown to the respondent.
 export type ChoiceOrder = Record<string, string[]>
@@ -40,7 +49,11 @@ export const attempts = pgTable(
     overallPct: numeric('overall_pct', { precision: 5, scale: 2, mode: 'number' }),
     overallLevel: levelEnum('overall_level'),
     resultsToken: text('results_token').unique(),
+    // Why an admin voided it (USR-03), and their note: required with `other`, optional otherwise.
+    voidReasonCode: voidReasonEnum('void_reason_code'),
     voidReason: text('void_reason'),
+    voidedAt: timestamp('voided_at', { withTimezone: true }),
+    // Null once the admin's account is deleted.
     voidedBy: uuid('voided_by').references(() => profiles.id, { onDelete: 'set null' }),
   },
   (t) => [
@@ -54,6 +67,18 @@ export const attempts = pgTable(
     index('attempts_status_submitted_at_idx').on(t.status, t.submittedAt),
     // Each link's response count, on the links page and when a student starts from it.
     index('attempts_school_link_id_idx').on(t.schoolLinkId),
+    // A voided attempt has its reason and time; any other has no void fields at all.
+    check(
+      'attempts_void_fields_by_status',
+      sql`case when ${t.status} = ${statusLiteral('voided')}
+          then ${t.voidReasonCode} is not null and ${t.voidedAt} is not null
+          else ${t.voidReasonCode} is null and ${t.voidReason} is null and ${t.voidedAt} is null
+            and ${t.voidedBy} is null end`,
+    ),
+    check(
+      'attempts_void_note_for_other',
+      sql`${t.voidReasonCode} <> ${voidReasonLiteral('other')} or ${t.voidReason} is not null`,
+    ),
   ],
 ).enableRLS()
 

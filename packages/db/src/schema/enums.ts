@@ -6,6 +6,7 @@ import {
   MODES,
   ROLES,
   SEXES,
+  VOID_REASONS,
 } from '@digibridge/shared'
 import { pgEnum } from 'drizzle-orm/pg-core'
 
@@ -16,3 +17,4 @@ export const difficultyEnum = pgEnum('difficulty', DIFFICULTIES)
 export const levelEnum = pgEnum('level', LEVELS)
 export const lessonTierEnum = pgEnum('lesson_tier', LESSON_TIERS)
 export const attemptStatusEnum = pgEnum('attempt_status', ATTEMPT_STATUSES)
+export const voidReasonEnum = pgEnum('void_reason', VOID_REASONS)
