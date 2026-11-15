@@ -1,6 +1,6 @@
 import { z } from 'zod'
 
-// Values of the 7 database enums. The Drizzle schema builds its pgEnums from these,
+// Values of the 8 database enums. The Drizzle schema builds its pgEnums from these,
 // so the database, the API and the web app share one list.
 
 export const ROLES = ['respondent', 'facilitator', 'admin'] as const
@@ -38,3 +38,19 @@ export const FINISHED_ATTEMPT_STATUSES = [
   'expired',
 ] as const satisfies readonly AttemptStatus[]
 export type FinishedAttemptStatus = (typeof FINISHED_ATTEMPT_STATUSES)[number]
+
+/**
+ * Why an admin voided an attempt (USR-03). A note is required with `other` and optional with the
+ * rest. A voided attempt is left out of every result and stat, and the respondent can start again.
+ */
+export const VOID_REASONS = [
+  'technical',
+  'wrong_person',
+  'duplicate',
+  'retake_requested',
+  'test_entry',
+  'not_eligible',
+  'other',
+] as const
+export const voidReasonSchema = z.enum(VOID_REASONS)
+export type VoidReason = (typeof VOID_REASONS)[number]
