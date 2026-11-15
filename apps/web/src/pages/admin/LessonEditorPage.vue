@@ -62,6 +62,10 @@ const heading = computed(() => (id.value ? (lesson.value?.title ?? null) : 'New 
 
 const dirty = ref(false)
 const notice = ref<string | null>(null)
+// The next change makes "Saved." untrue, so it goes then, not only on the next save.
+watch(dirty, (changed) => {
+  if (changed) notice.value = null
+})
 
 type Place = Pick<LessonInput, 'area' | 'tier'>
 /** A save to confirm: the lesson it unpublishes, and the place it leaves with none. */

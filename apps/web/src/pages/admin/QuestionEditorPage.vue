@@ -59,6 +59,10 @@ const heading = computed(() => {
 
 const dirty = ref(false)
 const notice = ref<string | null>(null)
+// The next change makes "Saved." untrue, so it goes then, not only on the next save.
+watch(dirty, (changed) => {
+  if (changed) notice.value = null
+})
 
 /** A save waiting on the reminder: rewording a question students have seen. */
 const pending = ref<QuestionInput | null>(null)
