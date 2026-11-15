@@ -4,8 +4,8 @@ import SkeletonText from '../results/SkeletonText.vue'
 
 // ItemCard while item analysis loads: the same boxes, padding and type sizes, with placeholders
 // where the words and numbers go. Every item has 4 choices, and their letters are fixed, so
-// they're shown; the bars are empty tracks. `variant` changes the line widths so a list of them
-// doesn't look stamped out. Change it along with ItemCard.
+// they're shown, as is the Edit question link; the bars are empty tracks. `variant` changes the
+// line widths so a list of them doesn't look stamped out. Change it along with ItemCard.
 const props = withDefaults(defineProps<{ variant?: number }>(), { variant: 0 })
 
 const LETTERS = ['A', 'B', 'C', 'D']
@@ -48,5 +48,9 @@ const shape = computed(() => SHAPES[props.variant % SHAPES.length] ?? SHAPES[0])
         <span class="mt-1 ml-6 block h-2 rounded-[4px] bg-track" />
       </li>
     </ul>
+
+    <p class="mt-2 flex min-h-11 items-center text-sm font-semibold text-evergreen">
+      Edit question
+    </p>
   </div>
 </template>
