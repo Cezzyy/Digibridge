@@ -140,6 +140,26 @@ export const router = createRouter({
           name: 'admin-analysis',
           component: () => import('./pages/admin/AnalysisPage.vue'),
         },
+        // The questions editor (CMS-01 to CMS-03), admin only: the list, then one question, new
+        // or saved.
+        {
+          path: 'questions',
+          name: 'admin-questions',
+          component: () => import('./pages/admin/QuestionListPage.vue'),
+          meta: { requires: 'admin' },
+        },
+        {
+          path: 'questions/new',
+          name: 'admin-question-new',
+          component: () => import('./pages/admin/QuestionEditorPage.vue'),
+          meta: { requires: 'admin', adminWide: true },
+        },
+        {
+          path: 'questions/:id',
+          name: 'admin-question',
+          component: () => import('./pages/admin/QuestionEditorPage.vue'),
+          meta: { requires: 'admin', adminWide: true },
+        },
         {
           path: 'items',
           name: 'admin-items',

@@ -6,8 +6,9 @@ import { useSessionStore } from '../stores/session'
 import { filterQuery, filtersFrom } from './useDashboardFilters'
 
 // The admin area's pages, for the side menu (AdminLayout, from `lg`) and the menu that opens from
-// the header below that (AdminMenu). School links (LNK-01), Item analysis, which shows the right
-// answers (DSH-08), and the lessons editor (CMS-04) show for admins only; the router keeps facilitators out of both too. Student
+// the header below that (AdminMenu). The questions editor (CMS-01), Item analysis, which shows
+// the right answers (DSH-08), School links (LNK-01) and the lessons editor (CMS-04) show for
+// admins only; the router keeps facilitators out of them too. Student
 // preview opens /home, where staff can try the student steps without saving anything. The pages
 // that take the dashboard filters get the ones set now, so they carry over (DSH-03).
 export function useAdminNav() {
@@ -29,6 +30,12 @@ export function useAdminNav() {
     },
     ...(session.isAdmin
       ? [
+          {
+            label: 'Questions',
+            to: { name: 'admin-questions' },
+            icon: ICONS.question,
+            currentOn: ['admin-question-new', 'admin-question'],
+          },
           {
             label: 'Item analysis',
             to: { name: 'admin-items', query: filters.value },
