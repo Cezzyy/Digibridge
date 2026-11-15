@@ -21,15 +21,21 @@ import type {
 // Scoring reads a question's area, difficulty and right choice when an attempt is submitted
 // (lib/close-attempt.ts), so once any attempt has shown it they're locked (CMS-02): changing them
 // would change what that attempt's answers are worth. Voided attempts count too: their answers and
-// scores stay for the record. An edit locks the question row and checks in the same transaction.
-// A start picks its items before it inserts, without locking them, so an edit at that same moment
-// can land on an item a new attempt just took; that attempt then shows and scores it as edited.
+// scores stay for the record. An edit or delete locks the question row FOR UPDATE, then checks.
+// A start locks the questions it picked FOR SHARE as its attempt goes in (lib/start-attempt.ts),
+// so the two take turns: the check must run in a statement after the lock, because a statement
+// sees the database as it was when the statement began, and would miss an attempt that went in
+// while it waited.
 
 const NOT_FOUND = 'We couldn’t find this question. Someone may have deleted it.'
 const AREA_MISSING = 'This area isn’t set up yet.'
 
-/** Whether any attempt has shown the question: its ID is in the attempt's question_order. */
-const shown = sql<boolean>`exists (select 1 from ${attempts} where ${questions.id} = any(${attempts.questionOrder}))`
+/**
+ * Whether any attempt has shown the question: its ID is in the attempt's question_order. The
+ * table is named outright: in a query on questions alone Drizzle writes `"id"` bare, which inside
+ * this subquery would mean attempts.id.
+ */
+const shown = sql<boolean>`exists (select 1 from ${attempts} where ${questions}.${sql.identifier(questions.id.name)} = any(${attempts.questionOrder}))`
 
 const summaryColumns = {
   id: questions.id,
@@ -162,27 +168,31 @@ export const updateQuestion: RouteHandler<typeof updateQuestionRoute, AuthEnv> =
 
   const updated = await saving(() =>
     c.var.db.transaction(async (tx) => {
-      // Locked, so a delete or another edit of this question waits for this one.
+      // Locked, so a delete, another edit or a start that picked this question waits for this one.
       const [current] = await tx
         .select({
           areaId: questions.areaId,
           area: competencyAreas.code,
           difficulty: questions.difficulty,
-          shown,
         })
         .from(questions)
         .innerJoin(competencyAreas, eq(competencyAreas.id, questions.areaId))
         .where(eq(questions.id, id))
         .for('update', { of: questions })
       if (!current) throw new ApiError('not_found', NOT_FOUND)
-      const currentChoices = await choicesOf(tx, id)
+      // Read once the lock is held (see the top of this file).
+      const [[seen], currentChoices] = await Promise.all([
+        tx.select({ shown }).from(questions).where(eq(questions.id, id)),
+        choicesOf(tx, id),
+      ])
+      const isShown = seen!.shown
 
       const area = newArea ?? (current.area as AreaCode)
       const moved =
         newChoices !== undefined &&
         correctChoiceIndex(newChoices) !== correctChoiceIndex(currentChoices)
       if (
-        current.shown &&
+        isShown &&
         (area !== current.area ||
           (changes.difficulty !== undefined && changes.difficulty !== current.difficulty) ||
           moved)
@@ -202,7 +212,7 @@ export const updateQuestion: RouteHandler<typeof updateQuestionRoute, AuthEnv> =
       const savedChoices = newChoices
         ? await writeChoices(tx, id, newChoices, moved)
         : currentChoices
-      return { ...row!, area, shown: current.shown, choices: savedChoices }
+      return { ...row!, area, shown: isShown, choices: savedChoices }
     }),
   )
   return c.json(toJson(updated), 200)
@@ -210,22 +220,25 @@ export const updateQuestion: RouteHandler<typeof updateQuestionRoute, AuthEnv> =
 
 export const deleteQuestion: RouteHandler<typeof deleteQuestionRoute, AuthEnv> = async (c) => {
   const { id } = c.req.valid('param')
-  const db = c.var.db
-  // Its choices go with it (on delete cascade).
-  const [deleted] = await db
-    .delete(questions)
-    .where(and(eq(questions.id, id), sql`not ${shown}`))
-    .returning({ id: questions.id })
-  if (deleted) return c.body(null, 204)
-
-  // Nothing deleted: either an attempt has shown it or it isn't there.
-  const [question] = await db
-    .select({ id: questions.id })
-    .from(questions)
-    .where(eq(questions.id, id))
-  if (!question) throw new ApiError('not_found', NOT_FOUND)
-  throw new ApiError(
-    'conflict',
-    'Students have already seen this question, so it can’t be deleted. Make it inactive instead.',
-  )
+  await c.var.db.transaction(async (tx) => {
+    // Locked first, then checked in a statement of its own (see the top of this file).
+    const [question] = await tx
+      .select({ id: questions.id })
+      .from(questions)
+      .where(eq(questions.id, id))
+      .for('update')
+    if (!question) throw new ApiError('not_found', NOT_FOUND)
+    // Its choices go with it (on delete cascade).
+    const [deleted] = await tx
+      .delete(questions)
+      .where(and(eq(questions.id, id), sql`not ${shown}`))
+      .returning({ id: questions.id })
+    if (!deleted) {
+      throw new ApiError(
+        'conflict',
+        'Students have already seen this question, so it can’t be deleted. Make it inactive instead.',
+      )
+    }
+  })
+  return c.body(null, 204)
 }
