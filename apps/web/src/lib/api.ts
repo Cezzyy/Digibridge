@@ -85,6 +85,8 @@ export async function call<R extends ClientResponse<unknown, number, string>>(
   } catch {
     throw new ApiRequestError('network', NETWORK_MESSAGE, 0)
   }
+  // 204 No Content (a delete) has no body to read.
+  if (res.status === 204) return undefined as SuccessBody<R>
   if (res.ok) return (await res.json()) as SuccessBody<R>
 
   const body = (await res.json().catch(() => null)) as {
