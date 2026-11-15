@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { voidReasonSchema } from '../enums/values'
 import { dashboardFiltersSchema } from './filters'
 
 // The respondents table (DSH-05, DSH-07, PRO-05).
@@ -50,3 +51,27 @@ export const respondentListQuerySchema = dashboardFiltersSchema.extend({
   page: z.coerce.number().pipe(z.int().min(1)).default(1),
 })
 export type RespondentListQuery = z.infer<typeof respondentListQuerySchema>
+
+export const VOID_NOTE_MAX_LENGTH = 300
+
+/**
+ * An admin voiding an attempt (USR-03): a reason from VOID_REASONS and a note, required with
+ * `other`. An empty note is the same as none.
+ */
+export const voidAttemptSchema = z
+  .object({
+    reason: voidReasonSchema,
+    note: z
+      .string()
+      .trim()
+      .max(VOID_NOTE_MAX_LENGTH, {
+        message: `Keep the note under ${VOID_NOTE_MAX_LENGTH} characters.`,
+      })
+      .nullable()
+      .default(null),
+  })
+  .refine((input) => input.reason !== 'other' || !!input.note, {
+    message: 'Say why, since none of the reasons fit.',
+    path: ['note'],
+  })
+export type VoidAttempt = z.infer<typeof voidAttemptSchema>
