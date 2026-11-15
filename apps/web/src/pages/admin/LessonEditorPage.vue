@@ -6,8 +6,8 @@ import {
   lessonTierSchema,
   type LessonInput,
 } from '@digibridge/shared'
-import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
-import { useRoute, useRouter, type RouteLocationNormalized } from 'vue-router'
+import { computed, onMounted, ref, watch } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
 import { ICONS } from '../../components/admin/admin-icons'
 import ErrorPanel from '../../components/admin/ErrorPanel.vue'
 import LessonForm from '../../components/admin/LessonForm.vue'
@@ -18,6 +18,7 @@ import ConfirmDialog from '../../components/ConfirmDialog.vue'
 import SkeletonText from '../../components/results/SkeletonText.vue'
 import { useAdminLessons, type AdminLessonRow } from '../../composables/useAdminLessons'
 import { useLessonEditor } from '../../composables/useLessonEditor'
+import { useUnsavedChangesGuard } from '../../composables/useUnsavedChangesGuard'
 import { PRIMARY_BUTTON } from '../../lib/buttons'
 
 // One lesson in the lessons editor (CMS-04), admin only: /admin/lessons/new for a new one
@@ -149,37 +150,7 @@ const confirm = computed(() => {
 
 // ---- Leaving with unsaved changes ----
 
-// A guard on the router, not onBeforeRouteLeave: /new and /:id share this page, so after a new
-// lesson's first save the page stays, and a leave guard would still belong to /new.
-const leaving = ref(false)
-let answerLeave: ((leave: boolean) => void) | null = null
-
-function answer(leave: boolean) {
-  answerLeave?.(leave)
-  answerLeave = null
-  leaving.value = false
-}
-
-/** The saved lesson's own address, which a new lesson's first save moves to without leaving. */
-const ownAddress = (to: RouteLocationNormalized) =>
-  to.name === 'admin-lesson' && lesson.value !== null && to.params.id === lesson.value.id
-
-const removeGuard = router.beforeEach((to, from) => {
-  if (!dirty.value || from.name !== route.name || to.fullPath === from.fullPath || ownAddress(to))
-    return true
-  leaving.value = true
-  return new Promise<boolean>((resolve) => (answerLeave = resolve))
-})
-
-function onBeforeUnload(event: BeforeUnloadEvent) {
-  if (dirty.value) event.preventDefault()
-}
-window.addEventListener('beforeunload', onBeforeUnload)
-onUnmounted(() => {
-  removeGuard()
-  answer(false)
-  window.removeEventListener('beforeunload', onBeforeUnload)
-})
+const { leaving, answer } = useUnsavedChangesGuard(dirty, 'admin-lesson', () => lesson.value?.id)
 </script>
 
 <template>

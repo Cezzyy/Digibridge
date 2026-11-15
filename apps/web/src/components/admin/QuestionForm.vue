@@ -5,7 +5,6 @@ import {
   CHOICES_PER_QUESTION,
   DIFFICULTIES,
   DIFFICULTY_LABELS,
-  ITEMS_PER_DIFFICULTY,
   POINTS_PER_DIFFICULTY,
   QUESTION_CHOICE_MAX,
   QUESTION_EXPLANATION_MAX,
@@ -18,6 +17,7 @@ import {
 import { computed, onUnmounted, ref, useId, watch } from 'vue'
 import type { AdminQuestion } from '../../composables/useQuestionEditor'
 import { PRIMARY_BUTTON } from '../../lib/buttons'
+import { ASSESSMENT_MIX } from './question-text'
 import FixedField from '../form/FixedField.vue'
 import SelectField from '../form/SelectField.vue'
 import TextAreaField from '../form/TextAreaField.vue'
@@ -112,11 +112,7 @@ const DIFFICULTY_HINT = `${DIFFICULTIES.map(
   (d) =>
     `${DIFFICULTY_LABELS[d]} is worth ${POINTS_PER_DIFFICULTY[d]} ${POINTS_PER_DIFFICULTY[d] === 1 ? 'point' : 'points'}`,
 ).join(', ')}.`
-const and = new Intl.ListFormat('en', { type: 'conjunction' })
-/** "Each assessment picks 4 basic, 4 intermediate and 2 advanced questions per area.", from ITEMS_PER_DIFFICULTY. */
-const PLACE_DESCRIPTION = `The area it tests and how hard it is. Each assessment picks ${and.format(
-  DIFFICULTIES.map((d) => `${ITEMS_PER_DIFFICULTY[d]} ${DIFFICULTY_LABELS[d].toLowerCase()}`),
-)} questions per area.`
+const PLACE_DESCRIPTION = `The area it tests and how hard it is. Each assessment picks ${ASSESSMENT_MIX} questions per area.`
 const LOCK_HINT = 'Fixed: students have seen this question.'
 
 const letter = (i: number) => String.fromCharCode(65 + i)

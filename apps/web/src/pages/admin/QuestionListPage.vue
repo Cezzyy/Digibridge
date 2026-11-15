@@ -14,6 +14,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { ICONS } from '../../components/admin/admin-icons'
 import ErrorPanel from '../../components/admin/ErrorPanel.vue'
 import QuestionStatusBadge from '../../components/admin/QuestionStatusBadge.vue'
+import { ASSESSMENT_MIX } from '../../components/admin/question-text'
 import StrokeIcon from '../../components/admin/StrokeIcon.vue'
 import ConfirmDialog from '../../components/ConfirmDialog.vue'
 import SkeletonText from '../../components/results/SkeletonText.vue'
@@ -118,11 +119,6 @@ function stopDeleting() {
   deleting.value = null
   deleteError.value = null
 }
-
-const and = new Intl.ListFormat('en', { type: 'conjunction' })
-const MIX = and.format(
-  DIFFICULTIES.map((d) => `${ITEMS_PER_DIFFICULTY[d]} ${DIFFICULTY_LABELS[d].toLowerCase()}`),
-)
 </script>
 
 <template>
@@ -130,9 +126,9 @@ const MIX = and.format(
     <div>
       <h1 class="text-3xl leading-tight font-bold sm:text-4xl">Questions</h1>
       <p class="mt-2 max-w-2xl text-lg text-quiet">
-        Write the assessment’s questions. Each assessment picks {{ MIX }} active questions per area
-        at random. Once students have seen a question, its area, difficulty and right answer can’t
-        change. To see how each question did, open
+        Write the assessment’s questions. Each assessment picks {{ ASSESSMENT_MIX }} active
+        questions per area at random. Once students have seen a question, its area, difficulty and
+        right answer can’t change. To see how each question did, open
         <RouterLink
           :to="{ name: 'admin-items' }"
           class="font-semibold text-evergreen underline-offset-4 hover:underline"
