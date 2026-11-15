@@ -25,8 +25,8 @@ import { PRIMARY_BUTTON } from '../../lib/buttons'
 // are active against what an assessment needs (ITEMS_PER_DIFFICULTY). A question can be made
 // active or inactive here; one no student has seen can be deleted, while a seen one can only be
 // made inactive, so past attempts keep every item they showed. Making one inactive asks first
-// when it leaves too few for an assessment to start. While the list loads, the groups are drawn
-// already, with placeholders where the questions go.
+// when it leaves too few for an assessment to start; deleting always asks, and warns of that too.
+// While the list loads, the groups are drawn already, with placeholders where the questions go.
 const route = useRoute()
 const router = useRouter()
 const {
@@ -78,12 +78,16 @@ const newQuestionLink = (difficulty?: Difficulty) => ({
 
 // ---- Active or inactive ----
 
+/** Whether taking this question out of use leaves its area too few for an assessment. */
+const leavesTooFew = (row: AdminQuestionRow) =>
+  row.isActive && activeIn(row.area, row.difficulty) - 1 < ITEMS_PER_DIFFICULTY[row.difficulty]
+const tooFewWarning = (row: AdminQuestionRow) =>
+  `${AREA_LABELS[row.area]} will have too few active ${DIFFICULTY_LABELS[row.difficulty].toLowerCase()} questions, so students can’t start the assessment until you add or turn on another one.`
+
 // Making one inactive asks first if the area would then have too few for an assessment.
 const deactivating = ref<AdminQuestionRow | null>(null)
 function toggle(row: AdminQuestionRow) {
-  const leavesTooFew =
-    row.isActive && activeIn(row.area, row.difficulty) - 1 < ITEMS_PER_DIFFICULTY[row.difficulty]
-  if (leavesTooFew) deactivating.value = row
+  if (leavesTooFew(row)) deactivating.value = row
   else void setActive(row.id, !row.isActive)
 }
 async function confirmDeactivate() {
@@ -98,8 +102,15 @@ function stopDeactivating() {
 
 // ---- Deleting ----
 
-// Deleting asks first: a question can't be brought back.
+// Deleting always asks first: a question can't be brought back. Like making one inactive, it
+// warns when the area would then have too few for an assessment.
 const deleting = ref<AdminQuestionRow | null>(null)
+const deleteMessage = computed(() => {
+  const row = deleting.value
+  if (!row) return ''
+  const gone = 'It will be gone for good. No student has seen it, so past results don’t change.'
+  return leavesTooFew(row) ? `${gone} ${tooFewWarning(row)}` : gone
+})
 async function confirmDelete() {
   if (deleting.value && (await remove(deleting.value.id))) deleting.value = null
 }
@@ -271,7 +282,7 @@ const MIX = and.format(
     title="Make this question inactive?"
     :message="
       deactivating
-        ? `${AREA_LABELS[deactivating.area]} will have too few active ${DIFFICULTY_LABELS[deactivating.difficulty].toLowerCase()} questions, so students can’t start the assessment until you add or turn on another one. Assessments already started keep their questions.`
+        ? `${tooFewWarning(deactivating)} Assessments already started keep their questions.`
         : ''
     "
     confirm-label="Make inactive"
@@ -285,7 +296,7 @@ const MIX = and.format(
   <ConfirmDialog
     :open="deleting !== null"
     title="Delete this question?"
-    message="It will be gone for good. No student has seen it, so nothing changes for them."
+    :message="deleteMessage"
     confirm-label="Delete question"
     busy-label="Deleting…"
     :busy="deletingId !== null"
