@@ -29,6 +29,7 @@ import {
   dashboardConditions,
   type CurrentAttempts,
 } from '../lib/dashboard-filters'
+import { newRespondentToken } from '../lib/respondent-token'
 import { ApiError } from '../middleware'
 import type {
   deleteRespondentRoute,
@@ -328,29 +329,57 @@ export const deleteRespondent: RouteHandler<typeof deleteRespondentRoute, AuthEn
 /**
  * Voids an attempt in progress or finished (USR-03). One statement: the update waits for a submit
  * (`for update`) or an answer save (`for share`) holding the row, then checks the status again, so
- * the attempt is voided after them, never in between.
+ * the attempt is voided after them, never in between. A school respondent's token is replaced in
+ * the same statement by the hash of one nobody holds: whoever took it (maybe under someone else's
+ * student number) can't start again from that browser, and the student comes back by joining the
+ * link again, which takes the number back (`joinLink`).
  */
 export const voidAttempt: RouteHandler<typeof voidAttemptRoute, AuthEnv> = async (c) => {
   const db = c.var.db
   const { id } = c.req.valid('param')
   const { reason, note } = c.req.valid('json')
+  const { hash } = await newRespondentToken()
 
+  const done = db.$with('done').as(
+    db
+      .update(attempts)
+      .set({
+        status: 'voided',
+        voidReasonCode: reason,
+        voidReason: note || null,
+        voidedAt: sql`now()`,
+        voidedBy: c.var.profile.id,
+      })
+      .where(and(eq(attempts.id, id), ne(attempts.status, 'voided')))
+      .returning({
+        id: attempts.id,
+        respondentId: attempts.respondentId,
+        voidReason: attempts.voidReasonCode,
+        voidNote: attempts.voidReason,
+        voidedAt: attempts.voidedAt,
+      }),
+  )
+  const signedOut = db.$with('signed_out').as(
+    db
+      .update(respondents)
+      .set({ accessTokenHash: hash })
+      .where(
+        and(
+          eq(respondents.mode, 'school'),
+          inArray(respondents.id, db.select({ id: done.respondentId }).from(done)),
+        ),
+      )
+      .returning({ id: respondents.id }),
+  )
   const [voided] = await db
-    .update(attempts)
-    .set({
-      status: 'voided',
-      voidReasonCode: reason,
-      voidReason: note || null,
-      voidedAt: sql`now()`,
-      voidedBy: c.var.profile.id,
+    .with(done, signedOut)
+    .select({
+      id: done.id,
+      voidReason: done.voidReason,
+      voidNote: done.voidNote,
+      voidedAt: done.voidedAt,
     })
-    .where(and(eq(attempts.id, id), ne(attempts.status, 'voided')))
-    .returning({
-      id: attempts.id,
-      voidReason: attempts.voidReasonCode,
-      voidNote: attempts.voidReason,
-      voidedAt: attempts.voidedAt,
-    })
+    .from(done)
   if (voided?.voidReason && voided.voidedAt) {
     return c.json(
       {

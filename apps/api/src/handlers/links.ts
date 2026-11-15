@@ -189,7 +189,14 @@ export const joinLink: RouteHandler<typeof joinLinkRoute, AppEnv> = async (c) =>
 
     // The number is taken. If every attempt under it was voided, the student starts over in the
     // same row: the new profile and consent, this link, and a new token, so a browser that still
-    // holds the old one loses its place.
+    // holds the old one loses its place. The row is locked first, so the check below runs after
+    // an attempt start (`for share` on this row) or another rejoin through another link has
+    // committed, and sees what it did.
+    await tx
+      .select({ id: respondents.id })
+      .from(respondents)
+      .where(eq(respondents.studentNumber, profile.studentNumber))
+      .for('update')
     const [rejoined] = await tx
       .update(respondents)
       .set({

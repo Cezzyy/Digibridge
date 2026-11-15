@@ -17,6 +17,8 @@ const props = defineProps<{
   open: boolean
   /** The attempt is still in progress, so voiding stops it at once. */
   inProgress: boolean
+  /** They came through a school link: the void ends their sign-in there, so they join again. */
+  school: boolean
   busy: boolean
   error: string | null
 }>()
@@ -55,7 +57,9 @@ const reasons = VOID_REASONS.map((value) => ({ value, label: VOID_REASON_LABELS[
 const message = computed(
   () =>
     (props.inProgress ? 'They’re still taking it, so this stops it now. ' : '') +
-    'It’s left out of every result and stat, and they can start again. Answers and scores stay for the record.',
+    'It’s left out of every result and stat, and they can start again' +
+    (props.school ? ' by opening the school link and filling in their details again. ' : '. ') +
+    'Answers and scores stay for the record.',
 )
 
 function confirm() {
