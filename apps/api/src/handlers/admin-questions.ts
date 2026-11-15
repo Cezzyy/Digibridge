@@ -31,11 +31,12 @@ const NOT_FOUND = 'We couldn’t find this question. Someone may have deleted it
 const AREA_MISSING = 'This area isn’t set up yet.'
 
 /**
- * Whether any attempt has shown the question: its ID is in the attempt's question_order. The
- * table is named outright: in a query on questions alone Drizzle writes `"id"` bare, which inside
- * this subquery would mean attempts.id.
+ * Whether any attempt has shown the question: its ID is in the attempt's question_order. Written
+ * with `@>`, not `= any(...)`, so it can use the GIN index on question_order instead of scanning
+ * every attempt for each question. The table is named outright: in a query on questions alone
+ * Drizzle writes `"id"` bare, which inside this subquery would mean attempts.id.
  */
-const shown = sql<boolean>`exists (select 1 from ${attempts} where ${questions}.${sql.identifier(questions.id.name)} = any(${attempts.questionOrder}))`
+const shown = sql<boolean>`exists (select 1 from ${attempts} where ${attempts.questionOrder} @> array[${questions}.${sql.identifier(questions.id.name)}])`
 
 const summaryColumns = {
   id: questions.id,
