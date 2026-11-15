@@ -47,7 +47,6 @@ Done when a test account goes from consent to results and lessons on a phone, us
 - [x] **Results page:** overall level, radar chart, score and level per area, recommended lessons, no per-item marks (RES-01 to RES-03, RES-05).
 - [x] **Lessons:** public library and lesson page with Markdown rendered through DOMPurify (LES-01 to LES-03).
 - [x] **SUS:** `lib/sus.ts` with its tests, `POST /api/v1/attempts/:id/sus`, `SusForm` as an optional card under results (SUS-01, SUS-02, SUS-04).
-- [ ] **QR code:** `results_token` at submit, `GET /api/v1/results/:token`, `ResultsQr` on the results page, so a student can reopen their results on another device (RES-04).
 
 ## Stage 2: School links
 
@@ -83,7 +82,7 @@ In this order:
 
 Done when an admin can load the 30 real items by CSV and read the pilot data on the dashboard. In this order:
 
-- [ ] **Questions:** list per area, create and edit with exactly 4 choices and 1 correct, correct choice locked once answered, deactivate instead of delete (CMS-01 to CMS-03).
+- [x] **Questions:** list per area, create and edit with exactly 4 choices and 1 correct, correct choice locked once answered, deactivate instead of delete (CMS-01 to CMS-03).
 - [ ] **Uploads:** `POST /api/v1/admin/uploads` to the R2 `MEDIA` bucket, PNG, JPEG or WebP up to 2 MB, and `GET /api/v1/media/:key` to serve them (CMS-05).
 - [ ] **CSV import:** columns from the TRD, report row errors, and the readiness check of 10 active items per area in the 4/4/2 mix (CMS-06, CMS-07). Needed before the real items can go in.
 - [x] **Lessons editor:** list and Markdown editor with preview (CMS-04).
