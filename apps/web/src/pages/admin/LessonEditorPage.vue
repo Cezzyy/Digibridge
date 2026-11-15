@@ -7,7 +7,7 @@ import {
   type LessonInput,
 } from '@digibridge/shared'
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
-import { useRoute, useRouter } from 'vue-router'
+import { useRoute, useRouter, type RouteLocationNormalized } from 'vue-router'
 import { ICONS } from '../../components/admin/admin-icons'
 import ErrorPanel from '../../components/admin/ErrorPanel.vue'
 import LessonForm from '../../components/admin/LessonForm.vue'
@@ -85,11 +85,12 @@ function onSave(input: LessonInput, replaces: AdminLessonRow | null) {
 
 async function commit(input: LessonInput) {
   const wasPublished = lesson.value?.isPublished ?? false
-  const saved = await save(input, id.value ?? undefined)
+  // The saved lesson's own ID, not the address's: after a new lesson's first save the address
+  // changes only once `router.replace` ends, or not at all if that's cut short.
+  const saved = await save(input, lesson.value?.id ?? id.value ?? undefined)
   if (!saved) return
   pending.value = null
-  // The form starts again from the saved lesson, so nothing is unsaved now.
-  dirty.value = false
+  // `dirty` follows the form, which keeps anything typed while this saved.
   notice.value =
     saved.isPublished && !wasPublished
       ? 'Published. Students can open it now.'
@@ -146,8 +147,13 @@ function answer(leave: boolean) {
   leaving.value = false
 }
 
+/** The saved lesson's own address, which a new lesson's first save moves to without leaving. */
+const ownAddress = (to: RouteLocationNormalized) =>
+  to.name === 'admin-lesson' && lesson.value !== null && to.params.id === lesson.value.id
+
 const removeGuard = router.beforeEach((to, from) => {
-  if (!dirty.value || from.name !== route.name || to.fullPath === from.fullPath) return true
+  if (!dirty.value || from.name !== route.name || to.fullPath === from.fullPath || ownAddress(to))
+    return true
   leaving.value = true
   return new Promise<boolean>((resolve) => (answerLeave = resolve))
 })
