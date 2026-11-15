@@ -30,9 +30,10 @@ describe('lessonInputSchema', () => {
     }
   })
 
-  it('refuses links that are not http(s), and too many resources', () => {
+  it('refuses links that are not https, and too many resources', () => {
     for (const bad of [
       { imageUrl: 'javascript:alert(1)' },
+      { imageUrl: 'http://example.com/a.png' },
       { videoUrl: 'youtube.com/watch?v=abc' },
       {
         resources: Array.from({ length: LESSON_RESOURCES_MAX + 1 }, () => lesson.resources[0]),
