@@ -176,17 +176,20 @@ function save() {
 const VIEWS = { edit: 'Edit', preview: 'Preview' } as const
 const view = ref<keyof typeof VIEWS>('edit')
 
-// The preview follows the text a moment after typing stops.
-const preview = ref({ stem: draft.value.stem, choices: [...draft.value.choices] })
+// The preview follows the text and the picture link a moment after typing stops, so a link
+// half typed doesn't load a picture for every letter.
+const previewOf = () => ({
+  stem: draft.value.stem,
+  imageUrl: draft.value.imageUrl,
+  choices: [...draft.value.choices],
+})
+const preview = ref(previewOf())
 let timer: ReturnType<typeof setTimeout> | undefined
 watch(
-  () => [draft.value.stem, ...draft.value.choices],
+  () => [draft.value.stem, draft.value.imageUrl, ...draft.value.choices],
   () => {
     clearTimeout(timer)
-    timer = setTimeout(
-      () => (preview.value = { stem: draft.value.stem, choices: [...draft.value.choices] }),
-      200,
-    )
+    timer = setTimeout(() => (preview.value = previewOf()), 200)
   },
 )
 onUnmounted(() => clearTimeout(timer))
@@ -389,7 +392,7 @@ const correctErrorId = `${id}-correct-error`
           <QuestionPreview
             :area="draft.area"
             :stem="preview.stem"
-            :image-url="draft.imageUrl"
+            :image-url="preview.imageUrl"
             :is-scenario="draft.isScenario"
             :choices="preview.choices"
           />
