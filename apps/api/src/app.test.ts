@@ -1656,6 +1656,77 @@ describe('school links', () => {
     it('answers 404 for an unknown code', async () => {
       expect((await join('NOSUCHCODE', profileFor())).status).toBe(404)
     })
+
+    describe('after the team voided their attempt (USR-03)', () => {
+      /** A student who joined and started, with their attempt then voided. */
+      const voidedStudent = async (link: { code: string }, studentNumber: string) => {
+        const student = await joined(link, { studentNumber })
+        expect((await start(student.headers)).status).toBe(201)
+        await testDb
+          .update(attempts)
+          .set(voidedFields())
+          .where(eq(attempts.respondentId, student.respondentId))
+        return student
+      }
+
+      it('lets them join again with the same number, through another link, with a new token', async () => {
+        const a = await addSchoolLink()
+        const b = await addSchoolLink()
+        const old = await voidedStudent(a, 'C23-01-7557-MAN121')
+        const res = await join(
+          b.code,
+          profileFor({ studentNumber: 'c23-01-7557-man121', fullName: 'Ana Reyes', yearLevel: 3 }),
+        )
+        expect(res.status).toBe(201)
+        const body = (await res.json()) as Joined
+        expect(body.respondent).toEqual({ id: old.respondentId, fullName: 'Ana Reyes' })
+
+        const [row] = await linkRespondents(b.id)
+        expect(row).toMatchObject({
+          id: old.respondentId,
+          yearLevel: 3,
+          accessTokenHash: await hashRespondentToken(body.token),
+        })
+        expect(await linkRespondents(a.id)).toHaveLength(0)
+        // The old browser loses its place; the new token starts a new attempt from link b.
+        expect((await openLink(a.code, old.headers)).status).toBe(401)
+        expect((await start(old.headers)).status).toBe(401)
+        expect((await start(tokenHeader(body.token))).status).toBe(201)
+        const current = (await attemptsOf(old.respondentId)).find((t) => t.status !== 'voided')
+        expect(current).toMatchObject({ status: 'in_progress', schoolLinkId: b.id })
+      })
+
+      it('lets them back into a full link they already count on, but no one new', async () => {
+        const link = await addSchoolLink({ maxResponses: 1 })
+        await voidedStudent(link, 'C23-01-7557-MAN121')
+        expect((await join(link.code, profileFor())).status).toBe(410)
+        const res = await join(link.code, profileFor({ studentNumber: 'C23-01-7557-MAN121' }))
+        expect(res.status).toBe(201)
+        expect(await linkRespondents(link.id)).toHaveLength(1)
+      })
+
+      it('still refuses a number whose attempt isn’t voided', async () => {
+        const link = await addSchoolLink()
+        const student = await joined(link, { studentNumber: 'C23-01-7557-MAN121' })
+        const { id } = (await (await start(student.headers)).json()) as { id: string }
+        await app.request(
+          `/api/v1/attempts/${id}/submit`,
+          { method: 'POST', headers: student.headers },
+          env,
+        )
+        // One voided attempt and a later one in place: still taken.
+        await testDb.insert(attempts).values({
+          respondentId: student.respondentId,
+          schoolLinkId: link.id,
+          ...voidedFields(),
+          expiresAt: new Date(),
+          questionOrder: [],
+          choiceOrder: {},
+        })
+        const res = await join(link.code, profileFor({ studentNumber: 'C23-01-7557-MAN121' }))
+        expect(res.status).toBe(409)
+      })
+    })
   })
 
   describe('the respondent token on the attempt routes', () => {

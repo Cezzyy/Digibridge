@@ -76,7 +76,7 @@ export const joinLinkRoute = createRoute({
   tags: ['School link'],
   summary: 'Save consent, the school profile and identity choice',
   description:
-    'No sign-in. The general profile plus student number, course and year level, which must fit the link’s lock, the identity choice and consent to the school notice, saved together (LNK-03, PRO-01 to PRO-05, CON-02). The student counts against the link’s limit from now on, and can take the assessment even if the link closes later. One respondent per student number across all links. Returns the respondent token once.',
+    'No sign-in. The general profile plus student number, course and year level, which must fit the link’s lock, the identity choice and consent to the school notice, saved together (LNK-03, PRO-01 to PRO-05, CON-02). The student counts against the link’s limit from now on, and can take the assessment even if the link closes later. One respondent per student number across all links. A student whose every attempt was voided (USR-03) can join again with the same number, through this link or another: their profile and consent are saved again in place, the token changes, and they count against this link. Returns the respondent token once.',
   request: {
     params: LinkParamsSchema,
     body: {
@@ -96,7 +96,9 @@ export const joinLinkRoute = createRoute({
       'A field is missing or not valid, it doesn’t fit the link’s course or year level, or the notice is out of date',
     ),
     404: errorResponse('No link has this code'),
-    409: errorResponse('The student number was already used'),
+    409: errorResponse(
+      'The student number was already used, by a student who hasn’t had every attempt voided',
+    ),
     410: errorResponse('The link was closed, has expired or is full'),
   },
 })

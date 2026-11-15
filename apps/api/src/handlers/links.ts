@@ -8,8 +8,9 @@ import {
   type YearLevel,
 } from '@digibridge/shared'
 import type { RouteHandler } from '@hono/zod-openapi'
-import { and, eq, ne, sql } from 'drizzle-orm'
+import { and, eq, exists, ne, notExists, sql, type SQL } from 'drizzle-orm'
 import type { AppEnv } from '../env'
+import type { Tx } from '../lib/close-attempt'
 import { linkResponses } from '../lib/link-responses'
 import { checkAgeOnConsentDay } from '../lib/respondent'
 import { hashRespondentToken, isRespondentToken, newRespondentToken } from '../lib/respondent-token'
@@ -19,6 +20,22 @@ import type { getLinkRoute, joinLinkRoute } from '../routes/links'
 const NOT_FOUND = 'We couldn’t find this link. Check that you have the whole address.'
 const NUMBER_USED =
   'This student number has already been used. If this is you, ask the DigiBridge team for help.'
+
+/**
+ * The respondent has voided attempts and no other (USR-03), so their student number may join a
+ * link again and start over. One who never started can't: their number stays theirs.
+ */
+const onlyVoidedAttempts = (db: Tx) => {
+  const theirs = (status: SQL) =>
+    db
+      .select({ one: sql`1` })
+      .from(attempts)
+      .where(and(eq(attempts.respondentId, respondents.id), status))
+  return and(
+    exists(theirs(eq(attempts.status, 'voided'))),
+    notExists(theirs(ne(attempts.status, 'voided'))),
+  )!
+}
 
 /** Codes are upper case; one typed or pasted in lower case still opens the link. */
 const normalizeCode = (code: string) => code.trim().toUpperCase()
@@ -103,6 +120,21 @@ export const getLink: RouteHandler<typeof getLinkRoute, AppEnv> = async (c) => {
   )
 }
 
+/** The student number belongs to a student who joined this link and had every attempt voided. */
+async function rejoiningHere(tx: Tx, linkId: string, studentNumber: string) {
+  const [found] = await tx
+    .select({ id: respondents.id })
+    .from(respondents)
+    .where(
+      and(
+        eq(respondents.studentNumber, studentNumber),
+        eq(respondents.schoolLinkId, linkId),
+        onlyVoidedAttempts(tx),
+      ),
+    )
+  return !!found
+}
+
 export const joinLink: RouteHandler<typeof joinLinkRoute, AppEnv> = async (c) => {
   const code = normalizeCode(c.req.valid('param').code)
   const { consentVersion, ...profile } = c.req.valid('json')
@@ -129,7 +161,11 @@ export const joinLink: RouteHandler<typeof joinLinkRoute, AppEnv> = async (c) =>
 
     // Counted only when there's a limit to count against.
     const responses = link.maxResponses === null ? 0 : await linkResponses(tx, link.id)
-    const status = linkStatus({ ...link, responses }, consentedAt)
+    let status = linkStatus({ ...link, responses }, consentedAt)
+    // A full link still lets back in a student already counted on it whose attempt was voided.
+    if (status === 'full' && (await rejoiningHere(tx, link.id, profile.studentNumber))) {
+      status = 'open'
+    }
     if (status !== 'open') throw new ApiError('gone', LINK_GONE_MESSAGES[status])
 
     const [issue] = linkLockIssues(link, profile)
@@ -149,8 +185,24 @@ export const joinLink: RouteHandler<typeof joinLinkRoute, AppEnv> = async (c) =>
       })
       .onConflictDoNothing({ target: respondents.studentNumber })
       .returning({ id: respondents.id, fullName: respondents.fullName })
-    if (!row) throw new ApiError('conflict', NUMBER_USED)
-    return row
+    if (row) return row
+
+    // The number is taken. If every attempt under it was voided, the student starts over in the
+    // same row: the new profile and consent, this link, and a new token, so a browser that still
+    // holds the old one loses its place.
+    const [rejoined] = await tx
+      .update(respondents)
+      .set({
+        ...profile,
+        schoolLinkId: link.id,
+        accessTokenHash: hash,
+        consentVersion,
+        consentedAt,
+      })
+      .where(and(eq(respondents.studentNumber, profile.studentNumber), onlyVoidedAttempts(tx)))
+      .returning({ id: respondents.id, fullName: respondents.fullName })
+    if (!rejoined) throw new ApiError('conflict', NUMBER_USED)
+    return rejoined
   })
 
   return c.json({ respondent: created, token }, 201)
