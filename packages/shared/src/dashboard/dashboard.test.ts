@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { AGE_MAX, AGE_MIN } from '../profile/birth-date'
 import { AGE_GROUP_RANGES, AGE_GROUPS, ageGroupFor } from './age-groups'
 import { dashboardFiltersSchema, hasSchoolOnlyFilter } from './filters'
-import { respondentListQuerySchema } from './respondents'
+import { respondentListQuerySchema, VOID_NOTE_MAX_LENGTH, voidAttemptSchema } from './respondents'
 import { statsQuerySchema } from './stats'
 
 describe('age groups', () => {
@@ -82,5 +82,36 @@ describe('statsQuerySchema', () => {
 
   it('refuses an unknown grouping', () => {
     expect(statsQuerySchema.safeParse({ groupBy: 'name' }).success).toBe(false)
+  })
+})
+
+describe('voidAttemptSchema', () => {
+  it('takes a reason with no note', () => {
+    expect(voidAttemptSchema.parse({ reason: 'technical' })).toEqual({
+      reason: 'technical',
+      note: null,
+    })
+  })
+
+  it('trims the note', () => {
+    expect(voidAttemptSchema.parse({ reason: 'duplicate', note: '  Second account ' }).note).toBe(
+      'Second account',
+    )
+  })
+
+  it('needs a note with other', () => {
+    expect(voidAttemptSchema.safeParse({ reason: 'other' }).success).toBe(false)
+    expect(voidAttemptSchema.safeParse({ reason: 'other', note: '   ' }).success).toBe(false)
+    expect(voidAttemptSchema.safeParse({ reason: 'other', note: 'Fire drill' }).success).toBe(true)
+  })
+
+  it('refuses an unknown reason and a long note', () => {
+    expect(voidAttemptSchema.safeParse({ reason: 'bored' }).success).toBe(false)
+    expect(
+      voidAttemptSchema.safeParse({
+        reason: 'technical',
+        note: 'x'.repeat(VOID_NOTE_MAX_LENGTH + 1),
+      }).success,
+    ).toBe(false)
   })
 })
