@@ -96,6 +96,8 @@ export type ExportQuestion = {
   id: string
   area: AreaCode
   difficulty: Difficulty
+  /** `questions.item_number`: set once, never reused. */
+  itemNumber: number
   stem: string
   isActive: boolean
 }
@@ -320,18 +322,11 @@ const SUS_COLUMNS: RespondentColumn[] = [
   })),
 ]
 
-/** Each question's column name: numbered in its area and difficulty, in the order given. */
-function itemCodes(questions: ExportQuestion[]) {
-  const counts = new Map<string, number>()
-  return new Map(
-    questions.map((q) => {
-      const key = `${q.area}:${q.difficulty}`
-      const n = (counts.get(key) ?? 0) + 1
-      counts.set(key, n)
-      return [q.id, exportItemCode(q.area, q.difficulty, n)]
-    }),
-  )
-}
+/**
+ * Each question's column name: its area, difficulty and stored item number, which never changes,
+ * so a code names the same question in every export. Area and difficulty are fixed once shown.
+ */
+const itemCode = (q: ExportQuestion) => exportItemCode(q.area, q.difficulty, q.itemNumber)
 
 const pctRange = (min: number, below?: number) =>
   below === undefined
@@ -361,7 +356,6 @@ function filtersInWords({ query, linkLabel }: ExportData) {
 }
 
 export function buildExport(data: ExportData): Sheet[] {
-  const codes = itemCodes(data.questions)
   const areasBy = new Map<string, Map<AreaCode, ExportAreaResult>>()
   for (const result of data.areas) {
     const areas = areasBy.get(result.attemptId) ?? new Map<AreaCode, ExportAreaResult>()
@@ -392,7 +386,7 @@ export function buildExport(data: ExportData): Sheet[] {
   const shown = new Set(rows.flatMap((r) => (r.finished ? (r.questionOrder ?? []) : [])))
   const shownQuestions = data.questions.filter((q) => shown.has(q.id))
   const itemColumns = shownQuestions.map((q): ValueColumn => ({
-    header: codes.get(q.id)!,
+    header: itemCode(q),
     value: (r) =>
       r.finished && r.questionOrder?.includes(q.id) ? (r.marks.get(q.id) ? 1 : 0) : null,
   }))
@@ -418,7 +412,7 @@ export function buildExport(data: ExportData): Sheet[] {
       { header: 'Question', width: 60, wrap: true },
     ],
     rows: shownQuestions.map((q) => [
-      codes.get(q.id)!,
+      itemCode(q),
       AREA_LABELS[q.area],
       DIFFICULTY_LABELS[q.difficulty],
       POINTS_PER_DIFFICULTY[q.difficulty],
@@ -443,7 +437,7 @@ export function buildExport(data: ExportData): Sheet[] {
       ...described.map((column): Cell[] => [column.header, column.description]),
       [
         `Question columns (${firstCode}, …)`,
-        `One per question shown in a finished assessment in this file, named by area (${AREA_CODES.map((a) => `${EXPORT_AREA_CODES[a]} ${AREA_LABELS[a]}`).join(', ')}), difficulty (${DIFFICULTIES.map((d) => `${EXPORT_DIFFICULTY_CODES[d]} ${DIFFICULTY_LABELS[d]}`).join(', ')}) and number. 1 = answered right; 0 = answered wrong or left blank, as scored; empty = not in their assessment. The Questions sheet has each one’s text.`,
+        `One per question shown in a finished assessment in this file, named by area (${AREA_CODES.map((a) => `${EXPORT_AREA_CODES[a]} ${AREA_LABELS[a]}`).join(', ')}), difficulty (${DIFFICULTIES.map((d) => `${EXPORT_DIFFICULTY_CODES[d]} ${DIFFICULTY_LABELS[d]}`).join(', ')}) and the question’s own number, which never changes, so a code names the same question in every export. Numbers run across the whole bank, so they have gaps. 1 = answered right; 0 = answered wrong or left blank, as scored; empty = not in their assessment. The Questions sheet has each one’s text.`,
       ],
       [null, null],
       ['Exported at', data.exportedAt],

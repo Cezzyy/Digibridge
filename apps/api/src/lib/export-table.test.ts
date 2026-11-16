@@ -60,16 +60,39 @@ const data = (values: Partial<ExportData> = {}): ExportData => ({
   sus: [],
   marks: [],
   questions: [
-    { id: Q.infoBasic1, area: 'info_literacy', difficulty: 'basic', stem: 'One', isActive: true },
-    { id: Q.infoBasic2, area: 'info_literacy', difficulty: 'basic', stem: 'Two', isActive: false },
+    // Item numbers run across the bank, with a gap where a question was deleted.
+    {
+      id: Q.infoBasic1,
+      area: 'info_literacy',
+      difficulty: 'basic',
+      itemNumber: 1,
+      stem: 'One',
+      isActive: true,
+    },
+    {
+      id: Q.infoBasic2,
+      area: 'info_literacy',
+      difficulty: 'basic',
+      itemNumber: 4,
+      stem: 'Two',
+      isActive: false,
+    },
     {
       id: Q.unshown,
       area: 'communication',
       difficulty: 'intermediate',
+      itemNumber: 2,
       stem: 'Three',
       isActive: true,
     },
-    { id: Q.safetyAdvanced, area: 'safety', difficulty: 'advanced', stem: 'Four', isActive: true },
+    {
+      id: Q.safetyAdvanced,
+      area: 'safety',
+      difficulty: 'advanced',
+      itemNumber: 7,
+      stem: 'Four',
+      isActive: true,
+    },
   ],
   query: { sort: 'newest' },
   linkLabel: null,
@@ -163,8 +186,8 @@ describe('buildExport', () => {
         ],
       }),
     )
-    // Numbered in the bank's order within area and difficulty; unshown questions get no column.
-    expect(headers.slice(-3)).toEqual(['INF-B01', 'INF-B02', 'SAF-A01'])
+    // Named by each question's stored item number; unshown questions get no column.
+    expect(headers.slice(-3)).toEqual(['INF-B01', 'INF-B04', 'SAF-A07'])
     expect(rows[0]).toMatchObject({
       Status: 'Finished',
       'Closed by timer': 'No',
@@ -180,8 +203,8 @@ describe('buildExport', () => {
       'SUS 1': 4,
       'SUS 10': 2,
       'INF-B01': 1,
-      'INF-B02': 0,
-      'SAF-A01': 0,
+      'INF-B04': 0,
+      'SAF-A07': 0,
     })
   })
 
@@ -195,7 +218,7 @@ describe('buildExport', () => {
         marks: [{ attemptId: 'a-2', questionId: Q.infoBasic1, correct: true }],
       }),
     )
-    expect(rows[1]).toMatchObject({ 'INF-B01': 1, 'INF-B02': null, 'SAF-A01': null })
+    expect(rows[1]).toMatchObject({ 'INF-B01': 1, 'INF-B04': null, 'SAF-A07': null })
   })
 
   it('keeps scores, SUS and questions out for a voided attempt, with its reason', () => {
@@ -230,9 +253,9 @@ describe('buildExport', () => {
         query: { sort: 'score_high', sex: 'female', status: 'finished', q: 'Cruz' },
       }),
     )
-    expect(questions!.rows.map((row) => row[0])).toEqual(['INF-B01', 'INF-B02', 'SAF-A01'])
+    expect(questions!.rows.map((row) => row[0])).toEqual(['INF-B01', 'INF-B04', 'SAF-A07'])
     expect(questions!.rows[1]).toEqual([
-      'INF-B02',
+      'INF-B04',
       AREA_LABELS.info_literacy,
       'Basic',
       1,
