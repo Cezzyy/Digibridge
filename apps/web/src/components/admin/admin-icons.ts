@@ -41,6 +41,7 @@ export const ICONS = {
   ],
   signOut: ['M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4', 'm16 17 5-5-5-5', 'M21 12H9'],
   plus: 'M12 5v14M5 12h14',
+  download: ['M12 4v11', 'm7 10 5 5 5-5', 'M5 20h14'],
   refresh: ['M20 11A8 8 0 0 0 5.3 7', 'M4 4v4h4', 'M4 13a8 8 0 0 0 14.7 4', 'M20 20v-4h-4'],
   arrow: ['M5 12h14', 'm13 6 6 6-6 6'],
   items: [
