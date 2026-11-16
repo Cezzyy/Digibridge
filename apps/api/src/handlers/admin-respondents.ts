@@ -9,26 +9,23 @@ import {
   schoolLinks,
   susResponses,
 } from '@digibridge/db'
-import {
-  ageGroupFor,
-  FINISHED_ATTEMPT_STATUSES,
-  RESPONDENTS_PAGE_SIZE,
-  type AreaCode,
-  type Level,
-  type RespondentSort,
-  type RespondentStatus,
-} from '@digibridge/shared'
+import { ageGroupFor, RESPONDENTS_PAGE_SIZE, type AreaCode } from '@digibridge/shared'
 import type { RouteHandler } from '@hono/zod-openapi'
-import { and, asc, count, desc, eq, ilike, inArray, ne, or, sql, type SQL } from 'drizzle-orm'
+import { and, count, eq, inArray, ne, sql } from 'drizzle-orm'
 import type { Db } from '../config/db'
 import type { AuthEnv } from '../env'
 import {
   ageAtConsent,
   currentAttemptOrder,
   currentAttempts,
-  dashboardConditions,
   type CurrentAttempts,
 } from '../lib/dashboard-filters'
+import {
+  finishedScore,
+  respondentConditions,
+  respondentOrder,
+  statusOf,
+} from '../lib/respondent-list'
 import { newRespondentToken } from '../lib/respondent-token'
 import { ApiError } from '../middleware'
 import type {
@@ -37,48 +34,6 @@ import type {
   listRespondentsRoute,
   voidAttemptRoute,
 } from '../routes/admin-respondents'
-
-/** RESPONDENT_STATUSES from the respondent's attempt. Submitted and expired both have results. */
-const statusOf = (current: CurrentAttempts) =>
-  sql<RespondentStatus>`case
-    when ${current.id} is null then 'not_started'
-    when ${current.status} = 'in_progress' then 'in_progress'
-    when ${current.status} = 'voided' then 'voided'
-    else 'finished' end`
-
-/** The attempt's score and level, or null unless it's finished: a voided attempt is left out. */
-const finishedScore = (current: CurrentAttempts) => {
-  const finished = inArray(current.status, FINISHED_ATTEMPT_STATUSES)
-  return {
-    pct: sql<number | null>`case when ${finished} then ${current.overallPct} end`.mapWith(
-      current.overallPct,
-    ),
-    level: sql<Level | null>`case when ${finished} then ${current.overallLevel} end`,
-  }
-}
-
-/** Hidden names sort last, as if blank, so their place in the list gives nothing away (PRO-05). */
-const orderFor = (sort: RespondentSort, current: CurrentAttempts): SQL[] => {
-  const newest = [desc(respondents.consentedAt), desc(respondents.id)]
-  switch (sort) {
-    case 'newest':
-      return newest
-    case 'oldest':
-      return [asc(respondents.consentedAt), asc(respondents.id)]
-    case 'name':
-      return [
-        sql`case when ${respondents.showIdentity} then ${respondents.fullName} end asc nulls last`,
-        ...newest,
-      ]
-    case 'score_high':
-      return [sql`${finishedScore(current).pct} desc nulls last`, ...newest]
-    case 'score_low':
-      return [sql`${finishedScore(current).pct} asc nulls last`, ...newest]
-  }
-}
-
-/** `%text%` for ILIKE, with the search's own `%`, `_` and `\` matched as themselves. */
-const containing = (text: string) => `%${text.replace(/[\\%_]/g, '\\$&')}%`
 
 /** Respondents with their attempt and the link they joined through, as table rows. */
 function selectRespondents(db: Db, current: CurrentAttempts) {
@@ -124,30 +79,15 @@ const toRespondent = ({ showIdentity, linkId, linkLabel, ...row }: Row) => ({
 })
 
 export const listRespondents: RouteHandler<typeof listRespondentsRoute, AuthEnv> = async (c) => {
-  const { status, q, sort, page, ...filters } = c.req.valid('query')
+  const { page, ...query } = c.req.valid('query')
   const db = c.var.db
   const current = currentAttempts(db)
-
-  const conditions = dashboardConditions(filters)
-  if (status) conditions.push(sql`${statusOf(current)} = ${status}`)
-  if (q) {
-    // Only shown identities can be found by name or student number (PRO-05).
-    conditions.push(
-      and(
-        eq(respondents.showIdentity, true),
-        or(
-          ilike(respondents.fullName, containing(q)),
-          ilike(respondents.studentNumber, containing(q)),
-        ),
-      )!,
-    )
-  }
-  const where = and(...conditions)
+  const where = and(...respondentConditions(query, current))
 
   const [rows, [counted]] = await Promise.all([
     selectRespondents(db, current)
       .where(where)
-      .orderBy(...orderFor(sort, current))
+      .orderBy(...respondentOrder(query.sort, current))
       .limit(RESPONDENTS_PAGE_SIZE)
       .offset((page - 1) * RESPONDENTS_PAGE_SIZE),
     db
