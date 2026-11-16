@@ -179,7 +179,7 @@ Through a school link the profile also asks for student number, course and year 
 | DSH-03 | Filters for sex, age group, devices owned, internet access, mode (online or school link), school link and date range, plus course and year level. Course, year level and link exist only for school-link respondents, so picking any of them shows school-link respondents only. All charts and cards follow the filters. | Must |
 | DSH-04 | Comparison chart of average score by a chosen grouping, such as by internet access or by mode. Grouping by course, year level or school link uses school-link respondents only, and the chart says so. | Must |
 | DSH-05 | Respondents table with search and sort, and a detail view of one respondent's profile and area scores. Name and student number appear only for respondents who allowed it (PRO-05). Online respondents have no student number, course, year level or school link, so those cells are empty. | Must |
-| DSH-06 | Export the filtered respondents with profile, area scores, levels and SUS score as CSV, keeping hidden identities hidden, with each respondent's school link. Student number, course, year level and link are empty for online respondents. Admin only. | Must |
+| DSH-06 | Export the filtered respondents with profile, area scores, levels and SUS score as CSV or Excel (with a codebook), keeping hidden identities hidden, with each respondent's school link. Student number, course, year level and link are empty for online respondents. Admin only. | Must |
 | DSH-07 | Facilitators can view the dashboard and respondents but cannot export or change anything. | Should |
 | DSH-08 | Item analysis: percent of respondents who got each item right, to spot items that are too easy, too hard or confusing. | Should |
 
