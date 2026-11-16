@@ -29,6 +29,7 @@ import {
   listRespondents,
   voidAttempt,
 } from './handlers/admin-respondents'
+import { exportCsv, exportXlsx } from './handlers/admin-export'
 import { getItemAnalysis } from './handlers/admin-items'
 import { getStats } from './handlers/admin-stats'
 import { getHealth } from './handlers/health'
@@ -65,6 +66,7 @@ import {
   listRespondentsRoute,
   voidAttemptRoute,
 } from './routes/admin-respondents'
+import { exportCsvRoute, exportXlsxRoute } from './routes/admin-export'
 import { itemAnalysisRoute } from './routes/admin-items'
 import { statsRoute } from './routes/admin-stats'
 import {
@@ -108,6 +110,8 @@ const v1Routes = v1
   .openapi(deleteRespondentRoute, deleteRespondent)
   .openapi(voidAttemptRoute, voidAttempt)
   .openapi(statsRoute, getStats)
+  .openapi(exportCsvRoute, exportCsv)
+  .openapi(exportXlsxRoute, exportXlsx)
   .openapi(itemAnalysisRoute, getItemAnalysis)
   .openapi(listAdminLessonsRoute, listAdminLessons)
   .openapi(getAdminLessonRoute, getAdminLesson)
