@@ -1,7 +1,6 @@
 import {
   answers,
   areaResults,
-  choices,
   competencyAreas,
   questions,
   respondents,
@@ -17,7 +16,7 @@ import {
   type ExportQuery,
 } from '@digibridge/shared'
 import type { RouteHandler } from '@hono/zod-openapi'
-import { and, eq, inArray } from 'drizzle-orm'
+import { and, eq, inArray, sql } from 'drizzle-orm'
 import type { Db } from '../config/db'
 import type { AuthEnv } from '../env'
 import { toCsv } from '../lib/csv'
@@ -98,14 +97,14 @@ async function readExport(db: Db, query: ExportQuery) {
           .innerJoin(competencyAreas, eq(competencyAreas.id, areaResults.areaId))
           .where(inArray(areaResults.attemptId, finishedIds)),
         tx.select().from(susResponses).where(inArray(susResponses.attemptId, finishedIds)),
+        // The points saved at submit, not the choices' right answers now, so the marks are as scored.
         tx
           .select({
             attemptId: answers.attemptId,
             questionId: answers.questionId,
-            correct: choices.isCorrect,
+            correct: sql<boolean>`coalesce(${answers.points}, 0) > 0`,
           })
           .from(answers)
-          .innerJoin(choices, eq(choices.id, answers.choiceId))
           .where(inArray(answers.attemptId, finishedIds)),
         tx
           .select({
