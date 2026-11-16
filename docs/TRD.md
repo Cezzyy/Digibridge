@@ -77,7 +77,7 @@ digibridge/
 │     │  ├─ routes/          route definitions per feature: me, respondents, links, attempts, results, lessons, admin
 │     │  ├─ handlers/        the logic behind each route
 │     │  ├─ middleware/      auth, requireRole, respondent, cors, error handler
-│     │  ├─ lib/             scoring.ts, sus.ts, shuffle.ts, stats.ts, csv.ts, helpers
+│     │  ├─ lib/             scoring.ts, sus.ts, shuffle.ts, stats.ts, csv.ts, xlsx.ts, export-table.ts, helpers
 │     │  ├─ openapi/         OpenAPI setup and API docs page
 │     │  ├─ app.ts           builds the Hono app, mounts routes, exports AppType
 │     │  ├─ index.ts         Worker entry: fetch + scheduled (cron)
@@ -223,7 +223,8 @@ School-link respondents use the same respondent-flow routes (`/api/v1/attempts/*
 | GET | `/api/v1/admin/respondents` | Facilitator, admin | Paged, filtered, sorted list. Name and student number show as Hidden unless the respondent allowed them. |
 | GET | `/api/v1/admin/respondents/:id` | Facilitator, admin | Profile, area results and SUS answers of one respondent. Admins also get the answer sheet: each item in the order shown, with the choice picked and the right one |
 | GET | `/api/v1/admin/items` | Admin | Item analysis: per question how many saw it, got it right or left it blank, picks per choice, and flags (too easy at 90% or more right, too hard below 20%, confusing when a wrong choice beats the right one; none until 5 have seen it). Takes the dashboard filters |
-| GET | `/api/v1/admin/export.csv` | Admin | Filtered respondents with profile, area scores, levels and SUS score; hidden identities stay hidden |
+| GET | `/api/v1/admin/export.csv` | Admin | The respondents table's rows (filters, status, search and sort, every page): profile with a 0/1 column per device and internet access, school link, attempt status and times, overall and per-area points, percentage and level, SUS score and its 10 answers, and a 0/1 column per question shown (`INF-B01`, ...); finished attempts only for scores; hidden identities read Hidden |
+| GET | `/api/v1/admin/export.xlsx` | Admin | The same rows as an Excel workbook, plus a Questions sheet (each item column's code, area, difficulty and text) and a Codebook sheet (every column, the filters used, level cut-offs and points) |
 | POST | `/api/v1/admin/attempts/:id/void` | Admin | Void an attempt in progress or finished: a reason from `VOID_REASONS` and a note (`voidAttemptSchema`, note required with `other`). Its answers and scores stay; it's left out of all stats and the respondent can start again: online from the same account, through a school link by joining it again, since the void ends the student's token. 404 unknown, 409 already voided |
 | DELETE | `/api/v1/admin/respondents/:id` | Admin | Delete a respondent on request (USR-03), with their attempts, answers, area results and SUS through the cascades. An online respondent's profile stays, so signing in again starts over; a school-link student frees their place and student number. 204; 404 unknown |
 | GET, POST | `/api/v1/admin/questions` | Admin | List every question, inactive ones too, by area order and difficulty, each with `shown` (any attempt's `question_order` holds it, voided ones included); create a question with exactly 4 choices and exactly 1 right (`questionInputSchema`). 404 if the areas were never seeded. Item analysis stays at `/admin/items` |
