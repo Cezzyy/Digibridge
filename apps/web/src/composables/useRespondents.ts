@@ -14,6 +14,19 @@ export type RespondentsQuery = DashboardFilters & {
   page: number
 }
 
+/** The table's query as URL parameters, without the page: the export takes the same. */
+export function respondentQuery({
+  status,
+  q,
+  sort,
+  ...filters
+}: Omit<RespondentsQuery, 'page'>): Record<string, string> {
+  const query: Record<string, string> = { ...filterQuery(filters), sort }
+  if (status) query.status = status
+  if (q) query.q = q
+  return query
+}
+
 /**
  * One page of the respondents table (DSH-05), staff only. A reload keeps the last page on screen
  * until the new one comes in, and only the latest load counts, so typing a search quickly never
@@ -25,18 +38,12 @@ export function useRespondents() {
   const loading = ref(false)
   let latest = 0
 
-  async function load({ status, q, sort, page: pageNumber, ...filters }: RespondentsQuery) {
+  async function load({ page: pageNumber, ...rest }: RespondentsQuery) {
     const request = ++latest
     loading.value = true
     error.value = null
     try {
-      const query: Record<string, string> = {
-        ...filterQuery(filters),
-        sort,
-        page: String(pageNumber),
-      }
-      if (status) query.status = status
-      if (q) query.q = q
+      const query = { ...respondentQuery(rest), page: String(pageNumber) }
       const found = await call(api.admin.respondents.$get({ query }))
       if (request === latest) page.value = found
     } catch (err) {

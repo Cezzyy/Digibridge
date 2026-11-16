@@ -14,6 +14,7 @@ import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter, type LocationQueryRaw } from 'vue-router'
 import { ICONS } from '../../components/admin/admin-icons'
 import ErrorPanel from '../../components/admin/ErrorPanel.vue'
+import ExportButtons from '../../components/admin/ExportButtons.vue'
 import FilterBar from '../../components/admin/FilterBar.vue'
 import RespondentDrawer from '../../components/admin/RespondentDrawer.vue'
 import RespondentsTable from '../../components/admin/RespondentsTable.vue'
@@ -23,7 +24,7 @@ import SelectField from '../../components/form/SelectField.vue'
 import TextField from '../../components/form/TextField.vue'
 import SkeletonText from '../../components/results/SkeletonText.vue'
 import { useDashboardFilters } from '../../composables/useDashboardFilters'
-import { useRespondents } from '../../composables/useRespondents'
+import { respondentQuery, useRespondents } from '../../composables/useRespondents'
 import { useSchoolLinks } from '../../composables/useSchoolLinks'
 import { SECONDARY_BUTTON } from '../../lib/buttons'
 import { useSessionStore } from '../../stores/session'
@@ -96,6 +97,11 @@ watch(
   { immediate: true },
 )
 const reload = () => load(listQuery.value)
+// The export has every page of the same rows.
+const exportQuery = computed(() => {
+  const { page: _page, ...rest } = listQuery.value
+  return respondentQuery(rest)
+})
 
 const statusOptions = [
   { value: null, label: 'Any status' },
@@ -150,12 +156,15 @@ function onDeleted() {
 </script>
 
 <template>
-  <div>
-    <h1 class="text-3xl leading-tight font-bold sm:text-4xl">Respondents</h1>
-    <p class="mt-2 max-w-2xl text-lg text-quiet">
-      Everyone who agreed to the notice and saved a profile. Open one to see their profile and
-      scores<template v-if="session.isAdmin">, and the answers they gave</template>.
-    </p>
+  <div class="flex flex-col gap-6 xl:flex-row xl:items-end xl:justify-between">
+    <div>
+      <h1 class="text-3xl leading-tight font-bold sm:text-4xl">Respondents</h1>
+      <p class="mt-2 max-w-2xl text-lg text-quiet">
+        Everyone who agreed to the notice and saved a profile. Open one to see their profile and
+        scores<template v-if="session.isAdmin">, and the answers they gave</template>.
+      </p>
+    </div>
+    <ExportButtons v-if="session.isAdmin" :query="exportQuery" :total="page?.total ?? null" />
   </div>
 
   <FilterBar class="mt-8" :links="session.isAdmin ? (schoolLinks.links.value ?? []) : null" />

@@ -88,11 +88,30 @@ export async function call<R extends ClientResponse<unknown, number, string>>(
   // 204 No Content (a delete) has no body to read.
   if (res.status === 204) return undefined as SuccessBody<R>
   if (res.ok) return (await res.json()) as SuccessBody<R>
+  throw await failure(res)
+}
 
+/**
+ * Awaits an API call whose answer is a file (an export) and returns it, or throws
+ * ApiRequestError like `call`.
+ */
+export async function callFile(request: Promise<ClientResponse<unknown, number, string>>) {
+  let res: ClientResponse<unknown, number, string>
+  try {
+    res = await request
+  } catch {
+    throw new ApiRequestError('network', NETWORK_MESSAGE, 0)
+  }
+  if (res.ok) return res.blob()
+  throw await failure(res)
+}
+
+/** The API's error from a failed response, or a fallback when the body isn't one. */
+async function failure(res: ClientResponse<unknown, number, string>) {
   const body = (await res.json().catch(() => null)) as {
     error?: { code?: ErrorCode; message?: string }
   } | null
-  throw new ApiRequestError(
+  return new ApiRequestError(
     body?.error?.code ?? 'internal_error',
     body?.error?.message ?? FALLBACK_MESSAGE,
     res.status,
