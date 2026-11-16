@@ -1,5 +1,5 @@
 import { HIDDEN_IDENTITY, SUS_STATEMENT_COUNT } from '@digibridge/shared'
-import { questions } from '@digibridge/db'
+import { answers, questions } from '@digibridge/db'
 import { eq } from 'drizzle-orm'
 import { strFromU8, unzipSync } from 'fflate'
 import { describe, expect, it } from 'vitest'
@@ -165,6 +165,18 @@ describe('GET /api/v1/admin/export.csv', () => {
     const before = await codes()
     await testDb.delete(questions).where(eq(questions.id, older!.id))
     expect(await codes()).toEqual(before)
+  })
+
+  it('marks each item by the points saved at submit, not the choices now', async () => {
+    const taker = await finishedOnline()
+    // The right answer's choice still says right; only the saved points change.
+    await testDb.update(answers).set({ points: 0 }).where(eq(answers.attemptId, taker.attempt.id))
+    const admin = await signedIn('admin')
+    const [row] = await csvRows(await get('/api/v1/admin/export.csv', admin.headers))
+    const marks = Object.keys(row!)
+      .filter((key) => ITEM_CODE.test(key))
+      .map((key) => row![key])
+    expect(marks).toEqual(Array(30).fill('0'))
   })
 
   it('refuses a filter that isn’t valid', async () => {
