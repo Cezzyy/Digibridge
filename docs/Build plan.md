@@ -98,8 +98,8 @@ Done when an admin can load the 30 real items by CSV and read the pilot data on 
 Small, fit in anywhere:
 
 - [ ] Notice in Messenger's in-app browser on the online sign-in page: "Open in Chrome or Safari to sign in with Google." School links need no sign-in, so they work in Messenger as they are.
-- [ ] Error screens in plain words, no technical terms or stack traces.
-- [ ] Empty states: dashboard with 0 respondents, lessons not yet published, no questions in an area, no school links yet.
+- [x] Error screens in plain words, no technical terms or stack traces.
+- [x] Empty states: dashboard with 0 respondents, lessons not yet published, no questions in an area, no school links yet.
 - [ ] Mobile pass at 360 px on every page; tap targets at least 44 px.
 - [x] Landing page copy: what DigiBridge is, how long it takes, privacy line. The public pages are for online mode, so they don't mention course or year level: change the profile step in `components/landing/steps.ts` and its demo in `StepScreen.vue`, which still show them.
 - [ ] Loading and saving states on every button that calls the API.

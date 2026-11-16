@@ -67,6 +67,7 @@ const placeholderRows = ['Overall', ...AREA_CODES.map((area) => AREA_LABELS[area
         <div class="mt-2 flex h-7 gap-0.5 rounded-[4px] bg-track">
           <span
             v-for="part in row.parts"
+            v-show="part.count > 0"
             :key="part.level"
             class="group relative flex h-full min-w-1 items-center justify-center rounded-[4px] text-sm font-semibold tabular-nums"
             :class="LEVEL_TONE[part.level]"

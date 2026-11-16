@@ -26,7 +26,7 @@ import { useSessionStore } from '../../stores/session'
 const route = useRoute()
 const router = useRouter()
 const session = useSessionStore()
-const { filters } = useDashboardFilters()
+const { filters, activeCount, clear } = useDashboardFilters()
 const { stats, error, loading, load } = useAdminStats()
 
 const schoolLinks = useSchoolLinks()
@@ -138,6 +138,38 @@ const areaAverages = computed(() =>
     :message="stats ? `We couldn’t refresh the numbers. ${error}` : error"
     @retry="reload"
   />
+
+  <!-- With no finished attempts the charts below are blank, so say why. -->
+  <div
+    v-if="stats && stats.finished === 0"
+    class="mt-4 flex flex-col gap-4 rounded-card bg-mist-soft p-5 sm:flex-row sm:items-center"
+  >
+    <div class="min-w-0 flex-1">
+      <p class="font-semibold">
+        {{
+          activeCount > 0
+            ? 'No finished attempts match these filters.'
+            : 'No one has finished the assessment yet.'
+        }}
+      </p>
+      <p class="mt-1 text-quiet">
+        {{
+          activeCount > 0
+            ? 'Try fewer filters, or clear them all.'
+            : 'The scores and charts fill in as students submit.'
+        }}
+      </p>
+    </div>
+    <button
+      v-if="activeCount > 0"
+      type="button"
+      :class="SECONDARY_BUTTON"
+      class="shrink-0"
+      @click="clear"
+    >
+      Clear filters
+    </button>
+  </div>
 
   <template v-if="stats || !error">
     <dl class="mt-4 grid gap-4 sm:grid-cols-2 xl:grid-cols-5" :aria-busy="!stats">
