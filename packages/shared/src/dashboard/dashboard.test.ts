@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { AGE_MAX, AGE_MIN } from '../profile/birth-date'
 import { AGE_GROUP_RANGES, AGE_GROUPS, ageGroupFor } from './age-groups'
+import { exportItemCode, exportQuerySchema } from './export'
 import { dashboardFiltersSchema, hasSchoolOnlyFilter } from './filters'
 import { respondentListQuerySchema, VOID_NOTE_MAX_LENGTH, voidAttemptSchema } from './respondents'
 import { statsQuerySchema } from './stats'
@@ -113,5 +114,21 @@ describe('voidAttemptSchema', () => {
         note: 'x'.repeat(VOID_NOTE_MAX_LENGTH + 1),
       }).success,
     ).toBe(false)
+  })
+})
+
+describe('exportQuerySchema', () => {
+  it('takes the table’s query without the page', () => {
+    expect(exportQuerySchema.parse({ sort: 'name', page: '3', status: 'finished' })).toEqual({
+      sort: 'name',
+      status: 'finished',
+    })
+  })
+})
+
+describe('exportItemCode', () => {
+  it('names a question by area, difficulty and number', () => {
+    expect(exportItemCode('info_literacy', 'basic', 1)).toBe('INF-B01')
+    expect(exportItemCode('safety', 'advanced', 12)).toBe('SAF-A12')
   })
 })
