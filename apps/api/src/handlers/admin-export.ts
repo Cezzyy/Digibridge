@@ -31,25 +31,21 @@ import {
 import { toXlsx, XLSX_TYPE } from '../lib/xlsx'
 import type { exportCsvRoute, exportXlsxRoute } from '../routes/admin-export'
 
+const finishedStatuses: readonly string[] = FINISHED_ATTEMPT_STATUSES
+
 /**
- * Everything the export needs, in one round of queries: the respondents with their attempt, and
- * the area results, SUS answers and answer marks of their finished attempts, picked by the same
- * conditions in a subquery so nothing waits on the respondents' rows. They share one snapshot
- * (a read-only repeatable read transaction), so a submit committing midway can't give a finished
- * row without its area results and marks.
+ * Everything the export needs: the respondents with their attempt, then the area results, SUS
+ * answers and answer marks of the finished attempts among them, by ID, so the current attempts and
+ * the filters are worked out once. Both rounds share one snapshot (a read-only repeatable read
+ * transaction), so a submit committing between them can't give a finished row without its area
+ * results and marks.
  */
 async function readExport(db: Db, query: ExportQuery) {
   const current = currentAttempts(db)
-  const where = and(...respondentConditions(query, current))
-  const finishedIds = db
-    .select({ id: current.id })
-    .from(respondents)
-    .innerJoin(current, eq(current.respondentId, respondents.id))
-    .where(and(where, inArray(current.status, FINISHED_ATTEMPT_STATUSES)))
 
   const [rows, areas, sus, marks, bank, [link]] = await db.transaction(
-    (tx) =>
-      Promise.all([
+    async (tx) => {
+      const [rows, bank, linkRows] = await Promise.all([
         tx
           .select({
             id: respondents.id,
@@ -83,8 +79,35 @@ async function readExport(db: Db, query: ExportQuery) {
           .from(respondents)
           .leftJoin(current, eq(current.respondentId, respondents.id))
           .leftJoin(schoolLinks, eq(schoolLinks.id, respondents.schoolLinkId))
-          .where(where)
+          .where(and(...respondentConditions(query, current)))
           .orderBy(...respondentOrder(query.sort, current)),
+        tx
+          .select({
+            id: questions.id,
+            area: competencyAreas.code,
+            difficulty: questions.difficulty,
+            itemNumber: questions.itemNumber,
+            stem: questions.stem,
+            isActive: questions.isActive,
+          })
+          .from(questions)
+          .innerJoin(competencyAreas, eq(competencyAreas.id, questions.areaId))
+          // As item analysis lists them; the difficulty enum is in order: basic, intermediate, advanced.
+          .orderBy(competencyAreas.sortOrder, questions.difficulty, questions.itemNumber),
+        query.schoolLinkId
+          ? tx
+              .select({ label: schoolLinks.label })
+              .from(schoolLinks)
+              .where(eq(schoolLinks.id, query.schoolLinkId))
+          : [],
+      ])
+
+      const finishedIds = rows.flatMap((row) =>
+        row.attemptId && row.attemptStatus && finishedStatuses.includes(row.attemptStatus)
+          ? [row.attemptId]
+          : [],
+      )
+      const [areas, sus, marks] = await Promise.all([
         tx
           .select({
             attemptId: areaResults.attemptId,
@@ -106,26 +129,9 @@ async function readExport(db: Db, query: ExportQuery) {
           })
           .from(answers)
           .where(inArray(answers.attemptId, finishedIds)),
-        tx
-          .select({
-            id: questions.id,
-            area: competencyAreas.code,
-            difficulty: questions.difficulty,
-            itemNumber: questions.itemNumber,
-            stem: questions.stem,
-            isActive: questions.isActive,
-          })
-          .from(questions)
-          .innerJoin(competencyAreas, eq(competencyAreas.id, questions.areaId))
-          // As item analysis lists them; the difficulty enum is in order: basic, intermediate, advanced.
-          .orderBy(competencyAreas.sortOrder, questions.difficulty, questions.itemNumber),
-        query.schoolLinkId
-          ? tx
-              .select({ label: schoolLinks.label })
-              .from(schoolLinks)
-              .where(eq(schoolLinks.id, query.schoolLinkId))
-          : [],
-      ]),
+      ])
+      return [rows, areas, sus, marks, bank, linkRows] as const
+    },
     { isolationLevel: 'repeatable read', accessMode: 'read only' },
   )
 
