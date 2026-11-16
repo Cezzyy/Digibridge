@@ -432,6 +432,8 @@ insert into questions (id, area_id, difficulty, stem, is_scenario, explanation)
 select i.id, a.id, i.difficulty, i.stem, i.is_scenario, i.explanation
 from dev_items i
 join competency_areas a on a.code = i.area_code
+-- item_number (the export's question codes) follows this order.
+order by a.sort_order, i.difficulty, i.id
 on conflict (id) do nothing;
 
 insert into choices (question_id, label, is_correct, position)

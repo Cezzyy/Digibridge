@@ -3,6 +3,7 @@ import { sql } from 'drizzle-orm'
 import {
   boolean,
   check,
+  integer,
   jsonb,
   pgTable,
   smallint,
@@ -27,6 +28,9 @@ export const competencyAreas = pgTable('competency_areas', {
 // Never hard-deleted once answered (answers block it); set isActive false instead.
 export const questions = pgTable('questions', {
   id: uuid('id').primaryKey().defaultRandom(),
+  // Set once and never reused: the number in the export's question codes (INF-B07), so a code
+  // means the same question in every export.
+  itemNumber: integer('item_number').notNull().unique().generatedAlwaysAsIdentity(),
   areaId: uuid('area_id')
     .notNull()
     .references(() => competencyAreas.id),

@@ -1,8 +1,10 @@
 import { HIDDEN_IDENTITY, SUS_STATEMENT_COUNT } from '@digibridge/shared'
+import { questions } from '@digibridge/db'
+import { eq } from 'drizzle-orm'
 import { strFromU8, unzipSync } from 'fflate'
 import { describe, expect, it } from 'vitest'
 import { app } from '../app'
-import { env, signedIn } from './helpers'
+import { env, signedIn, testDb } from './helpers'
 import {
   addSchoolRespondent,
   attemptsOf,
@@ -19,6 +21,9 @@ import {
 } from './fixtures'
 
 useQuestionBank()
+
+/** A question column's header, like INF-B07; the shared test database numbers past 99. */
+const ITEM_CODE = /^[A-Z]{3}-[BIA]\d{2,}$/
 
 /** The CSV's rows as objects keyed by header. Test data has no commas, quotes or line breaks. */
 async function csvRows(res: Response) {
@@ -88,7 +93,7 @@ describe('GET /api/v1/admin/export.csv', () => {
     expect(Number(row!['Overall points'])).toBeGreaterThan(0)
     // 30 item columns, from the bank's codes: the first answer right, the second wrong, the
     // rest blank and so 0.
-    const items = Object.keys(row!).filter((key) => /^[A-Z]{3}-[BIA]\d{2}$/.test(key))
+    const items = Object.keys(row!).filter((key) => ITEM_CODE.test(key))
     expect(items).toHaveLength(30)
     expect(items.map((key) => row![key]).sort()).toEqual([...Array(29).fill('0'), '1'])
   })
@@ -139,6 +144,27 @@ describe('GET /api/v1/admin/export.csv', () => {
     const all = await (await get('/api/v1/admin/export.csv', admin.headers)).text()
     expect(all).not.toContain('Maria')
     expect(all).not.toContain(hidden.studentNumber)
+  })
+
+  it('keeps each question’s code when an older unshown question is deleted', async () => {
+    const taker = await finishedOnline()
+    // An inactive question older than the bank, beside the first one shown.
+    const [first] = await testDb
+      .select({ areaId: questions.areaId, difficulty: questions.difficulty })
+      .from(questions)
+      .where(eq(questions.id, taker.attempt.questionOrder[0]!))
+    const [older] = await testDb
+      .insert(questions)
+      .values({ ...first!, stem: 'Older', isActive: false, createdAt: new Date('2026-01-01') })
+      .returning({ id: questions.id })
+    const admin = await signedIn('admin')
+    const codes = async () => {
+      const [row] = await csvRows(await get('/api/v1/admin/export.csv', admin.headers))
+      return Object.keys(row!).filter((key) => ITEM_CODE.test(key))
+    }
+    const before = await codes()
+    await testDb.delete(questions).where(eq(questions.id, older!.id))
+    expect(await codes()).toEqual(before)
   })
 
   it('refuses a filter that isn’t valid', async () => {
