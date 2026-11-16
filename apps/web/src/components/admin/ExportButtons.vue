@@ -24,8 +24,10 @@ const note = computed(() => {
 </script>
 
 <template>
-  <div class="flex flex-col gap-2 sm:items-end">
-    <div role="group" aria-label="Download respondents" class="flex flex-wrap gap-2">
+  <!-- shrink-0 keeps both buttons on one row beside the page intro; the note's w-0 min-w-full
+       wraps it to the buttons' width instead of letting it widen the column. -->
+  <div class="flex shrink-0 flex-col gap-2 sm:items-end">
+    <div role="group" aria-label="Download respondents" class="flex flex-wrap gap-2 sm:flex-nowrap">
       <button
         v-for="format in EXPORT_FORMATS"
         :key="format"
@@ -39,7 +41,9 @@ const note = computed(() => {
         {{ busy === format ? 'Preparing…' : `Download ${EXPORT_FORMAT_LABELS[format]}` }}
       </button>
     </div>
-    <p v-if="error" role="alert" class="font-semibold text-error">{{ error }}</p>
-    <p v-else class="text-quiet">{{ note }}</p>
+    <p v-if="error" role="alert" class="font-semibold text-error sm:w-0 sm:min-w-full">
+      {{ error }}
+    </p>
+    <p v-else class="text-quiet sm:w-0 sm:min-w-full">{{ note }}</p>
   </div>
 </template>
