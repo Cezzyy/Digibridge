@@ -97,11 +97,17 @@ watch(
   { immediate: true },
 )
 const reload = () => load(listQuery.value)
-// The export has every page of the same rows.
+// The export has every page of the same rows, searched by the box's text even before it reaches
+// the URL, so a click right after typing downloads what the box shows.
+const searchText = computed(() => search.value.trim() || undefined)
 const exportQuery = computed(() => {
   const { page: _page, ...rest } = listQuery.value
-  return respondentQuery(rest)
+  return respondentQuery({ ...rest, q: searchText.value })
 })
+// The count is the last page's, so it shows only once the list has loaded for this query.
+const exportTotal = computed(() =>
+  loading.value || searchText.value !== q.value ? null : (page.value?.total ?? null),
+)
 
 const statusOptions = [
   { value: null, label: 'Any status' },
@@ -164,7 +170,7 @@ function onDeleted() {
         scores<template v-if="session.isAdmin">, and the answers they gave</template>.
       </p>
     </div>
-    <ExportButtons v-if="session.isAdmin" :query="exportQuery" :total="page?.total ?? null" />
+    <ExportButtons v-if="session.isAdmin" :query="exportQuery" :total="exportTotal" />
   </div>
 
   <FilterBar class="mt-8" :links="session.isAdmin ? (schoolLinks.links.value ?? []) : null" />
