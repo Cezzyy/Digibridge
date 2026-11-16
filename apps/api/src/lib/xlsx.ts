@@ -35,11 +35,15 @@ const STYLES = `${HEAD}<styleSheet xmlns="${MAIN}">\
 <cellStyles count="1"><cellStyle name="Normal" xfId="0" builtinId="0"/></cellStyles>\
 </styleSheet>`
 
-/** Characters XML 1.0 doesn't allow are dropped; the rest are escaped. */
+/**
+ * Characters XML 1.0 doesn't allow are dropped: control characters, U+FFFE and U+FFFF, and
+ * unpaired surrogates (from pasted text with a broken emoji); the rest are escaped.
+ */
 const escape = (text: string) =>
   text
     // eslint-disable-next-line no-control-regex
     .replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F￾￿]/g, '')
+    .replace(/[\uD800-\uDBFF](?![\uDC00-\uDFFF])|(?<![\uD800-\uDBFF])[\uDC00-\uDFFF]/g, '')
     .replace(/&/g, '&amp;')
     .replace(/</g, '&lt;')
     .replace(/>/g, '&gt;')

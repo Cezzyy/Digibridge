@@ -1,4 +1,4 @@
-import { AREA_LABELS, HIDDEN_IDENTITY } from '@digibridge/shared'
+import { AREA_LABELS, HIDDEN_IDENTITY, VOID_REASON_LABELS } from '@digibridge/shared'
 import { describe, expect, it } from 'vitest'
 import { buildExport, type ExportData, type ExportRespondent } from './export-table'
 
@@ -32,6 +32,7 @@ const person = (values: Partial<ExportRespondent> = {}): ExportRespondent => ({
   startedAt: null,
   submittedAt: null,
   voidReason: null,
+  voidNote: null,
   voidedAt: null,
   totalPoints: null,
   overallPct: null,
@@ -221,11 +222,12 @@ describe('buildExport', () => {
     expect(rows[1]).toMatchObject({ 'INF-B01': 1, 'INF-B04': null, 'SAF-A07': null })
   })
 
-  it('keeps scores, SUS and questions out for a voided attempt, with its reason', () => {
+  it('keeps scores, SUS and questions out for a voided attempt, with its reason and note', () => {
     const voided = finished({
       status: 'voided',
       attemptStatus: 'voided',
-      voidReason: 'duplicate',
+      voidReason: 'other',
+      voidNote: 'Used a friend’s student number',
       voidedAt: new Date('2026-11-11T02:00:00Z'),
       // finishedScore leaves these null in the query; set here to show the builder does too.
       totalPoints: 40,
@@ -238,7 +240,8 @@ describe('buildExport', () => {
     )
     expect(rows[0]).toMatchObject({
       Status: 'Voided',
-      'Void reason': 'Took it more than once',
+      'Void reason': VOID_REASON_LABELS.other,
+      'Void note': 'Used a friend’s student number',
       'Submitted at': null,
       'Overall points': null,
       'SUS score': null,

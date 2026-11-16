@@ -71,6 +71,8 @@ export type ExportRespondent = {
   startedAt: Date | null
   submittedAt: Date | null
   voidReason: VoidReason | null
+  /** The admin's note on the void; required with Other. */
+  voidNote: string | null
   voidedAt: Date | null
   totalPoints: number | null
   overallPct: number | null
@@ -121,6 +123,8 @@ type Row = ExportRespondent & {
   areas: Map<AreaCode, ExportAreaResult>
   sus: ExportSus | null
   marks: Map<string, boolean>
+  /** The items their finished attempt showed; empty otherwise. */
+  shown: Set<string>
 }
 
 /** A column of the respondents sheet: its cell for each row. */
@@ -267,6 +271,12 @@ const ATTEMPT_COLUMNS: RespondentColumn[] = [
     value: (r) => label(VOID_REASON_LABELS, r.voidReason),
   },
   {
+    header: 'Void note',
+    width: 40,
+    description: `The admin’s note on why it was voided; always there with ${VOID_REASON_LABELS.other}. Voided only.`,
+    value: (r) => r.voidNote,
+  },
+  {
     header: 'Voided at',
     width: 20,
     description: 'When an admin voided their attempt. Voided only.',
@@ -380,16 +390,16 @@ export function buildExport(data: ExportData): Sheet[] {
       areas: areasBy.get(attemptId) ?? new Map(),
       sus: susBy.get(attemptId) ?? null,
       marks: marksBy.get(attemptId) ?? new Map(),
+      shown: new Set(finished ? (r.questionOrder ?? []) : []),
     }
   })
 
   // A column for each question a finished attempt in the file showed.
-  const shown = new Set(rows.flatMap((r) => (r.finished ? (r.questionOrder ?? []) : [])))
+  const shown = new Set(rows.flatMap((r) => [...r.shown]))
   const shownQuestions = data.questions.filter((q) => shown.has(q.id))
   const itemColumns = shownQuestions.map((q): ValueColumn => ({
     header: itemCode(q),
-    value: (r) =>
-      r.finished && r.questionOrder?.includes(q.id) ? (r.marks.get(q.id) ? 1 : 0) : null,
+    value: (r) => (r.shown.has(q.id) ? (r.marks.get(q.id) ? 1 : 0) : null),
   }))
 
   const described = [...PROFILE_COLUMNS, ...ATTEMPT_COLUMNS, ...SCORE_COLUMNS, ...SUS_COLUMNS]
