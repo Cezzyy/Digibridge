@@ -70,6 +70,7 @@ async function readExport(db: Db, query: ExportQuery) {
             startedAt: current.startedAt,
             submittedAt: current.submittedAt,
             voidReason: current.voidReasonCode,
+            voidNote: current.voidNote,
             voidedAt: current.voidedAt,
             totalPoints: current.totalPoints,
             overallPct: finishedScore(current).pct,

@@ -71,4 +71,18 @@ describe('toXlsx', () => {
     expect(sheet).toContain('<c r="A2" t="inlineStr" s="3"><is><t xml:space="preserve">=1+1</t>')
     expect(sheet).not.toContain('<f>')
   })
+  it('drops characters XML can’t hold, keeping whole emoji', () => {
+    const [sheet] = Object.values(
+      parts(
+        toXlsx([
+          {
+            name: 'Odd',
+            columns: [{ header: 'Text' }],
+            rows: [['a\u0007b￾c\uD83Dd\uDE00e 😀']],
+          },
+        ]),
+      ),
+    ).filter((part) => part.includes('<sheetData>'))
+    expect(sheet).toContain('<t xml:space="preserve">abcde 😀</t>')
+  })
 })
