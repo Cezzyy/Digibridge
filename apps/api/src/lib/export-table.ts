@@ -28,6 +28,7 @@ import {
   SUS_STATEMENTS,
   VOID_REASON_LABELS,
   YEAR_LEVEL_LABELS,
+  YEAR_LEVELS,
   type AreaCode,
   type AttemptStatus,
   type Difficulty,
@@ -187,7 +188,7 @@ const PROFILE_COLUMNS: RespondentColumn[] = [
   },
   {
     header: 'Year level',
-    description: 'School links only, from 1 to 4. Empty online.',
+    description: `School links only, from ${YEAR_LEVELS[0]} to ${YEAR_LEVELS.at(-1)}. Empty online.`,
     value: (r) => r.yearLevel,
   },
   {
