@@ -25,6 +25,14 @@ export function addApiDocs<E extends Env, S extends Schema>(app: OpenAPIHono<E, 
     openapi: '3.1.0',
     info: { title: 'DigiBridge API', version: '0.0.0' },
   })
-  // Sidebar shows each route's path (GET /api/v1/health) instead of its summary.
-  app.get('/reference', Scalar({ url: '/api/openapi.json', operationTitleSource: 'path' }))
+  // Sidebar shows each route's path (GET /api/v1/health) instead of its summary. The nonce is the
+  // one the docs page's Content-Security-Policy allows (middleware/security-headers.ts).
+  app.get(
+    '/reference',
+    Scalar((c) => ({
+      url: '/api/openapi.json',
+      operationTitleSource: 'path',
+      nonce: c.get('secureHeadersNonce') as string | undefined,
+    })),
+  )
 }

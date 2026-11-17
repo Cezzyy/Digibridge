@@ -11,8 +11,8 @@ import {
   susAnswersSchema,
 } from '@digibridge/shared'
 import { createRoute, z } from '@hono/zod-openapi'
-import { respondent } from '../middleware'
-import { errorResponse } from '../openapi'
+import { answerIpLimit, answerLimit, respondent, respondentActionLimit } from '../middleware'
+import { errorResponse, rateLimited } from '../openapi'
 
 // Every route here is the respondent's own: online with a Google sign-in, or through a school link
 // with the token its browser keeps (the `respondent` middleware).
@@ -38,7 +38,7 @@ export const startAttemptRoute = createRoute({
   summary: 'Start the attempt, or return the one in progress',
   description:
     'Picks 4 basic, 4 intermediate and 2 advanced active items per area, shuffles the items together and each item’s choices, and sets `expires_at` (ASM-01, ASM-02). Calling it again returns the attempt in progress. One attempt per respondent; a voided one frees the slot (PRO-07). A school-link student’s attempt records the link they joined through (LNK-05), and can start even if the link has closed since. Respondents only: staff preview the flow without saving.',
-  middleware: [respondent] as const,
+  middleware: [respondent, respondentActionLimit('start')] as const,
   security: RESPONDENT_SECURITY,
   responses: {
     200: {
@@ -54,6 +54,7 @@ export const startAttemptRoute = createRoute({
     409: errorResponse(
       'No profile yet, the assessment was already taken, or there are too few active items',
     ),
+    429: rateLimited('this respondent'),
   },
 })
 
@@ -125,7 +126,7 @@ export const saveAnswerRoute = createRoute({
   tags: ['Assessment'],
   summary: 'Save or change one answer',
   description: `Saves the choice for one item, replacing any earlier one (ASM-04, ASM-05). The item must be in the attempt and the choice must be one of its own. Refused once the attempt is closed, or more than ${ANSWER_GRACE_SECONDS} seconds after \`expires_at\` (ASM-09). ${SELF_ONLY}`,
-  middleware: [respondent] as const,
+  middleware: [answerIpLimit, respondent, answerLimit] as const,
   security: RESPONDENT_SECURITY,
   request: {
     params: AnswerParamsSchema,
@@ -141,6 +142,7 @@ export const saveAnswerRoute = createRoute({
     403: errorResponse('Signed in as staff'),
     404: errorResponse('No such attempt for this respondent'),
     409: errorResponse('The attempt is closed, or its time is up'),
+    429: rateLimited('this respondent or IP'),
   },
 })
 
@@ -158,7 +160,7 @@ export const submitAttemptRoute = createRoute({
   tags: ['Assessment'],
   summary: 'Score and close the attempt',
   description: `Scores the saved answers (unanswered items earn 0), writes each answer’s points, one result per area and the overall score and level, all in one transaction (PRD scoring rules). Sent after \`expires_at\` plus the grace period, the attempt closes as \`expired\`. Safe to call twice: a closed attempt is returned as it is. ${SELF_ONLY}`,
-  middleware: [respondent] as const,
+  middleware: [respondent, respondentActionLimit('submit')] as const,
   security: RESPONDENT_SECURITY,
   request: { params: AttemptParamsSchema },
   responses: {
@@ -170,6 +172,7 @@ export const submitAttemptRoute = createRoute({
     403: errorResponse('Signed in as staff'),
     404: errorResponse('No such attempt for this respondent'),
     409: errorResponse('The attempt was voided'),
+    429: rateLimited('this respondent'),
   },
 })
 
@@ -250,7 +253,7 @@ export const saveSusRoute = createRoute({
   tags: ['Results'],
   summary: 'Save the usability survey',
   description: `Saves the ${SUS_STATEMENT_COUNT} System Usability Scale answers, in statement order and each from ${SUS_ANSWER_MIN} (Strongly disagree) to ${SUS_ANSWER_MAX} (Strongly agree), for a submitted or expired attempt, and returns the SUS score, 0 to 100, worked out on the server (SUS-01, SUS-04). One survey per attempt. ${SELF_ONLY}`,
-  middleware: [respondent] as const,
+  middleware: [respondent, respondentActionLimit('sus')] as const,
   security: RESPONDENT_SECURITY,
   request: {
     params: AttemptParamsSchema,
@@ -268,5 +271,6 @@ export const saveSusRoute = createRoute({
     409: errorResponse(
       'The survey was already answered (`already_answered`), or the attempt is in progress or voided (`conflict`)',
     ),
+    429: rateLimited('this respondent'),
   },
 })

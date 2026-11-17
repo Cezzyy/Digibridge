@@ -18,15 +18,38 @@ import { migrate } from 'drizzle-orm/pglite/migrator'
 import { exportJWK, generateKeyPair, SignJWT, type CryptoKey } from 'jose'
 import { fileURLToPath } from 'node:url'
 import { vi } from 'vitest'
+import type { RateLimit } from '@cloudflare/workers-types'
 import type { Bindings } from '../env'
 
 export const SUPABASE_URL = 'https://test-project.supabase.co'
 export const WEB_ORIGIN = 'http://localhost:5173'
 export const ADMIN_EMAIL = 'cez@aclc.test'
+/** A rate limiter that lets everything through, and keeps the keys it was asked about. */
+export function testLimiter(refuse: (key: string) => boolean = () => false) {
+  const keys: string[] = []
+  const limiter = {
+    keys,
+    limit: ({ key }: { key: string }) => {
+      keys.push(key)
+      return Promise.resolve({ success: !refuse(key) })
+    },
+  }
+  return limiter as typeof limiter & RateLimit
+}
+
+const allowAll: RateLimit = testLimiter()
+
 export const env = {
   SUPABASE_URL,
   WEB_ORIGIN,
   ADMIN_EMAILS: ` ${ADMIN_EMAIL} , other@aclc.test`,
+  API_IP_LIMIT: allowAll,
+  LINK_OPEN_LIMIT: allowAll,
+  LINK_JOIN_LIMIT: allowAll,
+  STUDENT_NUMBER_LIMIT: allowAll,
+  ANSWER_LIMIT: allowAll,
+  ANSWER_IP_LIMIT: allowAll,
+  RESPONDENT_ACTION_LIMIT: allowAll,
 } as Bindings
 
 // ---- Database ----

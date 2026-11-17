@@ -1,7 +1,7 @@
 import { onlineRespondentSchema } from '@digibridge/shared'
 import { createRoute, z } from '@hono/zod-openapi'
-import { auth, requireRole } from '../middleware'
-import { errorResponse } from '../openapi'
+import { accountActionLimit, auth, requireRole } from '../middleware'
+import { errorResponse, rateLimited } from '../openapi'
 
 /** A respondent as their own pages see them. Also used by GET /me. */
 export const RespondentSummarySchema = z
@@ -16,7 +16,7 @@ export const createRespondentRoute = createRoute({
   description:
     'Online: the general profile only (PRO-01, PRO-06). Consent is saved with the profile, so declining stores nothing (CON-02). One respondent per Google account (PRO-07). Respondents only: staff try the flow as a preview that saves nothing, so no test rows reach the research data.',
   // School-link students save theirs through the link: POST /links/{code}/respondents.
-  middleware: [auth, requireRole('respondent')] as const,
+  middleware: [auth, requireRole('respondent'), accountActionLimit('respondent')] as const,
   security: [{ Bearer: [] }],
   request: {
     body: {
@@ -38,5 +38,6 @@ export const createRespondentRoute = createRoute({
     401: errorResponse('Not signed in, or the sign-in has expired'),
     403: errorResponse('Signed in as staff'),
     409: errorResponse('This account already has a respondent'),
+    429: rateLimited('this account'),
   },
 })

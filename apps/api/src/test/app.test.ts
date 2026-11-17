@@ -1,4 +1,4 @@
-// App-wide behavior: health, error responses, CORS and the API docs.
+// App-wide behavior: health, error responses, CORS, security headers and the API docs.
 import { RESPONDENT_TOKEN_HEADER } from '@digibridge/shared'
 import { OpenAPIHono, createRoute, z } from '@hono/zod-openapi'
 import { bodyLimit } from 'hono/body-limit'
@@ -195,5 +195,55 @@ describe('API docs', () => {
         '/api/v1/admin/links/{id}/close',
       ]),
     )
+  })
+})
+
+describe('security headers', () => {
+  it('sends a lock-down policy and no-store on JSON, errors included', async () => {
+    for (const path of ['/api/v1/health', '/api/v1/nope', '/api/openapi.json']) {
+      const res = await get(path)
+      expect(res.headers.get('Content-Security-Policy')).toBe(
+        "default-src 'none'; frame-ancestors 'none'; base-uri 'none'; form-action 'none'",
+      )
+      expect(res.headers.get('X-Content-Type-Options')).toBe('nosniff')
+      expect(res.headers.get('X-Frame-Options')).toBe('DENY')
+      expect(res.headers.get('Referrer-Policy')).toBe('no-referrer')
+      expect(res.headers.get('Strict-Transport-Security')).toBe(
+        'max-age=31536000; includeSubDomains',
+      )
+      expect(res.headers.get('Cache-Control')).toBe('no-store')
+    }
+  })
+
+  it('sends them on a CORS preflight too', async () => {
+    const res = await app.request(
+      '/api/v1/attempts',
+      {
+        method: 'OPTIONS',
+        headers: { Origin: WEB_ORIGIN, 'Access-Control-Request-Method': 'POST' },
+      },
+      env,
+    )
+    expect(res.headers.get('Access-Control-Allow-Origin')).toBe(WEB_ORIGIN)
+    expect(res.headers.get('X-Content-Type-Options')).toBe('nosniff')
+  })
+
+  it('lets the docs page run only its own nonced scripts', async () => {
+    const res = await get('/api/reference')
+    expect(res.status).toBe(200)
+    const csp = res.headers.get('Content-Security-Policy') ?? ''
+    const nonce = /script-src 'nonce-([^']+)' https:\/\/cdn\.jsdelivr\.net/.exec(csp)?.[1]
+    expect(nonce).toBeTruthy()
+    const html = await res.text()
+    const scripts = html.match(/<script\b[^>]*>/g) ?? []
+    expect(scripts.length).toBeGreaterThan(0)
+    for (const tag of scripts) expect(tag).toContain(`nonce="${nonce}"`)
+    expect(csp).toContain("frame-ancestors 'none'")
+  })
+
+  it('gives each docs page load a new nonce', async () => {
+    const nonceOf = async () =>
+      (await get('/api/reference')).headers.get('Content-Security-Policy')?.match(/'nonce-[^']+'/)
+    expect((await nonceOf())?.[0]).not.toBe((await nonceOf())?.[0])
   })
 })

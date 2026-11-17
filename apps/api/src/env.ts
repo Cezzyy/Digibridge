@@ -1,5 +1,5 @@
 // Imported, not global: the web app type-checks this file too (for AppType) without Worker globals.
-import type { Hyperdrive, R2Bucket } from '@cloudflare/workers-types'
+import type { Hyperdrive, R2Bucket, RateLimit } from '@cloudflare/workers-types'
 import type { Profile } from '@digibridge/db'
 import type { Db } from './config/db'
 
@@ -10,7 +10,20 @@ export type Bindings = {
   WEB_ORIGIN: string
   HYPERDRIVE: Hyperdrive
   MEDIA: R2Bucket
+  // Rate limiters ([[ratelimits]] in wrangler.toml, used by middleware/rate-limit.ts).
+  API_IP_LIMIT: RateLimit
+  LINK_OPEN_LIMIT: RateLimit
+  LINK_JOIN_LIMIT: RateLimit
+  STUDENT_NUMBER_LIMIT: RateLimit
+  ANSWER_LIMIT: RateLimit
+  ANSWER_IP_LIMIT: RateLimit
+  RESPONDENT_ACTION_LIMIT: RateLimit
 }
+
+/** The name of a rate limiter binding. */
+export type RateLimiterName = {
+  [K in keyof Bindings]: Bindings[K] extends RateLimit ? K : never
+}[keyof Bindings]
 
 // c.var.db is set for every /api/v1 request (middleware/db.ts).
 export type AppEnv = { Bindings: Bindings; Variables: { db: Db } }
