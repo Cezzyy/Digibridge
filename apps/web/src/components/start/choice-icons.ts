@@ -73,6 +73,12 @@ const CIRCLE = 'M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18Z'
 
 /** One per privacy notice section, by title, so renaming a section asks for its icon here. */
 export const NOTICE_ICONS = {
+  'Who we are': [
+    'M16 20v-1.5a3.5 3.5 0 0 0-3.5-3.5h-5A3.5 3.5 0 0 0 4 18.5V20',
+    'M10 4a3.5 3.5 0 1 0 0 7 3.5 3.5 0 0 0 0-7Z',
+    'M20 20v-1.5a3.5 3.5 0 0 0-2.5-3.35',
+    'M15.5 4.15a3.5 3.5 0 0 1 0 6.7',
+  ],
   'Why we ask': [CIRCLE, 'M9.5 9a2.5 2.5 0 1 1 3.5 2.3c-.6.3-1 .9-1 1.6v.4', 'M12 17h.01'],
   'What we collect': [
     'M9 3h6a1 1 0 0 1 1 1v2H8V4a1 1 0 0 1 1-1Z',
@@ -81,6 +87,23 @@ export const NOTICE_ICONS = {
     'M9 15h4',
   ],
   'Who sees it': IDENTITY_ICONS.show,
+  'Where it’s kept': [
+    'M4 6c0-1.66 3.58-3 8-3s8 1.34 8 3-3.58 3-8 3-8-1.34-8-3Z',
+    'M4 6v12c0 1.66 3.58 3 8 3s8-1.34 8-3V6',
+    'M4 12c0 1.66 3.58 3 8 3s8-1.34 8-3',
+  ],
+  'How we protect it': [
+    'M6 11h12a1 1 0 0 1 1 1v7a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1v-7a1 1 0 0 1 1-1Z',
+    'M8 11V8a4 4 0 0 1 8 0v3',
+    'M12 15v2',
+  ],
   'How long we keep it': [CIRCLE, 'M12 7v5l3 2'],
+  'Your rights': [
+    'M12 3v18',
+    'M7 21h10',
+    'M5 7h14',
+    'M5 7l-3 7a3 3 0 0 0 6 0Z',
+    'M19 7l-3 7a3 3 0 0 0 6 0Z',
+  ],
   'Your choice': [CIRCLE, 'm8.5 12 2.5 2.5 4.5-5'],
 } as const satisfies Record<NoticeSectionTitle, ChoiceIcon>

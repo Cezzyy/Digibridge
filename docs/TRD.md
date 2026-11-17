@@ -367,7 +367,7 @@ The browser never talks to the database directly, and only the fields the study 
   - Name and student number are shown to the team only if the respondent allowed it (show\_identity). Otherwise they read Hidden everywhere, including the CSV.
   - CSV export is admin only.
   - Respondent deletion on request (USR-03).
-  - Online respondent data deleted at the end of the semester (December 2026); school-link data after 30 days (`SCHOOL_DATA_KEPT_DAYS`).
+  - Respondent data, online and school links, deleted 30 days after they take part (`DATA_KEPT_DAYS`).
 - **Secrets** (`DATABASE_URL`, Supabase keys) live in Wrangler secrets and local env files, never in the repo.
 
 ## Environments and deployment

@@ -145,15 +145,8 @@ const current = computed(() => NOTICES.find((n) => n.key === route.query.notice)
           <div>
             <h2 id="questions-title" class="text-lg font-bold">Questions about your data?</h2>
             <p class="mt-1 max-w-[68ch] leading-relaxed">
-              Contact {{ CONSENT_CONTACT }}. If you think your data was misused, you can also
-              contact the National Privacy Commission at
-              <a
-                href="https://privacy.gov.ph"
-                target="_blank"
-                rel="noopener"
-                class="font-semibold text-evergreen underline decoration-evergreen/40 underline-offset-2 hover:decoration-evergreen"
-                >privacy.gov.ph</a
-              >.
+              Contact {{ CONSENT_CONTACT }} to ask about your data, or to use any of the rights
+              above.
             </p>
           </div>
         </section>
