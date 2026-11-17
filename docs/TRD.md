@@ -242,8 +242,8 @@ School-link respondents use the same respondent-flow routes (`/api/v1/attempts/*
 | --- | --- | --- | --- |
 | GET | `/api/v1/health` | Public | Check that the API is running |
 | GET | `/api/v1/media/:key` | Public | Serve an uploaded image from R2, cached for a year (keys are random and never reused) |
-| GET | `/api/openapi.json` | Public | OpenAPI 3.1 spec, built from the route definitions |
-| GET | `/api/reference` | Public | API docs page (Scalar) for the spec above |
+| GET | `/api/openapi.json` | Public while `API_DOCS` is `true` (local only; 404 when deployed) | OpenAPI 3.1 spec, built from the route definitions |
+| GET | `/api/reference` | Public while `API_DOCS` is `true` (local only; 404 when deployed) | API docs page (Scalar) for the spec above |
 
 **Question import CSV columns:** `area_code, difficulty, stem, image_url, choice_a, choice_b, choice_c, choice_d, correct (a to d), explanation, is_scenario`. This matches the columns the content team uses in the shared sheet.
 

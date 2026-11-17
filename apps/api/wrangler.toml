@@ -17,6 +17,8 @@ region = "aws:ap-south-1"
 [vars]
 SUPABASE_URL = "https://pvjykztyqpuywsccvlqg.supabase.co"
 WEB_ORIGIN = "https://digibridge-web.pages.dev"
+# The API spec and docs page stay off in production; .dev.vars turns them on locally.
+API_DOCS = "false"
 
 # Postgres through Hyperdrive (pooled connection to the Supabase direct connection).
 # Locally, wrangler dev uses CLOUDFLARE_HYPERDRIVE_LOCAL_CONNECTION_STRING_HYPERDRIVE from apps/api/.env instead.

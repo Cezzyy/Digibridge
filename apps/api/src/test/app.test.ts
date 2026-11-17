@@ -173,6 +173,24 @@ describe('CORS', () => {
 })
 
 describe('API docs', () => {
+  it('hides the spec and the docs page unless API_DOCS is "true"', async () => {
+    for (const API_DOCS of ['false', '', 'TRUE']) {
+      for (const path of ['/api/openapi.json', '/api/reference']) {
+        const res = await app.request(path, {}, { ...env, API_DOCS })
+        expect(res.status).toBe(404)
+        expect(await res.json()).toEqual({
+          error: { code: 'not_found', message: expect.any(String) },
+        })
+      }
+    }
+  })
+
+  it('serves the docs page while API_DOCS is on', async () => {
+    const res = await get('/api/reference')
+    expect(res.status).toBe(200)
+    expect(res.headers.get('Content-Type')).toContain('text/html')
+  })
+
   it('builds the OpenAPI spec with every route', async () => {
     const res = await get('/api/openapi.json')
     expect(res.status).toBe(200)

@@ -111,7 +111,7 @@ Backend safety, before the pilot. Most urgent first:
 - [x] **Secrets** only in Wrangler secrets and local env files; `.env.example` in the repo.
 - [x] **Security headers** on the API and the web.
 - [x] **Supabase settings:** only `https://digibridge.app` and `localhost` as redirect URLs, once the old Pages URL is retired.
-- [ ] **Decide whether `/api/reference` stays open in prod**, with an `API_DOCS` flag.
+- [x] **Decide whether `/api/reference` stays open in prod**, with an `API_DOCS` flag: off when deployed (`API_DOCS = "false"` in `wrangler.toml`), on locally through `.dev.vars`; the spec at `/api/openapi.json` follows it.
 - [x] **Dependency audit:** `pnpm audit`.
 
 ## Domain, privacy and monitoring

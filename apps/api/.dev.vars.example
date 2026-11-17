@@ -6,3 +6,6 @@ ADMIN_EMAILS=you@example.com
 
 # Local override of [vars]: the Vite dev server
 WEB_ORIGIN=http://localhost:5173
+
+# Local override of [vars]: serve /api/openapi.json and /api/reference (off when deployed)
+API_DOCS=true
