@@ -34,26 +34,27 @@ bucket_name = "digibridge-media"
 # Rate limits (middleware/rate-limit.ts). Counts are per Cloudflare location and approximate, which
 # is enough here: [placement] keeps every request in one region. A period is 10 or 60 seconds only.
 # Per IP means per IPv4 address or per IPv6 /64, since one user can hold a whole /64.
-# A school lab often reaches the API from one IP, so the per-IP limits leave room for ~60 students
-# at once. namespace_id is any number, unique among this account's rate limiters.
+# A school lab often reaches the API from one IP, so the per-IP limits are sized for a lab of ~150
+# joining in the same minute, with reloads and retries, and answer saves count per respondent only.
+# namespace_id is any number, unique among this account's rate limiters.
 
 # Every /api/v1 request, per IP: a catch-all well above a full lab's traffic.
 [[ratelimits]]
 name = "API_IP_LIMIT"
 namespace_id = "1001"
-simple = { limit = 2400, period = 60 }
+simple = { limit = 6000, period = 60 }
 
 # Opening a school link (GET /links/{code}), per IP.
 [[ratelimits]]
 name = "LINK_OPEN_LIMIT"
 namespace_id = "1002"
-simple = { limit = 120, period = 60 }
+simple = { limit = 600, period = 60 }
 
 # Joining a school link (POST /links/{code}/respondents), per IP.
 [[ratelimits]]
 name = "LINK_JOIN_LIMIT"
 namespace_id = "1003"
-simple = { limit = 60, period = 60 }
+simple = { limit = 300, period = 60 }
 
 # Joining a school link, per IP and student number (hashed), across all links.
 [[ratelimits]]
@@ -66,12 +67,6 @@ simple = { limit = 5, period = 60 }
 name = "ANSWER_LIMIT"
 namespace_id = "1005"
 simple = { limit = 120, period = 60 }
-
-# Answer saves, per IP: a lab of students saving at once.
-[[ratelimits]]
-name = "ANSWER_IP_LIMIT"
-namespace_id = "1006"
-simple = { limit = 1200, period = 60 }
 
 # Starting, submitting, the SUS and the online profile, per respondent and per action.
 [[ratelimits]]
