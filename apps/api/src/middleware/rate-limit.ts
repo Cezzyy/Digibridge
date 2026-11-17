@@ -35,15 +35,20 @@ export function rateLimit<E extends AppEnv = AppEnv>(limiter: RateLimiterName, k
  */
 export const clientIp = (c: Context) => ipKey(c.req.header('CF-Connecting-IP') ?? 'unknown')
 
+/** A Google account's key, the same whether it's counted as a respondent or as an account. */
+const profileKey = (profileId: string) => `profile:${profileId}`
+
 /** The respondent a request is for, after the `respondent` middleware. */
 const respondentOf = (c: Context<RespondentEnv>) => {
   const key = c.var.respondentKey
-  return 'tokenHash' in key ? `token:${key.tokenHash}` : `profile:${key.profileId}`
+  return 'tokenHash' in key ? `token:${key.tokenHash}` : profileKey(key.profileId)
 }
 
 /**
- * The caller's IP and the student number in a join request's body, hashed so it never reaches the
- * counters as is. Per IP, so nobody elsewhere can use up a student's tries by sending their number.
+ * The caller's IP and the student number in a join request's body. Per IP, so nobody elsewhere can
+ * use up a student's tries by sending their number. The number is hashed only to keep it out of
+ * the key as plain text: it isn't secret, since student numbers are few enough to hash them all,
+ * but the keys stay inside Cloudflare, which sees the request body anyway.
  * Hono keeps the parsed body, so the route's validator reads it again for free. A body that isn't
  * JSON or has no valid number isn't counted: the validator refuses it before any database work.
  */
@@ -79,4 +84,4 @@ export const respondentActionLimit = (action: string) =>
 
 /** One of a signed-in user's actions (the online profile), per account. Goes after `auth`. */
 export const accountActionLimit = (action: string) =>
-  rateLimit<AuthEnv>('RESPONDENT_ACTION_LIMIT', (c) => `${action}:profile:${c.var.profile.id}`)
+  rateLimit<AuthEnv>('RESPONDENT_ACTION_LIMIT', (c) => `${action}:${profileKey(c.var.profile.id)}`)

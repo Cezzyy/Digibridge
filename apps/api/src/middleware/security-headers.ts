@@ -6,9 +6,6 @@ import { NONCE, secureHeaders } from 'hono/secure-headers'
 // apps/web/security-headers.ts). Hono's defaults also send nosniff, COOP and CORP same-origin,
 // Origin-Agent-Cluster and the rest; CORP doesn't apply to the web app's CORS requests.
 
-/** The docs page, the one HTML page the API serves (openapi/index.ts). */
-export const DOCS_PATH = '/api/reference'
-
 const shared = {
   strictTransportSecurity: 'max-age=31536000; includeSubDomains',
   xFrameOptions: 'DENY',
@@ -26,9 +23,13 @@ const apiHeaders = secureHeaders({
   },
 })
 
-// Scalar: its script from jsdelivr plus an inline one, both carrying this response's nonce (passed
-// to Scalar in openapi/index.ts); it injects styles and fonts, and fetches the spec from here.
-const docsHeaders = secureHeaders({
+/**
+ * For the docs page, the one HTML page the API serves: goes in its own route's middleware
+ * (openapi/index.ts), before Scalar, which reads the nonce it sets. Scalar's script comes from
+ * jsdelivr plus an inline one, both carrying this response's nonce; it injects styles and fonts,
+ * and fetches the spec from here.
+ */
+export const docsSecurityHeaders: MiddlewareHandler = secureHeaders({
   ...shared,
   contentSecurityPolicy: {
     defaultSrc: ["'none'"],
@@ -44,11 +45,15 @@ const docsHeaders = secureHeaders({
   },
 })
 
+const done = async () => {}
+
 /**
- * The headers for the response's path, plus `Cache-Control: no-store` unless the route set its own,
- * so answers, results and the dashboard never sit in a shared or browser cache.
+ * The API's headers once the response is ready, unless its route sent its own policy (the docs
+ * page), plus `Cache-Control: no-store` unless the route set its own, so answers, results and the
+ * dashboard never sit in a shared or browser cache.
  */
 export const securityHeaders: MiddlewareHandler = createMiddleware(async (c, next) => {
-  await (c.req.path === DOCS_PATH ? docsHeaders : apiHeaders)(c, next)
+  await next()
+  if (!c.res.headers.has('Content-Security-Policy')) await apiHeaders(c, done)
   if (!c.res.headers.has('Cache-Control')) c.res.headers.set('Cache-Control', 'no-store')
 })
