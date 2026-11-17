@@ -160,6 +160,11 @@ describe('CORS', () => {
     expect(res.headers.get('Access-Control-Allow-Headers')).toContain(RESPONDENT_TOKEN_HEADER)
   })
 
+  it('lets the web app read Retry-After, to wait out a rate limit', async () => {
+    const res = await get('/api/v1/health', { Origin: WEB_ORIGIN })
+    expect(res.headers.get('Access-Control-Expose-Headers')).toContain('Retry-After')
+  })
+
   it('refuses other origins', async () => {
     const res = await preflight('https://evil.example')
     expect(res.headers.get('Access-Control-Allow-Origin')).toBeNull()

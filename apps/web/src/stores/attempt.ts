@@ -14,7 +14,10 @@ export type SubmittedAttempt = InferResponseType<
 /** Where one answer's save is: on its way, saved, or failed after every retry. */
 export type SaveState = 'saving' | 'saved' | 'failed'
 
-/** Waits before each retry of a failed save: 3 retries after the first try (TRD). */
+/**
+ * Waits before each retry of a failed save: 3 retries after the first try (TRD). A save refused as
+ * `rate_limited` waits for its Retry-After instead, since a try sooner would only be counted again.
+ */
 const RETRY_DELAYS_MS = [1000, 2000, 4000]
 /**
  * When time is up, how long submit waits for saves still on their way before sending anyway.
@@ -154,8 +157,10 @@ export const useAttemptStore = defineStore('attempt', () => {
           closed.value = true
           return false
         }
-        const delay = RETRY_DELAYS_MS[tries]
-        if (!canRetry(err) || delay === undefined) return false
+        const backoff = RETRY_DELAYS_MS[tries]
+        if (!canRetry(err) || backoff === undefined) return false
+        const retryAfter = err instanceof ApiRequestError ? err.retryAfterSeconds : undefined
+        const delay = retryAfter === undefined ? backoff : retryAfter * 1000
         await sleep(delay)
         // A newer choice came in while waiting: the loop sends that one instead.
         if (wanted.get(questionId) !== choiceId) return false

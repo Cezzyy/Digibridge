@@ -1,4 +1,4 @@
-import { studentNumberSchema } from '@digibridge/shared'
+import { RATE_LIMIT_RETRY_AFTER_SECONDS, studentNumberSchema } from '@digibridge/shared'
 import type { Context, Env } from 'hono'
 import { createMiddleware } from 'hono/factory'
 import type { AppEnv, AuthEnv, Bindings, RateLimiterName, RespondentEnv } from '../env'
@@ -9,9 +9,6 @@ import { ApiError } from './error'
 // Rate limits through the Workers Rate Limiting binding ([[ratelimits]] in wrangler.toml, where the
 // numbers are). A request over a limit gets 429 `rate_limited` with Retry-After; the web app retries
 // answer saves by itself and shows the message elsewhere.
-
-/** Every limiter counts over a minute, so that's the longest anyone has to wait. */
-export const RATE_LIMIT_RETRY_AFTER_SECONDS = 60
 
 /** Who a request counts against; undefined skips the limit (the request fails its checks next). */
 type KeyOf<E extends Env> = (c: Context<E>) => string | undefined | Promise<string | undefined>
