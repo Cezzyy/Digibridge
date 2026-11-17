@@ -7,8 +7,8 @@ import {
 } from '@digibridge/shared'
 import { computed, nextTick, ref, useTemplateRef } from 'vue'
 import { useRouter } from 'vue-router'
-import { NOTICE_ICONS } from '../../components/start/choice-icons'
 import LinkTag from '../../components/start/LinkTag.vue'
+import NoticeSections from '../../components/start/NoticeSections.vue'
 import StartLayout from '../../components/start/StartLayout.vue'
 import StartSteps from '../../components/start/StartSteps.vue'
 import { useRespondentFlow } from '../../composables/useRespondentFlow'
@@ -26,18 +26,6 @@ const consent = useConsentStore()
 const flow = useRespondentFlow()
 const router = useRouter()
 const notice = flow.notice.value
-
-// A section whose every paragraph starts with a short label ("From Google: …") is a list of
-// sources, shown as one tile per label instead of paragraphs.
-const LABELLED = /^([^:]{1,30}): (.+)$/
-const capitalize = (text: string) => text.charAt(0).toUpperCase() + text.slice(1)
-const sections = notice.sections.map((section) => {
-  const matches = section.body.map((paragraph) => LABELLED.exec(paragraph))
-  const items = matches.every((m) => m !== null)
-    ? matches.map((m) => ({ label: m[1] ?? '', text: capitalize(m[2] ?? '') }))
-    : null
-  return { ...section, items }
-})
 
 // Online, the Google name; a school-link student hasn't told us theirs yet.
 const name = flow.isSchool.value ? null : session.me?.profile.fullName
@@ -185,57 +173,7 @@ async function decline() {
         </div>
       </header>
 
-      <!-- One row per section, read top to bottom: the title on the left, what it says on the
-           right (stacked on phones). -->
-      <ol
-        class="mt-6 divide-y divide-line overflow-hidden rounded-card border border-line bg-surface"
-      >
-        <li
-          v-for="(section, i) in sections"
-          :key="section.title"
-          class="gap-8 px-5 py-6 sm:px-7 md:grid md:grid-cols-[14rem_minmax(0,1fr)] lg:grid-cols-1 xl:grid-cols-[16rem_minmax(0,1fr)] xl:py-7 2xl:grid-cols-[18rem_minmax(0,1fr)]"
-        >
-          <div class="flex items-center gap-3 md:items-start lg:items-center xl:items-start">
-            <span
-              aria-hidden="true"
-              class="grid size-10 shrink-0 place-items-center rounded-control bg-evergreen-soft text-evergreen"
-            >
-              <svg
-                viewBox="0 0 24 24"
-                class="size-6 fill-none stroke-current stroke-[1.75]"
-                stroke-linecap="round"
-                stroke-linejoin="round"
-              >
-                <path v-for="d in NOTICE_ICONS[section.title]" :key="d" :d="d" />
-              </svg>
-            </span>
-            <h3 class="text-lg leading-snug font-bold md:pt-2 lg:pt-0 xl:pt-2">
-              <span class="sr-only">{{ i + 1 }}.</span> {{ section.title }}
-            </h3>
-          </div>
-
-          <!-- "From Google: …"-style lists become one labelled tile per item. -->
-          <ul v-if="section.items" class="mt-4 grid gap-3 md:mt-0 lg:mt-4 xl:mt-0 2xl:grid-cols-3">
-            <li
-              v-for="item in section.items"
-              :key="item.label"
-              class="rounded-control bg-mist-soft px-4 py-3.5"
-            >
-              <p class="font-semibold text-evergreen">{{ item.label }}</p>
-              <p class="mt-1 leading-relaxed">{{ item.text }}</p>
-            </li>
-          </ul>
-          <div v-else class="mt-3 space-y-3 md:mt-0 lg:mt-3 xl:mt-0 md:pt-2 lg:pt-0 xl:pt-2">
-            <p
-              v-for="paragraph in section.body"
-              :key="paragraph"
-              class="max-w-[68ch] leading-relaxed"
-            >
-              {{ paragraph }}
-            </p>
-          </div>
-        </li>
-      </ol>
+      <NoticeSections :notice="notice" class="mt-6" />
     </article>
 
     <template v-if="!declined" #actions>
