@@ -49,7 +49,6 @@ export const env = {
   LINK_JOIN_LIMIT: allowAll,
   STUDENT_NUMBER_LIMIT: allowAll,
   ANSWER_LIMIT: allowAll,
-  ANSWER_IP_LIMIT: allowAll,
   RESPONDENT_ACTION_LIMIT: allowAll,
 } as Bindings
 

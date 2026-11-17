@@ -69,10 +69,11 @@ export const linkJoinLimit = rateLimit('LINK_JOIN_LIMIT', clientIp)
 /** Joining a school link, per IP and student number, across all links. */
 export const studentNumberLimit = rateLimit('STUDENT_NUMBER_LIMIT', studentNumberOf)
 
-/** Answer saves, per IP. Goes before `respondent`, so it costs no token hashing. */
-export const answerIpLimit = rateLimit('ANSWER_IP_LIMIT', clientIp)
-
-/** Answer saves, per respondent. Goes after `respondent`. */
+/**
+ * Answer saves, per respondent. Goes after `respondent`. There's no per-IP limit of its own: a lab
+ * shares one IP, so one student flooding it would block every classmate's saves, and a made-up
+ * token costs only one indexed lookup that saves nothing, which the catch-all already caps.
+ */
 export const answerLimit = rateLimit<RespondentEnv>('ANSWER_LIMIT', respondentOf)
 
 /** One of a respondent's actions (start, submit, SUS), per respondent. Goes after `respondent`. */

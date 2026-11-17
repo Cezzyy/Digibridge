@@ -11,7 +11,7 @@ import {
   susAnswersSchema,
 } from '@digibridge/shared'
 import { createRoute, z } from '@hono/zod-openapi'
-import { answerIpLimit, answerLimit, respondent, respondentActionLimit } from '../middleware'
+import { answerLimit, respondent, respondentActionLimit } from '../middleware'
 import { errorResponse, rateLimited } from '../openapi'
 
 // Every route here is the respondent's own: online with a Google sign-in, or through a school link
@@ -126,7 +126,7 @@ export const saveAnswerRoute = createRoute({
   tags: ['Assessment'],
   summary: 'Save or change one answer',
   description: `Saves the choice for one item, replacing any earlier one (ASM-04, ASM-05). The item must be in the attempt and the choice must be one of its own. Refused once the attempt is closed, or more than ${ANSWER_GRACE_SECONDS} seconds after \`expires_at\` (ASM-09). ${SELF_ONLY}`,
-  middleware: [answerIpLimit, respondent, answerLimit] as const,
+  middleware: [respondent, answerLimit] as const,
   security: RESPONDENT_SECURITY,
   request: {
     params: AnswerParamsSchema,
@@ -142,7 +142,7 @@ export const saveAnswerRoute = createRoute({
     403: errorResponse('Signed in as staff'),
     404: errorResponse('No such attempt for this respondent'),
     409: errorResponse('The attempt is closed, or its time is up'),
-    429: rateLimited('this respondent or IP'),
+    429: rateLimited('this respondent'),
   },
 })
 

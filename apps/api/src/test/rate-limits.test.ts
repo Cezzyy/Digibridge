@@ -169,14 +169,18 @@ describe('answer saves', () => {
     return { attempt: attempt! }
   }
 
-  it('limits saves per IP before the sign-in is checked', async () => {
-    const { limiter, env } = withLimiter('ANSWER_IP_LIMIT', true)
+  it('refuses a malformed token without counting it against anyone', async () => {
+    const { limiter, env } = withLimiter('ANSWER_LIMIT', true)
     const id = crypto.randomUUID()
-    const res = await request(env, 'PUT', `/api/v1/attempts/${id}/answers/${id}`, IP, {
-      choiceId: id,
-    })
-    await expectRateLimited(res)
-    expect(limiter.keys).toEqual(['203.0.113.7'])
+    const res = await request(
+      env,
+      'PUT',
+      `/api/v1/attempts/${id}/answers/${id}`,
+      { ...IP, [RESPONDENT_TOKEN_HEADER]: 'not-a-token' },
+      { choiceId: id },
+    )
+    expect(res.status).toBe(401)
+    expect(limiter.keys).toEqual([])
   })
 
   it('limits saves per online respondent and saves nothing when refused', async () => {

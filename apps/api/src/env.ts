@@ -18,7 +18,6 @@ export type Bindings = {
   LINK_JOIN_LIMIT: RateLimit
   STUDENT_NUMBER_LIMIT: RateLimit
   ANSWER_LIMIT: RateLimit
-  ANSWER_IP_LIMIT: RateLimit
   RESPONDENT_ACTION_LIMIT: RateLimit
 }
 
