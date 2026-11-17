@@ -3,7 +3,7 @@ import {
   AREA_CODES,
   AREA_MAX_POINTS,
   ATTEMPT_DURATION_MINUTES,
-  DATA_KEPT_UNTIL,
+  DATA_KEPT_DAYS,
   ITEMS_PER_AREA,
   ITEMS_PER_ATTEMPT,
   LEVELS,
@@ -63,7 +63,7 @@ const PRIVACY = [
   },
   {
     icon: 'calendar',
-    text: `We keep your data until ${DATA_KEPT_UNTIL}, then delete it. You can ask for it to be deleted sooner.`,
+    text: `We delete your data ${DATA_KEPT_DAYS} days after you take part. You can ask for it to be deleted sooner.`,
   },
 ] as const
 

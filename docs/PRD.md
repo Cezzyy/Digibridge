@@ -116,7 +116,7 @@ School links replaced kiosk mode (KIO-01 to KIO-06): no shared device, no exit P
 
 | ID | Requirement | Priority |
 | --- | --- | --- |
-| CON-01 | Before anything else, respondents see a consent notice under the Data Privacy Act of 2012: purpose, data collected, who sees it, how long data is kept before it's deleted (online: until the end of the semester, December 2026; school links: 30 days), and the DigiBridge team as contact. They must agree to continue. | Must |
+| CON-01 | Before anything else, respondents see a consent notice under the Data Privacy Act of 2012: purpose, data collected, who sees it, who handles it for us (Supabase, Cloudflare, Google), where it's stored (Mumbai, India), how it's protected, how long it's kept before it's deleted (30 days after taking part, online and school links alike), the respondent's rights under the Act, and the DigiBridge team as contact. They must agree to continue. | Must |
 | CON-02 | The app stores the consent with its timestamp and notice version. Declining ends the flow without saving anything. | Must |
 | PRO-01 | General profile, asked in both modes: full name, date of birth (age from 10 to 99, worked out from it in Philippine time), sex, devices they own, and how they usually get internet. | Must |
 | PRO-05 | Before starting, respondents choose whether the team may see who they are: their name, and through a school link also their student number. If they say no, these show as Hidden on the dashboard and in the CSV, and only the other profile answers are shown. | Must |
@@ -256,7 +256,7 @@ Screens in three groups: respondent, school link and admin.
 | Assessment | /assessment | Respondent | One item, 4 choices, timer, Back and Next, question grid, Submit |
 | Results | /results | Respondent | Overall level, radar chart, score and level per area, recommended lessons, QR code, Rate DigiBridge card |
 | Usability survey | /feedback | Respondent | 10 SUS statements on a 1 to 5 scale, Submit and Skip |
-| Privacy | /privacy | Everyone | Both privacy notices (Google sign-in and school links), the contact and the National Privacy Commission; linked from the landing page and sign in |
+| Privacy | /privacy | Everyone | Both privacy notices (Google sign-in and school links) and the contact; linked from the landing page and sign in |
 | Lessons library | /lessons | Everyone | Lessons grouped by area and level |
 | Lesson | /lessons/:slug | Everyone | Lesson body, image or video, resources |
 | School link | /s/:code → /s/:code/results | School-link respondent | The school notice, profile with the school details (student number, course, year level), home with the rules, assessment, results with the Rate DigiBridge card and Done (which opens the survey first if it isn't answered); a closed, expired or full link shows a plain message instead |
@@ -281,7 +281,7 @@ The app must work on a cheap phone over mobile data and keep student data privat
 | Reliability | No answer is lost on refresh, lost signal or closed tab. The app stays up through the pilot (Nov 11 to 12) and the defense. |
 | Capacity | 30 respondents taking the assessment at the same time without slowdown. |
 | Accessibility | Body text at least 16 px, color contrast at WCAG AA, every control usable by keyboard, choices are real radio buttons. |
-| Privacy | Follows the Data Privacy Act of 2012: consent first, only the fields the study needs, respondent data visible only to the team, deletion on request, online respondent data deleted at the end of the semester (December 2026) and school-link data after 30 days. |
+| Privacy | Follows the Data Privacy Act of 2012: consent first, only the fields the study needs, respondent data visible only to the team, deletion on request, respondent data, online and school links, deleted 30 days after they take part. |
 | Security | HTTPS only. Every API route checks the role. The database can't be reached directly from the browser. |
 | Language | English for this version, written plainly for students. |
 
@@ -313,7 +313,7 @@ The open questions are settled; each answer is built into the requirements above
 - **School links replace kiosk mode** (Nov 11): students use their own devices, so there's no shared tablet, exit PIN or device lock. A student counts against a link's limit once their profile is saved, and can finish after the link closes (LNK-02). A student number already used is stopped with a message to ask the team; there's no way to recover a lost place on another browser in this phase (PRO-03).
 - **Student number format:** like C23-01-7557-MAN121, school links only (PRO-02).
 - **Courses and year levels:** BSIT, BSCS, BSBA, BSA and BSHM for 1st to 4th year; TESDA scholars in HRT and WADT for 1st to 3rd year, school links only (PRO-04).
-- **Consent contact and retention:** both notices name the DigiBridge team as contact, not a person. Online data is kept until the end of the semester (December 2026), since it's needed for the defense and finals; school-link data is kept for 30 days. Then it's deleted (CON-01).
+- **Consent contact and retention:** both notices name the DigiBridge team as contact, not a person. Data from both modes is kept for 30 days after the respondent takes part, then deleted; only group results with no names stay for the paper (CON-01).
 - **SUS survey:** inside the app after results. Optional online, offered again by Done through a school link (SUS-01 to SUS-05). This replaces the separate Google Form.
 - **QR code to results:** included (RES-04).
 - **Showing identity:** each respondent chooses before the assessment whether the team sees their name and, through a school link, their student number (PRO-05).
