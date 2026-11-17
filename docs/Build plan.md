@@ -106,13 +106,67 @@ Small, fit in anywhere:
 
 Backend safety, before the pilot. Most urgent first:
 
-- [ ] **RLS on** for every `public` table with no policies; check the anon key can read nothing.
+- [x] **RLS on** for every `public` table with no policies; check the anon key can read nothing.
 - [x] **Rate limits** on the school link routes (open and profile), answer saves, start, submit, SUS and the online profile, plus a per-IP catch-all. CSV import gets its own once it's built.
 - [x] **Secrets** only in Wrangler secrets and local env files; `.env.example` in the repo.
 - [x] **Security headers** on the API and the web.
-- [ ] **Supabase settings:** only the Pages URL and `localhost` as redirect URLs.
+- [x] **Supabase settings:** only `https://digibridge.app` and `localhost` as redirect URLs, once the old Pages URL is retired.
 - [ ] **Decide whether `/api/reference` stays open in prod**, with an `API_DOCS` flag.
 - [x] **Dependency audit:** `pnpm audit`.
+
+## Domain, privacy and monitoring
+
+Done when the app runs on `https://digibridge.app`, a link pasted in Messenger shows a preview card, visits show in Web Analytics, an uptime alert reaches your email, and the privacy notice says what is tracked. Before the pilot, so the school links and QR codes carry the final address.
+
+Domain (bought on Spaceship, DNS on Cloudflare):
+
+- [ ] Buy `digibridge.app` on Spaceship for 1 year, with no add-ons.
+- [ ] Click Spaceship's contact verification email within 15 days, or the domain is suspended.
+- [ ] Turn on two-factor sign-in for the Spaceship account.
+- [ ] Check that WHOIS privacy, auto-renew and the transfer lock are on.
+- [ ] Add `digibridge.app` to Cloudflare on the Free plan and delete any parking records it imports.
+- [ ] Turn off DNSSEC in Spaceship, then set its nameservers to Cloudflare's two.
+- [ ] Wait until Cloudflare shows the domain as Active.
+- [ ] Add the custom domain `digibridge.app` to Pages `digibridge-web`, plus `www` redirecting to it.
+- [ ] Add the custom domain `api.digibridge.app` to the `digibridge-api` Worker.
+- [ ] Turn DNSSEC back on, this time in Cloudflare.
+
+Point the app at it:
+
+- [ ] Let the API take a list of web origins in `WEB_ORIGIN`, so the old and new addresses both work during the switch.
+- [ ] Set `WEB_ORIGIN` to the new and old addresses with `wrangler secret put`, then deploy the API.
+- [ ] Set `VITE_API_URL` in `apps/web/.env.production` to `https://api.digibridge.app`, then deploy the web app.
+- [ ] In Supabase, set the Site URL to `https://digibridge.app` and add `https://digibridge.app/**` to the redirect URLs.
+- [ ] Test on the new address: Google sign-in, a school link from start to results, and the admin pages.
+- [ ] Update the TRD's CORS and deploy sections and CLAUDE.md's deploy URLs to the new domain.
+- [ ] Once nothing in use still points at `pages.dev`, drop it from `WEB_ORIGIN` and from Supabase.
+
+Privacy notice:
+
+- [ ] Ask the research adviser whether the notices need to mention Cloudflare Web Analytics (no cookies, no personal data).
+- [ ] If they do, add one plain line about it to both notices in `packages/shared/src/consent/` and bump each `version`.
+- [ ] Add a public `/privacy` page with both notices, linked from the landing page footer and the sign-in page.
+- [ ] Add the domain, the home page and `/privacy` to Google's OAuth consent screen, and verify the domain in Google Search Console.
+
+Link previews (Messenger, Facebook and chat apps read only the HTML Pages sends, never what Vue draws):
+
+- [ ] Add Open Graph and Twitter card tags to `apps/web/index.html`: title, description, `og:url`, `og:site_name`, `og:type` and `summary_large_image`.
+- [ ] Make `apps/web/public/og.png` at 1200 × 630 and under 300 KB: logo, name and one line, readable as a small thumbnail.
+- [ ] Point `og:image` at the absolute `https://digibridge.app/og.png`, with its width, height and alt text.
+- [ ] Add `apple-touch-icon.png` (180 × 180) and a PNG favicon beside the SVG one, for iPhones and apps that skip SVG.
+- [ ] Add a Pages Function for `/s/*` that rewrites the title and description with `HTMLRewriter` to say "Your class is invited to take DigiBridge", with no school or label, so link details stay out of preview caches.
+- [ ] Optional: the same function for `/lessons/*`, putting each lesson's title and summary in its preview.
+- [ ] Send `X-Robots-Tag: noindex` on `/s/*`, `/admin/*`, `/home`, `/assessment` and `/results` through `public/_headers`, so search engines skip them; don't block them in `robots.txt`, or previews break too.
+- [ ] Add `public/robots.txt` that allows everything and lists the sitemap, plus `sitemap.xml` with the landing page and lessons.
+- [ ] Test the landing page, a lesson and a school link in Facebook's Sharing Debugger, then send each in Messenger.
+- [ ] After any preview change, press Scrape Again in the Sharing Debugger, since Messenger keeps old previews for days.
+
+Monitoring:
+
+- [ ] Turn on Web Analytics in Pages `digibridge-web` (Metrics → Web Analytics) and check visits come in after the next deploy.
+- [ ] Add `[observability] enabled = true` to `apps/api/wrangler.toml`, so Workers Logs keep the API's requests and errors.
+- [ ] Add UptimeRobot checks every 5 minutes on `https://digibridge.app` and `https://api.digibridge.app/api/v1/health`, emailing you on failure.
+- [ ] Before each school session, check that uptime is green and that the Worker's dashboard shows no errors.
 
 ## Stage 4: Real content and freeze
 
