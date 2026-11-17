@@ -14,3 +14,9 @@ export const ErrorSchema = z
 export function errorResponse(description: string) {
   return { description, content: { 'application/json': { schema: ErrorSchema } } }
 }
+
+/** The 429 of a route with its own rate limit (middleware/rate-limit.ts). */
+export const rateLimited = (who: string) =>
+  errorResponse(
+    `Too many requests from ${who} in the last minute; \`Retry-After\` says when to try again`,
+  )

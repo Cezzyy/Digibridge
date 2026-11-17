@@ -359,6 +359,19 @@ The browser never talks to the database directly, and only the fields the study 
 - **Correct answers never leave the server** during an attempt. `GET /api/v1/attempts/:id` returns choices without `is_correct`, and results show levels and scores, not per-item marks (RES-05).
 - **Every input is validated** with the shared Zod schemas. Markdown is rendered with markdown-it and cleaned with DOMPurify.
 - **CORS** allows only the Pages domain (and `localhost` in development).
+- **Rate limits** use the Workers Rate Limiting binding (`[[ratelimits]]` in `wrangler.toml`, `middleware/rate-limit.ts`); over a limit is 429 `rate_limited` with `Retry-After: 60`, and the web app retries answer saves by itself. All count per minute. A school lab often reaches the API from one IP, so per-IP limits leave room for about 60 students at once; answer saves also count per respondent. Counts are per Cloudflare location and approximate, which is fine with the Worker pinned to one region.
+
+  | Limit | Key | Per minute |
+  | --- | --- | --- |
+  | Every `/api/v1` request | IP | 2400 |
+  | Open a school link | IP | 120 |
+  | Join a school link | IP | 60 |
+  | Join a school link | Student number (SHA-256) | 5 |
+  | Save an answer | IP | 1200 |
+  | Save an answer | Respondent (token hash or account) | 120 |
+  | Start, submit, SUS, online profile | Respondent and action | 20 each |
+
+- **Security headers.** The API sends `default-src 'none'` with `frame-ancestors 'none'`, HSTS, `nosniff`, `X-Frame-Options: DENY`, `Referrer-Policy: no-referrer` and `Cache-Control: no-store` (unless a route sets its own) on every response; the docs page gets a policy that allows Scalar's script by nonce. The web app's headers are written into the build as Pages' `_headers` (`apps/web/security-headers.ts`): scripts from the site only (plus Cloudflare Web Analytics), inline styles, pictures from any https site (admins link them), `connect-src` to the API and Supabase, frames from youtube-nocookie only, no framing, HSTS, `nosniff`, `strict-origin-when-cross-origin` (YouTube needs the referrer) and a Permissions-Policy that turns off camera, microphone, location, payment and USB.
 - **Respondent tokens** are 32 random bytes; only their SHA-256 hash is stored, so the database can't be used to take over a student's attempt. A lost token can't be recovered: the same student number is refused, and the team helps.
 - **Uploads** accept only PNG, JPEG and WebP up to 2 MB.
 - **Data Privacy Act of 2012:**

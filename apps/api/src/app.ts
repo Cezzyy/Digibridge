@@ -38,10 +38,12 @@ import { getLink, joinLink } from './handlers/links'
 import { getMe } from './handlers/me'
 import { createRespondent } from './handlers/respondents'
 import {
+  apiRateLimit,
   corsMiddleware,
   dbMiddleware,
   handleError,
   handleNotFound,
+  securityHeaders,
   validationHook,
 } from './middleware'
 import { addApiDocs } from './openapi'
@@ -85,7 +87,9 @@ import { createRespondentRoute } from './routes/respondents'
 
 // Version 1 routes. Each route is defined in routes/ and bound to its handler here.
 // validationHook turns a failed Zod check into { error: { code, message } }.
+// The per-IP catch-all limit runs first, so a refused request never opens a connection.
 const v1 = new OpenAPIHono<AppEnv>({ defaultHook: validationHook })
+v1.use(apiRateLimit)
 v1.use(dbMiddleware)
 const v1Routes = v1
   .openapi(healthRoute, getHealth)
@@ -125,8 +129,10 @@ const v1Routes = v1
   .openapi(deleteQuestionRoute, deleteQuestion)
 
 // Builds the Hono app: routes under /api/v1, docs under /api.
-// CORS is added before the routes so it runs on every response, errors included.
+// Security headers and CORS are added before the routes so they run on every response, errors
+// and the docs included.
 const api = new OpenAPIHono<AppEnv>().basePath('/api')
+api.use(securityHeaders)
 api.use(corsMiddleware)
 export const app = api.route('/v1', v1Routes)
 

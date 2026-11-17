@@ -5,7 +5,8 @@ import {
   yearLevelSchema,
 } from '@digibridge/shared'
 import { createRoute, z } from '@hono/zod-openapi'
-import { errorResponse } from '../openapi'
+import { linkJoinLimit, linkOpenLimit, studentNumberLimit } from '../middleware'
+import { errorResponse, rateLimited } from '../openapi'
 import { RespondentSummarySchema } from './respondents'
 
 // The school-link routes a student calls without signing in (LNK-02, LNK-03). An admin makes the
@@ -48,6 +49,7 @@ export const getLinkRoute = createRoute({
   summary: 'Open a school link',
   description:
     'No sign-in. Gives the link’s name and its course and year-level lock while it’s open (LNK-02). With the `X-Respondent-Token` of a student who joined through it, it also gives their respondent and attempt, even after the link closed, so they can finish (LNK-04).',
+  middleware: [linkOpenLimit] as const,
   security: OPTIONAL_TOKEN,
   request: { params: LinkParamsSchema },
   responses: {
@@ -58,6 +60,7 @@ export const getLinkRoute = createRoute({
     401: errorResponse('The respondent token isn’t one for this link'),
     404: errorResponse('No link has this code'),
     410: errorResponse('The link was closed, has expired or is full'),
+    429: rateLimited('this IP'),
   },
 })
 
@@ -77,6 +80,7 @@ export const joinLinkRoute = createRoute({
   summary: 'Save consent, the school profile and identity choice',
   description:
     'No sign-in. The general profile plus student number, course and year level, which must fit the link’s lock, the identity choice and consent to the school notice, saved together (LNK-03, PRO-01 to PRO-05, CON-02). The student counts against the link’s limit from now on, and can take the assessment even if the link closes later. One respondent per student number across all links. A student whose every attempt was voided (USR-03) can join again with the same number, through this link or another: their profile and consent are saved again in place, the token changes, and they count against this link. Returns the respondent token once.',
+  middleware: [linkJoinLimit, studentNumberLimit] as const,
   request: {
     params: LinkParamsSchema,
     body: {
@@ -100,5 +104,6 @@ export const joinLinkRoute = createRoute({
       'The student number was already used, by a student who hasn’t had every attempt voided',
     ),
     410: errorResponse('The link was closed, has expired or is full'),
+    429: rateLimited('this IP, or for this student number'),
   },
 })

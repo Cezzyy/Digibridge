@@ -84,7 +84,7 @@ Done when an admin can load the 30 real items by CSV and read the pilot data on 
 
 - [x] **Questions:** list per area, create and edit with exactly 4 choices and 1 correct, correct choice locked once answered, deactivate instead of delete (CMS-01 to CMS-03).
 - [ ] **Uploads:** `POST /api/v1/admin/uploads` to the R2 `MEDIA` bucket, PNG, JPEG or WebP up to 2 MB, and `GET /api/v1/media/:key` to serve them (CMS-05).
-- [ ] **CSV import:** columns from the TRD, report row errors, and the readiness check of 10 active items per area in the 4/4/2 mix (CMS-06, CMS-07). Needed before the real items can go in.
+- [ ] **CSV import:** columns from the TRD, report row errors, and the readiness check of 10 active items per area in the 4/4/2 mix (CMS-06, CMS-07), with its own rate limit (`middleware/rate-limit.ts`). Needed before the real items can go in.
 - [x] **Lessons editor:** list and Markdown editor with preview (CMS-04).
 - [x] **Dashboard:** `GET /api/v1/admin/stats` with every filter, including mode and school link, summary cards including mean SUS, level chart per area, comparison chart by a chosen grouping; course and year level count school-link respondents only and say so (DSH-01 to DSH-04, SUS-05).
 - [x] **Respondents:** paged table, detail drawer, Hidden for respondents who chose it, the school link's label, empty school cells for online respondents, read only for facilitators (DSH-05, DSH-07, PRO-05).
@@ -107,9 +107,9 @@ Small, fit in anywhere:
 Backend safety, before the pilot. Most urgent first:
 
 - [ ] **RLS on** for every `public` table with no policies; check the anon key can read nothing.
-- [ ] **Rate limits** on the school link routes (open and profile), answer saves and CSV import.
+- [x] **Rate limits** on the school link routes (open and profile), answer saves, start, submit, SUS and the online profile, plus a per-IP catch-all. CSV import gets its own once it's built.
 - [x] **Secrets** only in Wrangler secrets and local env files; `.env.example` in the repo.
-- [ ] **Security headers** on the API and the web.
+- [x] **Security headers** on the API and the web.
 - [ ] **Supabase settings:** only the Pages URL and `localhost` as redirect URLs.
 - [ ] **Decide whether `/api/reference` stays open in prod**, with an `API_DOCS` flag.
 - [x] **Dependency audit:** `pnpm audit`.
