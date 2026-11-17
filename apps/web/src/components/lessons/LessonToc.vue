@@ -1,9 +1,21 @@
 <script setup lang="ts">
+import { useRoute } from 'vue-router'
 import type { LessonSection } from '../../lib/markdown'
 
 // The lesson's contents beside it on desktops: one link per part, with the part on screen
 // marked (`activeId`, from useReadingPosition) and the ones above it ticked off on the line.
-const props = defineProps<{ sections: LessonSection[]; activeId: string | null }>()
+// The privacy page uses it for the notice's sections, with its own `title`.
+const props = withDefaults(
+  defineProps<{
+    sections: Pick<LessonSection, 'id' | 'title' | 'number'>[]
+    activeId: string | null
+    title?: string
+  }>(),
+  { title: 'In this lesson' },
+)
+
+// Hash links keep the query, so /privacy?notice=school stays on the school notice.
+const route = useRoute()
 
 const pad = (n: number) => String(n).padStart(2, '0')
 const activeIndex = () => props.sections.findIndex((s) => s.id === props.activeId)
@@ -11,11 +23,11 @@ const activeIndex = () => props.sections.findIndex((s) => s.id === props.activeI
 
 <template>
   <nav aria-labelledby="toc-title">
-    <p id="toc-title" class="text-sm font-semibold text-quiet">In this lesson</p>
+    <p id="toc-title" class="text-sm font-semibold text-quiet">{{ title }}</p>
     <ol class="mt-4">
       <li v-for="(section, i) in sections" :key="section.id" class="relative">
         <RouterLink
-          :to="{ hash: `#${section.id}` }"
+          :to="{ query: route.query, hash: `#${section.id}` }"
           :aria-current="section.id === activeId ? 'location' : undefined"
           class="group flex gap-3 border-l-2 py-2 pr-2 pl-4 leading-snug transition-colors"
           :class="

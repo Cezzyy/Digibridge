@@ -70,7 +70,7 @@ async function decline() {
         Before you start<template v-if="name">, {{ name }}</template>
       </h1>
       <p
-        class="mt-3 text-lg leading-relaxed text-white/85 lg:mt-4 motion-safe:animate-rise motion-safe:[animation-delay:80ms]"
+        class="mt-3 text-lg leading-relaxed text-white/85 text-justify hyphens-auto lg:mt-4 motion-safe:animate-rise motion-safe:[animation-delay:80ms]"
       >
         DigiBridge checks your digital skills, then shows you your level and lessons that fit it.
         First, here’s what we do with your answers.
@@ -89,7 +89,7 @@ async function decline() {
       </dl>
 
       <p
-        class="mt-auto hidden gap-3 pt-10 text-sm leading-relaxed text-white/85 lg:order-2 lg:flex lg:short:hidden"
+        class="mt-auto hidden gap-3 pt-10 text-sm leading-relaxed text-white/85 text-justify hyphens-auto lg:order-2 lg:flex lg:short:hidden"
       >
         <svg
           viewBox="0 0 24 24"
@@ -133,7 +133,7 @@ async function decline() {
       >
         No problem. You won’t take the assessment.
       </h2>
-      <p class="mt-4 text-lg leading-relaxed text-quiet">
+      <p class="mt-4 text-lg leading-relaxed text-quiet text-justify hyphens-auto">
         We haven’t saved a profile or any answers for you. If you change your mind, come back and
         read the notice again.
       </p>
