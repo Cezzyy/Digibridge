@@ -12,7 +12,7 @@ const toBase64Url = (bytes: Uint8Array) =>
     .replace(/=+$/, '')
 
 /** The hash saved in `respondents.access_token_hash`, as 64 hex characters. */
-export const hashRespondentToken = (token: string): Promise<string> => sha256Hex(token)
+export const hashRespondentToken = sha256Hex
 
 /** True for a string shaped like a token, before it's worth hashing and looking up. */
 export const isRespondentToken = (token: string) => RESPONDENT_TOKEN_REGEX.test(token)

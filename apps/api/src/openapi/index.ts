@@ -4,6 +4,7 @@ import { Scalar } from '@scalar/hono-api-reference'
 import type { Env, MiddlewareHandler, Schema } from 'hono'
 import type { Bindings } from '../env'
 import { ApiError } from '../middleware/error'
+import { docsSecurityHeaders } from '../middleware/security-headers'
 
 export * from './error'
 
@@ -21,7 +22,7 @@ const docsOnly: MiddlewareHandler = async (c, next) => {
 // is on.
 export function addApiDocs<E extends Env, S extends Schema>(app: OpenAPIHono<E, S, '/api'>) {
   app.use('/openapi.json', docsOnly)
-  app.use('/reference', docsOnly)
+  app.use('/reference', docsOnly, docsSecurityHeaders)
   // Routes that need sign-in list `security: [{ Bearer: [] }]`; the docs page then asks for a token.
   app.openAPIRegistry.registerComponent('securitySchemes', 'Bearer', {
     type: 'http',
@@ -41,7 +42,7 @@ export function addApiDocs<E extends Env, S extends Schema>(app: OpenAPIHono<E, 
     info: { title: 'DigiBridge API', version: '0.0.0' },
   })
   // Sidebar shows each route's path (GET /api/v1/health) instead of its summary. The nonce is the
-  // one the docs page's Content-Security-Policy allows (middleware/security-headers.ts).
+  // one the docs page's Content-Security-Policy allows (`docsSecurityHeaders`).
   app.get(
     '/reference',
     Scalar((c) => ({
