@@ -8,6 +8,8 @@ export type Bindings = {
   SUPABASE_URL: string
   ADMIN_EMAILS: string
   WEB_ORIGIN: string
+  // "true" serves /api/openapi.json and /api/reference; anything else hides them (openapi/index.ts).
+  API_DOCS: string
   HYPERDRIVE: Hyperdrive
   MEDIA: R2Bucket
   // Rate limiters ([[ratelimits]] in wrangler.toml, used by middleware/rate-limit.ts).

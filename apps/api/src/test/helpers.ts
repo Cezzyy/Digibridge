@@ -43,6 +43,7 @@ export const env = {
   SUPABASE_URL,
   WEB_ORIGIN,
   ADMIN_EMAILS: ` ${ADMIN_EMAIL} , other@aclc.test`,
+  API_DOCS: 'true',
   API_IP_LIMIT: allowAll,
   LINK_OPEN_LIMIT: allowAll,
   LINK_JOIN_LIMIT: allowAll,

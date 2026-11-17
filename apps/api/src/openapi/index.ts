@@ -1,12 +1,27 @@
 import { RESPONDENT_TOKEN_HEADER } from '@digibridge/shared'
 import type { OpenAPIHono } from '@hono/zod-openapi'
 import { Scalar } from '@scalar/hono-api-reference'
-import type { Env, Schema } from 'hono'
+import type { Env, MiddlewareHandler, Schema } from 'hono'
+import type { Bindings } from '../env'
+import { ApiError } from '../middleware/error'
 
 export * from './error'
 
-// Serves the OpenAPI spec at /api/openapi.json and the docs page at /api/reference.
+/** True when `API_DOCS` is "true": in `.dev.vars` locally, never in the deployed [vars]. */
+export const apiDocsOn = (env: Pick<Bindings, 'API_DOCS'>) => env.API_DOCS === 'true'
+
+// The spec and the docs page answer 404 while API_DOCS is off, as if they weren't there: the spec
+// lists every route, so hiding only the page would leave the same map public.
+const docsOnly: MiddlewareHandler = async (c, next) => {
+  if (!apiDocsOn(c.env as Bindings)) throw new ApiError('not_found')
+  await next()
+}
+
+// Serves the OpenAPI spec at /api/openapi.json and the docs page at /api/reference, while API_DOCS
+// is on.
 export function addApiDocs<E extends Env, S extends Schema>(app: OpenAPIHono<E, S, '/api'>) {
+  app.use('/openapi.json', docsOnly)
+  app.use('/reference', docsOnly)
   // Routes that need sign-in list `security: [{ Bearer: [] }]`; the docs page then asks for a token.
   app.openAPIRegistry.registerComponent('securitySchemes', 'Bearer', {
     type: 'http',
