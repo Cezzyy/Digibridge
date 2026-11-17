@@ -1,4 +1,8 @@
-import { RESPONDENT_TOKEN_HEADER, type ErrorCode } from '@digibridge/shared'
+import {
+  RATE_LIMIT_RETRY_AFTER_SECONDS,
+  RESPONDENT_TOKEN_HEADER,
+  type ErrorCode,
+} from '@digibridge/shared'
 import type { AppType } from 'api/src/app'
 import { hc, type ClientResponse } from 'hono/client'
 import { supabase } from './supabase'
@@ -44,12 +48,20 @@ export function schoolApi(token: string | null): Api {
 export class ApiRequestError extends Error {
   readonly code: ErrorCode | 'network'
   readonly status: number
+  /** For `rate_limited`: how long to wait before trying again, in seconds (Retry-After). */
+  readonly retryAfterSeconds: number | undefined
 
-  constructor(code: ErrorCode | 'network', message: string, status: number) {
+  constructor(
+    code: ErrorCode | 'network',
+    message: string,
+    status: number,
+    retryAfterSeconds?: number,
+  ) {
     super(message)
     this.name = 'ApiRequestError'
     this.code = code
     this.status = status
+    this.retryAfterSeconds = retryAfterSeconds
   }
 }
 
@@ -111,9 +123,17 @@ async function failure(res: ClientResponse<unknown, number, string>) {
   const body = (await res.json().catch(() => null)) as {
     error?: { code?: ErrorCode; message?: string }
   } | null
+  const code = body?.error?.code ?? 'internal_error'
   return new ApiRequestError(
-    body?.error?.code ?? 'internal_error',
+    code,
     body?.error?.message ?? FALLBACK_MESSAGE,
     res.status,
+    code === 'rate_limited' ? retryAfterOf(res) : undefined,
   )
+}
+
+/** Retry-After in seconds, or the API's usual wait when it's missing or a date. */
+function retryAfterOf(res: ClientResponse<unknown, number, string>) {
+  const seconds = Number(res.headers.get('Retry-After'))
+  return Number.isFinite(seconds) && seconds > 0 ? seconds : RATE_LIMIT_RETRY_AFTER_SECONDS
 }

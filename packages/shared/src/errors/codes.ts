@@ -18,3 +18,6 @@ export const ERROR_CODES = [
 ] as const
 export const errorCodeSchema = z.enum(ERROR_CODES)
 export type ErrorCode = (typeof ERROR_CODES)[number]
+
+/** Every rate limit counts over a minute, so a `rate_limited` reply's Retry-After is this. */
+export const RATE_LIMIT_RETRY_AFTER_SECONDS = 60
