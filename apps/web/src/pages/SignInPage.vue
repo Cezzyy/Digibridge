@@ -114,7 +114,15 @@ const LAST = STEPS.length - 1
                   <rect x="5" y="11" width="14" height="9" rx="2" />
                   <path d="M8 11V8a4 4 0 0 1 8 0v3" />
                 </svg>
-                Only the DigiBridge team can see your answers.
+                <span>
+                  Only the DigiBridge team can see your answers.
+                  <RouterLink
+                    :to="{ name: 'privacy' }"
+                    class="font-semibold whitespace-nowrap text-evergreen underline decoration-evergreen/40 underline-offset-2 hover:decoration-evergreen"
+                  >
+                    Read the privacy notice
+                  </RouterLink>
+                </span>
               </li>
             </ul>
           </div>

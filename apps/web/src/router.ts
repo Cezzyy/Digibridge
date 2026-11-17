@@ -108,6 +108,14 @@ export const router = createRouter({
       component: () => import('./pages/results/ResultsPage.vue'),
       meta: { requires: 'signedIn', step: 'results' },
     },
+    // Both privacy notices, open to everyone, signed in or not, so no `requires`. Lazy, since few
+    // visitors open it. Google's OAuth consent screen links here.
+    {
+      path: '/privacy',
+      name: 'privacy',
+      component: () => import('./pages/PrivacyPage.vue'),
+      meta: { hideHeader: true },
+    },
     // The lessons library and each lesson, open to everyone (LES-03), so no `requires`.
     { path: '/lessons', name: 'lessons', component: LessonsPage },
     // Lazy, so markdown-it and DOMPurify load only here.

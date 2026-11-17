@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import BrandMark from './BrandMark.vue'
 
-// The footer on signed-out pages (landing, sign in).
+// The footer on signed-out pages (landing, privacy).
 </script>
 
 <template>
@@ -18,13 +18,21 @@ import BrandMark from './BrandMark.vue'
           Check your digital skills and find lessons that fit your level. Built on DigComp 2.2. ©
           2026 DigiBridge.
         </p>
-        <!-- The library is open without signing in (LES-03). -->
-        <RouterLink
-          :to="{ name: 'lessons' }"
-          class="mt-2 inline-flex min-h-11 items-center font-semibold text-white underline decoration-white/40 underline-offset-2 hover:decoration-white"
-        >
-          Browse the lessons
-        </RouterLink>
+        <!-- Both open without signing in: the library (LES-03) and the privacy notices. -->
+        <div class="mt-2 flex flex-wrap gap-x-6 sm:justify-end">
+          <RouterLink
+            :to="{ name: 'lessons' }"
+            class="inline-flex min-h-11 items-center font-semibold text-white underline decoration-white/40 underline-offset-2 hover:decoration-white"
+          >
+            Browse the lessons
+          </RouterLink>
+          <RouterLink
+            :to="{ name: 'privacy' }"
+            class="inline-flex min-h-11 items-center font-semibold text-white underline decoration-white/40 underline-offset-2 hover:decoration-white"
+          >
+            Privacy notice
+          </RouterLink>
+        </div>
       </div>
     </div>
   </footer>

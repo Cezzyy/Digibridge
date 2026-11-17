@@ -256,6 +256,7 @@ Screens in three groups: respondent, school link and admin.
 | Assessment | /assessment | Respondent | One item, 4 choices, timer, Back and Next, question grid, Submit |
 | Results | /results | Respondent | Overall level, radar chart, score and level per area, recommended lessons, QR code, Rate DigiBridge card |
 | Usability survey | /feedback | Respondent | 10 SUS statements on a 1 to 5 scale, Submit and Skip |
+| Privacy | /privacy | Everyone | Both privacy notices (Google sign-in and school links), the contact and the National Privacy Commission; linked from the landing page and sign in |
 | Lessons library | /lessons | Everyone | Lessons grouped by area and level |
 | Lesson | /lessons/:slug | Everyone | Lesson body, image or video, resources |
 | School link | /s/:code → /s/:code/results | School-link respondent | The school notice, profile with the school details (student number, course, year level), home with the rules, assessment, results with the Rate DigiBridge card and Done (which opens the survey first if it isn't answered); a closed, expired or full link shows a plain message instead |

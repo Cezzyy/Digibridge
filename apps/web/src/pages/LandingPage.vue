@@ -313,6 +313,19 @@ onBeforeUnmount(() => observer?.disconnect())
                 <p class="pt-2.5 leading-relaxed text-white/85">{{ item.text }}</p>
               </li>
             </ul>
+            <RouterLink
+              :to="{ name: 'privacy' }"
+              class="group mt-8 inline-flex min-h-11 items-center gap-2 font-semibold text-white underline decoration-white/40 underline-offset-4 hover:decoration-white"
+            >
+              Read the full privacy notice
+              <svg
+                viewBox="0 0 20 20"
+                aria-hidden="true"
+                class="size-5 fill-none stroke-current stroke-2 transition-transform group-hover:translate-x-0.5"
+              >
+                <path d="M4 10h12m-5-5 5 5-5 5" stroke-linecap="round" stroke-linejoin="round" />
+              </svg>
+            </RouterLink>
           </section>
 
           <section
