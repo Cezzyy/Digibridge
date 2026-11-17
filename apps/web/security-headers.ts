@@ -73,9 +73,15 @@ export function securityHeadersPlugin(): Plugin {
     configResolved(config) {
       env = config.env
     },
+    // A build without the real addresses would ship a policy that blocks the API or the sign-in
+    // (or point at localhost, from .env), so it fails. CI only checks that the app builds, never
+    // deploys it (Pages is direct upload), and has no .env.production, so there it's a warning.
     generateBundle() {
       for (const name of ['VITE_API_URL', 'VITE_SUPABASE_URL']) {
-        if (!originOf(env[name])) this.warn(`${name} is missing, so connect-src leaves it out`)
+        if (originOf(env[name])?.startsWith('https://')) continue
+        const problem = `${name} is missing or not https, so the deployed app can't reach it. Set it in apps/web/.env.production.`
+        if (process.env.CI) this.warn(problem)
+        else this.error(problem)
       }
       this.emitFile({
         type: 'asset',
