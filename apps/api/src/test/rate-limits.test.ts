@@ -66,6 +66,13 @@ describe('every /api/v1 route', () => {
     expect(limiter.keys).toEqual(['203.0.113.7', 'unknown'])
   })
 
+  it('counts every IPv6 address in one /64 as one client', async () => {
+    const { limiter, env } = withLimiter('API_IP_LIMIT')
+    await request(env, 'GET', '/api/v1/health', { 'CF-Connecting-IP': '2001:db8:1:2::1' })
+    await request(env, 'GET', '/api/v1/health', { 'CF-Connecting-IP': '2001:db8:1:2:ab:cd:ef:1' })
+    expect(limiter.keys).toEqual(['2001:db8:1:2::/64', '2001:db8:1:2::/64'])
+  })
+
   it('refuses a request over the catch-all with 429 and Retry-After', async () => {
     const { env } = withLimiter('API_IP_LIMIT', true)
     await expectRateLimited(await request(env, 'GET', '/api/v1/health', IP))
@@ -106,14 +113,14 @@ describe('school links', () => {
     ).toEqual([])
   })
 
-  it('limits joining per student number, hashed and in any letter case', async () => {
+  it('limits joining per IP and student number, hashed and in any letter case', async () => {
     const link = await addSchoolLink()
     const { limiter, env } = withLimiter('STUDENT_NUMBER_LIMIT')
     const path = `/api/v1/links/${link.code}/respondents`
     expect((await request(env, 'POST', path, IP, joinBody(' c23-01-4002-man121 '))).status).toBe(
       201,
     )
-    expect(limiter.keys).toEqual([await sha256Hex('C23-01-4002-MAN121')])
+    expect(limiter.keys).toEqual([`203.0.113.7|${await sha256Hex('C23-01-4002-MAN121')}`])
   })
 
   it('refuses a join over the student number limit, saving no one', async () => {

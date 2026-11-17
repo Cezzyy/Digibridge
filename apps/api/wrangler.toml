@@ -33,6 +33,7 @@ bucket_name = "digibridge-media"
 
 # Rate limits (middleware/rate-limit.ts). Counts are per Cloudflare location and approximate, which
 # is enough here: [placement] keeps every request in one region. A period is 10 or 60 seconds only.
+# Per IP means per IPv4 address or per IPv6 /64, since one user can hold a whole /64.
 # A school lab often reaches the API from one IP, so the per-IP limits leave room for ~60 students
 # at once. namespace_id is any number, unique among this account's rate limiters.
 
@@ -54,7 +55,7 @@ name = "LINK_JOIN_LIMIT"
 namespace_id = "1003"
 simple = { limit = 60, period = 60 }
 
-# Joining a school link, per student number (hashed), across all links.
+# Joining a school link, per IP and student number (hashed), across all links.
 [[ratelimits]]
 name = "STUDENT_NUMBER_LIMIT"
 namespace_id = "1004"

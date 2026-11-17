@@ -3,6 +3,7 @@ import type { Context, Env } from 'hono'
 import { createMiddleware } from 'hono/factory'
 import type { AppEnv, AuthEnv, Bindings, RateLimiterName, RespondentEnv } from '../env'
 import { sha256Hex } from '../lib/hash'
+import { ipKey } from '../lib/ip-key'
 import { ApiError } from './error'
 
 // Rate limits through the Workers Rate Limiting binding ([[ratelimits]] in wrangler.toml, where the
@@ -31,10 +32,11 @@ export function rateLimit<E extends AppEnv = AppEnv>(limiter: RateLimiterName, k
 }
 
 /**
- * The caller's IP, set by Cloudflare. A school lab often shares one, which is why the per-IP limits
- * are high. Without the header (tests), every request shares one key.
+ * The caller's IP, set by Cloudflare, with IPv6 counted per /64 (`ipKey`), since one user can
+ * pick a new address from theirs for every request. A school lab often shares one IP, which is why
+ * the per-IP limits are high. Without the header (tests), every request shares one key.
  */
-export const clientIp = (c: Context) => c.req.header('CF-Connecting-IP') ?? 'unknown'
+export const clientIp = (c: Context) => ipKey(c.req.header('CF-Connecting-IP') ?? 'unknown')
 
 /** The respondent a request is for, after the `respondent` middleware. */
 const respondentOf = (c: Context<RespondentEnv>) => {
@@ -43,7 +45,8 @@ const respondentOf = (c: Context<RespondentEnv>) => {
 }
 
 /**
- * The student number in a join request's body, hashed so it never reaches the counters as is.
+ * The caller's IP and the student number in a join request's body, hashed so it never reaches the
+ * counters as is. Per IP, so nobody elsewhere can use up a student's tries by sending their number.
  * Hono keeps the parsed body, so the route's validator reads it again for free. A body that isn't
  * JSON or has no valid number isn't counted: the validator refuses it before any database work.
  */
@@ -51,7 +54,7 @@ const studentNumberOf = async (c: Context) => {
   const body: unknown = await c.req.json().catch(() => undefined)
   if (typeof body !== 'object' || body === null || !('studentNumber' in body)) return undefined
   const parsed = studentNumberSchema.safeParse(body.studentNumber)
-  return parsed.success ? sha256Hex(parsed.data) : undefined
+  return parsed.success ? `${clientIp(c)}|${await sha256Hex(parsed.data)}` : undefined
 }
 
 /** Every /api/v1 request, per IP: a catch-all. */
@@ -63,7 +66,7 @@ export const linkOpenLimit = rateLimit('LINK_OPEN_LIMIT', clientIp)
 /** Joining a school link, per IP. */
 export const linkJoinLimit = rateLimit('LINK_JOIN_LIMIT', clientIp)
 
-/** Joining a school link, per student number, across all links. */
+/** Joining a school link, per IP and student number, across all links. */
 export const studentNumberLimit = rateLimit('STUDENT_NUMBER_LIMIT', studentNumberOf)
 
 /** Answer saves, per IP. Goes before `respondent`, so it costs no token hashing. */
