@@ -1,0 +1,54 @@
+name: Bug report
+description: Something in DigiBridge doesn't work the way it should.
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Don't post student names, student numbers or other personal data here. For a security problem, use the Security tab instead (see SECURITY.md).
+  - type: input
+    id: requirement
+    attributes:
+      label: Requirement ID
+      description: The PRD requirement it breaks, if you know it.
+      placeholder: ASM-03
+  - type: dropdown
+    id: where
+    attributes:
+      label: Where
+      options:
+        - Online (Google sign-in)
+        - School link
+        - Admin dashboard
+        - Lessons
+        - API only
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1. Open a school link
+        2. Fill in the profile
+        3. ...
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: What you expected
+    validations:
+      required: true
+  - type: textarea
+    id: actual
+    attributes:
+      label: What happened
+      description: Add a screenshot if you can.
+    validations:
+      required: true
+  - type: input
+    id: device
+    attributes:
+      label: Device and browser
+      placeholder: Android phone, Chrome 142

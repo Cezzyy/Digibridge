@@ -1,0 +1,17 @@
+name: Feature idea
+description: Suggest something new. Talk it through here before writing code.
+labels: [enhancement]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: What problem does it solve
+      description: Who runs into it (students, facilitators, admins) and when.
+    validations:
+      required: true
+  - type: textarea
+    id: idea
+    attributes:
+      label: Your idea
+    validations:
+      required: true

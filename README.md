@@ -14,6 +14,7 @@ A digital literacy assessment for ACLC College of Mandaue students, built on Dig
 [![Supabase](docs/badges/supabase.svg)](https://supabase.com)
 [![TypeScript](docs/badges/typescript.svg)](https://www.typescriptlang.org)
 [![Tailwind CSS v4](docs/badges/tailwind.svg)](https://tailwindcss.com)
+[![License: MIT](docs/badges/license.svg)](LICENSE)
 
 [**Live app**](https://digibridge-web.pages.dev) · [PRD](docs/PRD.md) · [TRD](docs/TRD.md) · [Build plan](<docs/Build plan.md>) · [Design](docs/design.md)
 
@@ -169,7 +170,7 @@ Then copy each example file and fill it in:
 | `apps/api/.env`      | `apps/api/.env.example`      | The database URL that `wrangler dev` connects Hyperdrive to |
 | `packages/db/.env`   | `packages/db/.env.example`   | `DATABASE_URL` (session pooler, port 5432) for drizzle-kit  |
 
-For practice data, run [`packages/db/seed/dev-questions.sql`](packages/db/seed/dev-questions.sql) and then [`lessons.sql`](packages/db/seed/lessons.sql) once in the Supabase SQL editor. Then start everything:
+On a new Supabase project, turn on the Google provider under **Authentication > Sign In / Providers**, then create the tables from [`supabase/migrations`](supabase/migrations) with `pnpm exec supabase db push --db-url "$DATABASE_URL"` (with `packages/db/.env` loaded). For practice data, run [`packages/db/seed/dev-questions.sql`](packages/db/seed/dev-questions.sql) and then [`lessons.sql`](packages/db/seed/lessons.sql) once in the Supabase SQL editor. Then start everything:
 
 ```sh
 pnpm dev
@@ -240,4 +241,8 @@ Respondents agree to a privacy notice before anything is saved, and can choose t
 
 Built by **Cez** (sole developer), with **Morales** on QA and the rest of **Group 2** on content, interviews and the pilot.
 
-Found a bug? Open a GitHub Issue with the PRD requirement ID, the steps, what you expected, what happened, and a screenshot.
+Found a bug? [Open an issue](https://github.com/Cezzyy/Digibridge/issues/new/choose) with the bug report form. Found a security problem? Report it privately as [SECURITY.md](SECURITY.md) explains. Want to help? Start with [CONTRIBUTING.md](CONTRIBUTING.md).
+
+## License
+
+[MIT](LICENSE) © John Cez Casupanan
