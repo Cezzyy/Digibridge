@@ -460,34 +460,42 @@ async function submit() {
           </template>
         </TextField>
 
-        <div class="grid gap-8 xl:grid-cols-2 xl:gap-x-6">
+        <!-- Each field has a hint, locked or not, and side by side from xl they share rows
+             (subgrid), so the boxes line up even when one hint takes two lines. -->
+        <div class="grid gap-8 xl:grid-cols-2 xl:grid-rows-[repeat(4,auto)] xl:gap-x-6 xl:gap-y-0">
           <FixedField
             v-if="lock.course"
             label="Course"
             :value="lock.course"
             hint="Your link is for this course."
+            class="xl:row-span-4 xl:grid xl:grid-rows-subgrid"
           />
           <SelectField
             v-else
             v-model="form.course"
             label="Course"
+            hint="The course you’re taking now."
             placeholder="Pick your course"
             :options="courseOptions"
             :error="errors.course"
+            class="xl:row-span-4 xl:grid xl:grid-rows-subgrid"
           />
           <FixedField
             v-if="lock.yearLevel"
             label="Year level"
             :value="yearLevelLabel(lock.yearLevel)"
             hint="Your link is for this year level."
+            class="xl:row-span-4 xl:grid xl:grid-rows-subgrid"
           />
           <SelectField
             v-else
             v-model="form.yearLevel"
             label="Year level"
+            hint="The year you’re in now."
             placeholder="Pick your year level"
             :options="yearOptions"
             :error="errors.yearLevel"
+            class="xl:row-span-4 xl:grid xl:grid-rows-subgrid"
           />
         </div>
       </FormSection>
