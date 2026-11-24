@@ -590,7 +590,7 @@ async function submit() {
               v-if="saving"
               viewBox="0 0 24 24"
               aria-hidden="true"
-              class="size-5 fill-none stroke-current stroke-[3] motion-safe:animate-spin"
+              class="size-5 fill-none stroke-current stroke-3 motion-safe:animate-spin"
             >
               <path d="M12 3a9 9 0 1 0 9 9" stroke-linecap="round" />
             </svg>
