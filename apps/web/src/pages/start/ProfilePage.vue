@@ -44,6 +44,7 @@ import { useRespondentFlow } from '../../composables/useRespondentFlow'
 import { useToday } from '../../composables/useToday'
 import { PRIMARY_BUTTON, SECONDARY_BUTTON } from '../../lib/buttons'
 import { useConsentStore } from '../../stores/consent'
+import { usePreviewStore } from '../../stores/preview'
 import { useSchoolLinkStore } from '../../stores/schoolLink'
 import { useSessionStore } from '../../stores/session'
 
@@ -58,6 +59,7 @@ const session = useSessionStore()
 const school = useSchoolLinkStore()
 const flow = useRespondentFlow()
 const consent = useConsentStore()
+const previews = usePreviewStore()
 const router = useRouter()
 const online = useCreateRespondent()
 const joining = useJoinLink()
@@ -262,7 +264,10 @@ async function submit() {
     return
   }
   if (preview.value) {
+    // Nothing is saved: the preview only notes that the form was filled in, so home moves on to
+    // Start, as it does for a student whose profile is saved.
     consent.clear()
+    if (flow.previewKey.value) previews.finishProfile(flow.previewKey.value)
     await router.replace(flow.page('home'))
     return
   }
@@ -581,7 +586,7 @@ async function submit() {
             >
               <path d="M12 3a9 9 0 1 0 9 9" stroke-linecap="round" />
             </svg>
-            {{ preview ? 'Finish preview' : saving ? 'Saving…' : 'Save and continue' }}
+            {{ preview ? 'Continue' : saving ? 'Saving…' : 'Save and continue' }}
           </button>
         </div>
       </div>
