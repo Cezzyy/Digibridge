@@ -28,7 +28,7 @@ Follow [Getting started](README.md#getting-started) in the README. You'll need y
 
 ## Branches
 
-- `main` is the released code. It only moves forward when `develop` is released.
+- `main` is the released code. It's protected: changes reach it only through a pull request from `develop` that passes CI.
 - `develop` is where finished work collects. Pull requests go here.
 - `feat/<name>` and `fix/<name>` branches come off `develop`.
 
@@ -45,8 +45,8 @@ DigiBridge uses [Semantic Versioning](https://semver.org). The version is in the
 To release:
 
 1. On `develop`, move the notes under `[Unreleased]` in [CHANGELOG.md](CHANGELOG.md) into a new version heading with today's date, and set the same version in the root `package.json`. Commit as `chore(release): vX.Y.Z`.
-2. Fast-forward `main` to `develop`: `git checkout main && git merge --ff-only develop`.
-3. Tag and push: `git tag -a vX.Y.Z -m "vX.Y.Z" && git push origin main vX.Y.Z`.
+2. Open a pull request from `develop` to `main` (`gh pr create --base main --head develop --title "Release vX.Y.Z"`), wait for CI, and merge it with **Create a merge commit**. `main` is protected, so this is the only way in.
+3. Tag the merge on `main` and push the tag: `git checkout main && git pull && git tag -a vX.Y.Z -m "vX.Y.Z" && git push origin vX.Y.Z`.
 4. Create the GitHub Release from the tag with that version's changelog notes: `gh release create vX.Y.Z --notes-file <notes>`.
 
 ## License
