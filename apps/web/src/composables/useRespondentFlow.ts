@@ -2,6 +2,7 @@ import { ONLINE_CONSENT_NOTICE, SCHOOL_CONSENT_NOTICE } from '@digibridge/shared
 import { computed } from 'vue'
 import type { RouteLocationRaw } from 'vue-router'
 import { api, type Api } from '../lib/api'
+import { previewScope, usePreviewStore } from '../stores/preview'
 import { linkConsentKey, useSchoolLinkStore } from '../stores/schoolLink'
 import { useSessionStore, type Me } from '../stores/session'
 
@@ -10,8 +11,15 @@ export type FlowStep = 'consent' | 'profile' | 'home' | 'assessment' | 'results'
 
 export type FlowAttempt = NonNullable<Me['attempt']>
 
-/** A student's calls and attempt updates, fixed when taken (`useRespondentFlow().hold`). */
-export type HeldFlow = { client: Api; setAttempt: (next: FlowAttempt) => void }
+/**
+ * A student's calls and attempt updates, fixed when taken (`useRespondentFlow().hold`). For a
+ * staff preview, `previewKey` names it, and nothing goes to the attempt routes.
+ */
+export type HeldFlow = {
+  client: Api
+  setAttempt: (next: FlowAttempt) => void
+  previewKey: string | null
+}
 
 const SCHOOL_ROUTE_NAMES = {
   consent: 'school-consent',
@@ -32,19 +40,32 @@ const SCHOOL_ROUTE_NAMES = {
 export function useRespondentFlow() {
   const session = useSessionStore()
   const school = useSchoolLinkStore()
+  const previews = usePreviewStore()
 
   const isSchool = computed(() => school.active)
   const respondent = computed(() =>
     isSchool.value ? school.respondent : (session.me?.respondent ?? null),
   )
-  const attempt = computed<FlowAttempt | null>(() =>
-    isSchool.value ? school.attempt : (session.me?.attempt ?? null),
-  )
   /**
    * Staff trying the student steps, online or through a link: the pages check their answers but
-   * save nothing, so their tries stay out of the research data (and off a link's limit).
+   * save nothing, so their tries stay out of the research data (and off a link's limit). The
+   * sample assessment and its result live in the preview store (stores/preview.ts).
    */
   const preview = computed(() => session.isStaff && respondent.value === null)
+  /** Which preview this is: the staff account's, online or through this link. */
+  const previewKey = computed(() =>
+    preview.value && session.me
+      ? previewScope(session.me.profile.id, isSchool.value ? school.code : null)
+      : null,
+  )
+  /** The preview got past the profile form, as a student who saved theirs. */
+  const previewProfileDone = computed(() =>
+    previewKey.value ? previews.profileDone(previewKey.value) : false,
+  )
+  const attempt = computed<FlowAttempt | null>(() => {
+    if (previewKey.value) return previews.attemptFor(previewKey.value)
+    return isSchool.value ? school.attempt : (session.me?.attempt ?? null)
+  })
   /** Submitted or expired: results is the student's page from now on. */
   const finished = computed(() => {
     const status = attempt.value?.status
@@ -67,6 +88,8 @@ export function useRespondentFlow() {
 
   /** After starting or finishing: the attempt the server would now return, without asking. */
   function setAttempt(next: FlowAttempt) {
+    // A preview's status lives with its sample assessment, which the preview store updates.
+    if (previewKey.value) return
     if (isSchool.value) school.setAttempt(next)
     else session.setAttempt(next)
   }
@@ -89,9 +112,15 @@ export function useRespondentFlow() {
   function hold(): HeldFlow {
     const calls = client()
     const toSchool = isSchool.value
+    const key = previewKey.value
     return {
       client: calls,
-      setAttempt: (next) => (toSchool ? school.setAttempt(next) : session.setAttempt(next)),
+      setAttempt: (next) => {
+        if (key) return
+        if (toSchool) school.setAttempt(next)
+        else session.setAttempt(next)
+      },
+      previewKey: key,
     }
   }
 
@@ -101,6 +130,8 @@ export function useRespondentFlow() {
     attempt,
     finished,
     preview,
+    previewKey,
+    previewProfileDone,
     notice,
     consentKey,
     failed,
