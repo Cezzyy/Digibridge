@@ -36,6 +36,7 @@ import { getHealth } from './handlers/health'
 import { getLesson, listLessons } from './handlers/lessons'
 import { getLink, joinLink } from './handlers/links'
 import { getMe } from './handlers/me'
+import { previewResult, startPreview } from './handlers/preview'
 import { createRespondent } from './handlers/respondents'
 import {
   apiRateLimit,
@@ -83,6 +84,7 @@ import { healthRoute } from './routes/health'
 import { getLessonRoute, listLessonsRoute } from './routes/lessons'
 import { getLinkRoute, joinLinkRoute } from './routes/links'
 import { meRoute } from './routes/me'
+import { previewResultRoute, startPreviewRoute } from './routes/preview'
 import { createRespondentRoute } from './routes/respondents'
 
 // Version 1 routes. Each route is defined in routes/ and bound to its handler here.
@@ -103,6 +105,8 @@ const v1Routes = v1
   .openapi(submitAttemptRoute, submitAttempt)
   .openapi(getResultRoute, getResult)
   .openapi(saveSusRoute, saveSus)
+  .openapi(startPreviewRoute, startPreview)
+  .openapi(previewResultRoute, previewResult)
   .openapi(listLessonsRoute, listLessons)
   .openapi(getLessonRoute, getLesson)
   .openapi(overviewRoute, getOverview)
