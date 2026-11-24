@@ -221,14 +221,14 @@ Requirement IDs from the PRD (`AUTH-01`, `ASM-03`, `LNK-04`, ...) tie the docs, 
 
 ## Where it's at
 
-| Stage                       | Status                                                     |
-| --------------------------- | ---------------------------------------------------------- |
-| 0 · Foundation              | Done                                                       |
-| 1 · Respondent flow         | Done                                                       |
-| 2 · School links            | Done                                                       |
-| 3 · Admin side              | In progress: image uploads, CSV import and user roles left |
-| 4 · Real content and freeze | Next                                                       |
-| 5 · Pilot and defense       | Planned                                                    |
+| Stage                       | Status                                                                   |
+| --------------------------- | ------------------------------------------------------------------------ |
+| 0 · Foundation              | Done                                                                     |
+| 1 · Respondent flow         | Done                                                                     |
+| 2 · School links            | Done                                                                     |
+| 3 · Admin side              | Done, except image uploads, CSV import and user roles, set aside for now |
+| 4 · Real content and freeze | Done                                                                     |
+| 5 · Pilot and defense       | Done                                                                     |
 
 The full checklist is in the [build plan](<docs/Build plan.md>).
 
