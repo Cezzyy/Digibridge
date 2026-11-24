@@ -13,13 +13,13 @@ import {
   ANSWER_GRACE_SECONDS,
   ATTEMPT_DURATION_MINUTES,
   FINISHED_ATTEMPT_STATUSES,
-  LESSON_TIERS_FOR_LEVEL,
   type AreaCode,
 } from '@digibridge/shared'
 import type { RouteHandler } from '@hono/zod-openapi'
 import { and, eq, inArray, ne, sql } from 'drizzle-orm'
 import type { Db } from '../config/db'
 import type { RespondentEnv, RespondentKey } from '../env'
+import { itemColumns, lessonPicks, orderItems, type LessonLink } from '../lib/attempt-items'
 import { pickItems } from '../lib/pick-items'
 import { scoreAndClose, timeIsUp, type Tx } from '../lib/close-attempt'
 import { susScore } from '../lib/sus'
@@ -194,15 +194,7 @@ export const getAttempt: RouteHandler<typeof getAttemptRoute, RespondentEnv> = a
   const [attempt, rows, saved] = await Promise.all([
     ownAttempt(db, c.var.respondentKey, attemptId),
     db
-      .select({
-        id: questions.id,
-        area: competencyAreas.code,
-        stem: questions.stem,
-        imageUrl: questions.imageUrl,
-        isScenario: questions.isScenario,
-        choiceId: choices.id,
-        label: choices.label,
-      })
+      .select(itemColumns)
       .from(questions)
       .innerJoin(competencyAreas, eq(competencyAreas.id, questions.areaId))
       .innerJoin(choices, eq(choices.questionId, questions.id))
@@ -221,28 +213,8 @@ export const getAttempt: RouteHandler<typeof getAttemptRoute, RespondentEnv> = a
       .where(eq(answers.attemptId, attemptId)),
   ])
 
-  const labels = new Map(rows.map((row) => [row.choiceId, row.label]))
-  const questionRows = new Map(rows.map((row) => [row.id, row]))
   // The stored order, not the database's: it is the shuffle this attempt was given (ASM-02).
-  const items = attempt.questionOrder.flatMap((id) => {
-    const row = questionRows.get(id)
-    if (!row) return []
-    const order = attempt.choiceOrder[id] ?? []
-    return [
-      {
-        id,
-        // Area codes are the seeded AREA_CODES.
-        area: row.area as AreaCode,
-        stem: row.stem,
-        imageUrl: row.imageUrl,
-        isScenario: row.isScenario,
-        choices: order.flatMap((choiceId) => {
-          const label = labels.get(choiceId)
-          return label === undefined ? [] : [{ id: choiceId, label }]
-        }),
-      },
-    ]
-  })
+  const items = orderItems(attempt.questionOrder, attempt.choiceOrder, rows)
 
   return c.json(
     {
@@ -408,8 +380,7 @@ export const getResult: RouteHandler<typeof getResultRoute, RespondentEnv> = asy
     throw new Error(`Attempt ${attempt.id} is closed but has no scores`)
   }
 
-  type Lesson = { slug: string; title: string; summary: string }
-  const byArea = new Map<string, { row: (typeof rows)[number]; lessons: Map<string, Lesson> }>()
+  const byArea = new Map<string, { row: (typeof rows)[number]; lessons: Map<string, LessonLink> }>()
   for (const row of rows) {
     let entry = byArea.get(row.areaId)
     if (!entry) {
@@ -433,12 +404,7 @@ export const getResult: RouteHandler<typeof getResultRoute, RespondentEnv> = asy
     maxPoints: row.maxPoints,
     pct: row.pct,
     level: row.level,
-    // The level's tiers, the first one to start with (PRD "Levels").
-    lessons: LESSON_TIERS_FOR_LEVEL[row.level].map((tier, i) => ({
-      tier,
-      nextStep: i > 0,
-      lesson: published.get(tier) ?? null,
-    })),
+    lessons: lessonPicks(row.level, published),
   }))
 
   return c.json(
