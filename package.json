@@ -1,6 +1,7 @@
 {
   "name": "digibridge",
   "private": true,
+  "version": "1.0.0",
   "license": "MIT",
   "type": "module",
   "packageManager": "pnpm@12.4.1",

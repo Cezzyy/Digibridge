@@ -26,6 +26,29 @@ Follow [Getting started](README.md#getting-started) in the README. You'll need y
 6. Use [Conventional Commits](https://www.conventionalcommits.org) for commit titles, like `fix(api): reject a choice from another question`.
 7. Open the pull request against `develop` and fill in the template.
 
+## Branches
+
+- `main` is the released code. It only moves forward when `develop` is released.
+- `develop` is where finished work collects. Pull requests go here.
+- `feat/<name>` and `fix/<name>` branches come off `develop`.
+
+## Versions and releases
+
+DigiBridge uses [Semantic Versioning](https://semver.org). The version is in the root [package.json](package.json), and each release is a `vX.Y.Z` tag on `main` with a GitHub Release.
+
+| Bump  | When                                                                                        | Example        |
+| ----- | ------------------------------------------------------------------------------------------- | -------------- |
+| Major | A change that breaks `/api/v1`, or a database change that needs existing data fixed by hand | 1.4.2 to 2.0.0 |
+| Minor | A new feature that keeps everything else working                                            | 1.4.2 to 1.5.0 |
+| Patch | Bug fixes only                                                                              | 1.4.2 to 1.4.3 |
+
+To release:
+
+1. On `develop`, move the notes under `[Unreleased]` in [CHANGELOG.md](CHANGELOG.md) into a new version heading with today's date, and set the same version in the root `package.json`. Commit as `chore(release): vX.Y.Z`.
+2. Fast-forward `main` to `develop`: `git checkout main && git merge --ff-only develop`.
+3. Tag and push: `git tag -a vX.Y.Z -m "vX.Y.Z" && git push origin main vX.Y.Z`.
+4. Create the GitHub Release from the tag with that version's changelog notes: `gh release create vX.Y.Z --notes-file <notes>`.
+
 ## License
 
 By contributing, you agree that your work is released under the [MIT License](LICENSE).

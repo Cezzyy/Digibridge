@@ -16,7 +16,7 @@ A digital literacy assessment for ACLC College of Mandaue students, built on Dig
 [![Tailwind CSS v4](docs/badges/tailwind.svg)](https://tailwindcss.com)
 [![License: MIT](docs/badges/license.svg)](LICENSE)
 
-[**Live app**](https://digibridge-web.pages.dev) · [PRD](docs/PRD.md) · [TRD](docs/TRD.md) · [Build plan](<docs/Build plan.md>) · [Design](docs/design.md)
+[**Live app**](https://digibridge-web.pages.dev) · [PRD](docs/PRD.md) · [TRD](docs/TRD.md) · [Build plan](<docs/Build plan.md>) · [Design](docs/design.md) · [Changelog](CHANGELOG.md)
 
 </div>
 
