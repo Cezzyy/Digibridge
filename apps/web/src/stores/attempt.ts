@@ -3,14 +3,17 @@ import { defineStore } from 'pinia'
 import { computed, ref, shallowRef } from 'vue'
 import type { api } from '../lib/api'
 import { ApiRequestError, call, messageOf } from '../lib/api'
-import { useRespondentFlow, type HeldFlow } from '../composables/useRespondentFlow'
+import {
+  useRespondentFlow,
+  type FlowAttempt,
+  type HeldFlow,
+} from '../composables/useRespondentFlow'
+import { usePreviewStore } from './preview'
 
 export type Attempt = InferResponseType<(typeof api.attempts)[':id']['$get'], 200>
 export type AttemptItem = Attempt['items'][number]
-export type SubmittedAttempt = InferResponseType<
-  (typeof api.attempts)[':id']['submit']['$post'],
-  200
->
+/** The closed attempt's ID and status, a student's or a staff preview's. */
+export type SubmittedAttempt = FlowAttempt
 /** Where one answer's save is: on its way, saved, or failed after every retry. */
 export type SaveState = 'saving' | 'saved' | 'failed'
 
@@ -43,10 +46,12 @@ const canRetry = (err: unknown) =>
  * Picking a choice shows it at once and saves it in the background (ASM-04). Saves for one
  * question go one at a time, newest choice last, so a slow older save can't overwrite a newer one.
  * The student's sign-in is taken when the attempt loads, so a save still retrying after they
- * leave the page goes out as them.
+ * leave the page goes out as them. A staff preview's sample assessment comes from the preview
+ * store instead: its picks count as saved at once, and its submit is scored without saving.
  */
 export const useAttemptStore = defineStore('attempt', () => {
   const flow = useRespondentFlow()
+  const previews = usePreviewStore()
   /** Whose attempt this is: the calls and state it was loaded with. */
   let owner: HeldFlow | null = null
 
@@ -104,7 +109,9 @@ export const useAttemptStore = defineStore('attempt', () => {
    */
   async function load(id: string) {
     const held = flow.hold()
-    const data = await call(held.client.attempts[':id'].$get({ param: { id } }))
+    const data = held.previewKey
+      ? previewAttempt(held.previewKey, id)
+      : await call(held.client.attempts[':id'].$get({ param: { id } }))
     const sameAttempt = attempt.value?.id === id
     if (!sameAttempt) reset()
     owner = held
@@ -137,8 +144,20 @@ export const useAttemptStore = defineStore('attempt', () => {
     return data
   }
 
+  /** The preview's sample assessment, with its status now. Throws `not_found` once it's gone. */
+  function previewAttempt(key: string, id: string): Attempt {
+    const sample = previews.of(key)?.attempt
+    const now = previews.attemptFor(key)
+    if (!sample || !now || sample.id !== id) {
+      throw new ApiRequestError('not_found', 'The preview has ended.', 404)
+    }
+    return { ...sample, status: now.status }
+  }
+
   /** Sends one choice, retrying when that might help. True once the server has it. */
   async function send(questionId: string, choiceId: string) {
+    // A preview saves nothing.
+    if (owner?.previewKey) return true
     const id = attempt.value?.id
     const calls = owner?.client
     if (!id || !calls) return false
@@ -267,6 +286,10 @@ export const useAttemptStore = defineStore('attempt', () => {
       if (failed > 0 && !closed.value && !run.timeUp) {
         submitError.value = `${failed === 1 ? '1 answer' : `${failed} answers`} didn’t save. Check your connection, then try again.`
         return null
+      }
+      if (held.previewKey) {
+        const scored = await previews.submit(held.previewKey, answers.value, run.timeUp)
+        return scored && { id: scored.id, status: scored.status }
       }
       const result = await call(held.client.attempts[':id'].submit.$post({ param: { id } }))
       held.setAttempt({ id: result.id, status: result.status })
