@@ -8,12 +8,12 @@
 
 A digital literacy assessment for ACLC College of Mandaue students, built on DigComp 2.2.
 
-[![Vue 3](https://img.shields.io/badge/Vue_3-1E5B44?logo=vuedotjs&logoColor=white)](https://vuejs.org)
-[![Hono](https://img.shields.io/badge/Hono-1E5B44?logo=hono&logoColor=white)](https://hono.dev)
-[![Cloudflare Workers](https://img.shields.io/badge/Cloudflare_Workers-1E5B44?logo=cloudflareworkers&logoColor=white)](https://workers.cloudflare.com)
-[![Supabase](https://img.shields.io/badge/Supabase-1E5B44?logo=supabase&logoColor=white)](https://supabase.com)
-[![TypeScript](https://img.shields.io/badge/TypeScript_6-1E5B44?logo=typescript&logoColor=white)](https://www.typescriptlang.org)
-[![Tailwind CSS v4](https://img.shields.io/badge/Tailwind_v4-1E5B44?logo=tailwindcss&logoColor=white)](https://tailwindcss.com)
+[![Vue 3](docs/badges/vue.svg)](https://vuejs.org)
+[![Hono](docs/badges/hono.svg)](https://hono.dev)
+[![Cloudflare Workers](docs/badges/cloudflare-workers.svg)](https://workers.cloudflare.com)
+[![Supabase](docs/badges/supabase.svg)](https://supabase.com)
+[![TypeScript](docs/badges/typescript.svg)](https://www.typescriptlang.org)
+[![Tailwind CSS v4](docs/badges/tailwind.svg)](https://tailwindcss.com)
 
 [**Live app**](https://digibridge-web.pages.dev) · [PRD](docs/PRD.md) · [TRD](docs/TRD.md) · [Build plan](<docs/Build plan.md>) · [Design](docs/design.md)
 
@@ -44,12 +44,12 @@ Every attempt covers 3 of DigComp 2.2's areas. Each area gets 10 questions, pick
 
 Each area's score, and the overall one, lands on one of 4 levels. The level decides which lessons the student sees first.
 
-| Level                                                                               | Score      | Lessons recommended        |
-| ----------------------------------------------------------------------------------- | ---------- | -------------------------- |
-| ![Beginner](https://img.shields.io/badge/Beginner-D6EBDF?style=flat-square)         | below 40%  | Foundations                |
-| ![Basic](https://img.shields.io/badge/Basic-8CC5A6?style=flat-square)               | 40% to 59% | Foundations → Intermediate |
-| ![Intermediate](https://img.shields.io/badge/Intermediate-2F7D58?style=flat-square) | 60% to 79% | Intermediate → Advanced    |
-| ![Advanced](https://img.shields.io/badge/Advanced-1E5B44?style=flat-square)         | 80% and up | Advanced                   |
+| Level                                               | Score      | Lessons recommended        |
+| --------------------------------------------------- | ---------- | -------------------------- |
+| ![Beginner](docs/badges/level-beginner.svg)         | below 40%  | Foundations                |
+| ![Basic](docs/badges/level-basic.svg)               | 40% to 59% | Foundations → Intermediate |
+| ![Intermediate](docs/badges/level-intermediate.svg) | 60% to 79% | Intermediate → Advanced    |
+| ![Advanced](docs/badges/level-advanced.svg)         | 80% and up | Advanced                   |
 
 The timer runs on the server's clock, every answer saves the moment it's picked, and an attempt left open past its time is scored and closed by a cron job every 5 minutes. After results, students can rate the app on the 10-statement System Usability Scale (SUS).
 
