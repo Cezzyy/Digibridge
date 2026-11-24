@@ -21,8 +21,9 @@ import StartLayout from '../components/start/StartLayout.vue'
 import StartSteps from '../components/start/StartSteps.vue'
 import { useRespondentFlow } from '../composables/useRespondentFlow'
 import { useStartAttempt } from '../composables/useStartAttempt'
-import { PRIMARY_BUTTON } from '../lib/buttons'
+import { PRIMARY_BUTTON, SECONDARY_BUTTON } from '../lib/buttons'
 import { LEVEL_BANDS, LEVEL_TONE, levelRange } from '../lib/levels'
+import { usePreviewStore } from '../stores/preview'
 import { useSchoolLinkStore } from '../stores/schoolLink'
 import { useSessionStore } from '../stores/session'
 
@@ -36,6 +37,7 @@ import { useSessionStore } from '../stores/session'
 const session = useSessionStore()
 const school = useSchoolLinkStore()
 const flow = useRespondentFlow()
+const previews = usePreviewStore()
 const router = useRouter()
 const { start, starting, error: startError } = useStartAttempt()
 
@@ -61,7 +63,9 @@ const ready = computed(() =>
 
 type View = 'start' | 'in-progress' | 'staff'
 const view = computed<View>(() => {
-  if (!flow.respondent.value) return 'staff'
+  // Staff see the preview's start until they've been through the notice and the profile form,
+  // then what a student sees: Start, then Continue.
+  if (!flow.respondent.value && !flow.previewProfileDone.value) return 'staff'
   // A voided attempt is left out, so a respondent whose attempt was voided can start again.
   return flow.attempt.value?.status === 'in_progress' ? 'in-progress' : 'start'
 })
@@ -85,7 +89,21 @@ const HEADINGS: Record<View, { title: string; lead: string }> = {
     lead: 'Go through the student steps to see what students see. It’s only a preview, so nothing you enter is saved.',
   },
 }
-const heading = computed(() => HEADINGS[view.value])
+/** Staff past the profile form in a preview: the student's view, with nothing saved. */
+const previewing = computed(() => flow.preview.value && view.value !== 'staff')
+const heading = computed(() =>
+  previewing.value && view.value === 'start'
+    ? {
+        title: 'You’re all set',
+        lead: `This is a preview, so your profile wasn’t saved. Next, answer ${ITEMS_PER_ATTEMPT} questions as a student would.`,
+      }
+    : HEADINGS[view.value],
+)
+
+/** Ends the preview: home goes back to its start, and the next try begins at the notice. */
+function endPreview() {
+  previews.clear()
+}
 
 const facts = [
   { value: ITEMS_PER_ATTEMPT, label: 'questions' },
@@ -418,6 +436,11 @@ const studentSteps = STEPS.slice(1)
           <span v-if="view === 'staff'">
             You go through the same pages as students, but nothing you enter is saved.
           </span>
+          <span v-else-if="previewing && view === 'start'">
+            Nothing is saved in a preview. The {{ ATTEMPT_DURATION_MINUTES }}-minute timer starts
+            when you choose <strong>Start</strong>.
+          </span>
+          <span v-else-if="previewing">The preview’s timer is still running.</span>
           <span v-else-if="view === 'start'">
             You can take it <strong>once</strong>. The {{ ATTEMPT_DURATION_MINUTES }}-minute timer
             starts when you choose <strong>Start</strong>.
@@ -440,6 +463,15 @@ const studentSteps = STEPS.slice(1)
           >
             {{ startError }}
           </p>
+          <button
+            v-if="previewing"
+            type="button"
+            :class="SECONDARY_BUTTON"
+            :disabled="starting"
+            @click="endPreview"
+          >
+            End preview
+          </button>
           <button
             v-if="view === 'start'"
             type="button"

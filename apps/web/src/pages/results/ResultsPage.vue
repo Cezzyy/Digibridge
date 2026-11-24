@@ -18,6 +18,7 @@ import { useResult, type AreaResult } from '../../composables/useResult'
 import { PRIMARY_BUTTON } from '../../lib/buttons'
 import { wholePct } from '../../lib/levels'
 import { useAttemptStore } from '../../stores/attempt'
+import { usePreviewStore } from '../../stores/preview'
 import { useSchoolLinkStore } from '../../stores/schoolLink'
 import { useSessionStore } from '../../stores/session'
 
@@ -32,6 +33,7 @@ const session = useSessionStore()
 const school = useSchoolLinkStore()
 const flow = useRespondentFlow()
 const attempt = useAttemptStore()
+const previews = usePreviewStore()
 const router = useRouter()
 const { result, error, load } = useResult()
 
@@ -71,8 +73,18 @@ async function finish() {
   const code = school.code
   finishing.value = false
   school.forget()
+  previews.clear()
   attempt.reset()
   if (code) await router.replace({ name: 'school-done', params: { code } })
+}
+
+// ---- A staff preview, online ----
+
+/** Ends the preview and goes back to home's start, where the next try begins at the notice. */
+async function endPreview() {
+  previews.clear()
+  attempt.reset()
+  await router.replace(flow.page('home'))
 }
 
 const name = computed(() => flow.respondent.value?.fullName ?? session.me?.profile.fullName)
@@ -399,7 +411,23 @@ const finishedOn = computed(() =>
       />
     </div>
 
-    <template v-if="flow.isSchool.value && result" #actions>
+    <template v-if="flow.preview.value && !flow.isSchool.value && result" #actions>
+      <div class="flex flex-col gap-4 md:flex-row md:items-center md:justify-between md:gap-8">
+        <p class="flex items-center gap-3 leading-snug">
+          <span
+            aria-hidden="true"
+            class="grid size-8 shrink-0 place-items-center rounded-full bg-marigold-soft"
+          >
+            <span class="size-2.5 rounded-full bg-marigold" />
+          </span>
+          <span>This is what students see. It was a preview, so nothing was saved.</span>
+        </p>
+        <button type="button" :class="[PRIMARY_BUTTON, 'shrink-0']" @click="endPreview">
+          End preview
+        </button>
+      </div>
+    </template>
+    <template v-else-if="flow.isSchool.value && result" #actions>
       <div class="flex flex-col gap-4 md:flex-row md:items-center md:justify-between md:gap-8">
         <p class="flex items-center gap-3 leading-snug">
           <span
