@@ -24,6 +24,10 @@ type PreviewAttempt = {
   answers: unknown[]
 }
 
+type PreviewResult = {
+  areas: { area: string; level: string; lessons: unknown[] }[]
+}
+
 const startPreview = (headers: Record<string, string>) =>
   send('POST', '/api/v1/preview/attempts', headers)
 const previewResult = (headers: Record<string, string>, body: unknown) =>
@@ -124,7 +128,7 @@ describe('POST /api/v1/preview/result', () => {
       timeUp: false,
     })
     expect(res.status).toBe(200)
-    const body = await res.json()
+    const body = (await res.json()) as PreviewResult
     expect(body).toMatchObject({
       id: preview.id,
       status: 'submitted',
@@ -132,12 +136,12 @@ describe('POST /api/v1/preview/result', () => {
       resultsToken: null,
       susAnswered: false,
     })
-    expect(body.areas.map((a: { area: string; level: string }) => [a.area, a.level])).toEqual([
+    expect(body.areas.map((a) => [a.area, a.level])).toEqual([
       ['info_literacy', 'advanced'],
       ['communication', 'beginner'],
       ['safety', 'beginner'],
     ])
-    const safety = body.areas[2]
+    const safety = body.areas[2]!
     expect(safety.lessons).toEqual([
       {
         tier: 'foundations',
