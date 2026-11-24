@@ -17,6 +17,7 @@ import SignInPage from './pages/SignInPage.vue'
 import ConsentPage from './pages/start/ConsentPage.vue'
 import ProfilePage from './pages/start/ProfilePage.vue'
 import { useConsentStore } from './stores/consent'
+import { previewScope, usePreviewStore } from './stores/preview'
 import { linkConsentKey, useSchoolLinkStore } from './stores/schoolLink'
 import { useSessionStore } from './stores/session'
 
@@ -284,13 +285,17 @@ function checkRequirement(requires: Requirement) {
 // both start pages send them home, and Start on home opens the assessment. Only an attempt in
 // progress can be opened; once it's submitted or expired, home and /assessment send them to
 // their results, and so does every later sign-in (PRO-07, RES-03). Staff land on /admin, and can
-// open /home from there to try the flow; they never get an attempt, so never results.
+// open /home from there to try the flow as a preview: the same steps in the same order, from the
+// preview store instead of /me, so nothing is saved.
 function checkStep(step: Step) {
   const session = useSessionStore()
   const me = session.me
   if (!me) return { name: 'sign-in' }
-  const hasProfile = me.respondent !== null
-  const finished = session.attemptFinished
+  const previews = usePreviewStore()
+  const key = session.isStaff ? previewScope(me.profile.id, null) : null
+  const hasProfile = key ? previews.profileDone(key) : me.respondent !== null
+  const attempt = key ? previews.attemptFor(key) : me.attempt
+  const finished = attempt?.status === 'submitted' || attempt?.status === 'expired'
   switch (step) {
     case 'home':
       if (finished) return { name: 'results' }
@@ -302,7 +307,7 @@ function checkStep(step: Step) {
       // The notice comes first, and its answer lives in memory only (stores/consent.ts).
       return useConsentStore().versionFor(me.profile.id) !== null || { name: 'consent' }
     case 'assessment':
-      return me.attempt?.status === 'in_progress' || { name: 'home' }
+      return attempt?.status === 'in_progress' || { name: 'home' }
     case 'results':
       return finished || { name: 'home' }
   }
@@ -311,12 +316,19 @@ function checkStep(step: Step) {
 // The same flow through a school link, from the link's state (GET /links/:code) instead of /me:
 // the notice and profile until the student joins, then home, the assessment and results. A
 // student who joined can always come back, even once the link closed (LNK-04). Staff signed in
-// with Google never join: they go through the same pages as a preview, as they do online.
+// with Google never join: they go through the same pages as a preview, as they do online, with
+// the preview store standing in for the link's state.
 function checkSchoolStep(code: string, step: Step | undefined) {
   const school = useSchoolLinkStore()
+  const session = useSessionStore()
+  const previews = usePreviewStore()
   const at = (name: string) => ({ name, params: { code } })
-  const joined = school.respondent !== null
-  const status = school.attempt?.status
+  const key =
+    school.respondent === null && session.isStaff && session.me
+      ? previewScope(session.me.profile.id, code)
+      : null
+  const joined = key ? previews.profileDone(key) : school.respondent !== null
+  const status = key ? previews.attemptFor(key)?.status : school.attempt?.status
   const finished = status === 'submitted' || status === 'expired'
   switch (step) {
     case 'consent':
@@ -326,7 +338,7 @@ function checkSchoolStep(code: string, step: Step | undefined) {
       return useConsentStore().versionFor(linkConsentKey(code)) !== null || at('school-consent')
     case 'home':
       // Staff who open a link get a preview: home without joining, like online (LNK-01).
-      if (!joined) return useSessionStore().isStaff || at('school-consent')
+      if (!joined) return session.isStaff || at('school-consent')
       return !finished || at('school-results')
     case 'assessment':
       return status === 'in_progress' || at('school-home')
